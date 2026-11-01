@@ -153,7 +153,7 @@ final class Prefs: ObservableObject {
         var corners: [Corner: CornerFunction] = [:]
         var apps: [Corner: String] = [:]
         for c in Corner.allCases {
-            let fallback: CornerFunction = (c == .topRight && legacy.mute) ? .mute : .off
+            let fallback: CornerFunction = legacy.mute ? Prefs.defaultCorner(c) : .off
             corners[c] = defaults.string(forKey: Keys.corner(c)).flatMap(CornerFunction.init(rawValue:)) ?? fallback
             apps[c] = defaults.string(forKey: Keys.cornerApp(c))
         }
@@ -184,6 +184,15 @@ final class Prefs: ObservableObject {
         }
     }
 
+    static func defaultCorner(_ c: Corner) -> CornerFunction { c == .topRight ? .mute : .off }
+
+    /// True when edges and corners are exactly as Brim ships.
+    var gesturesAreDefault: Bool {
+        EdgeSide.allCases.allSatisfy { edge($0) == Prefs.defaultEdge($0) }
+            && Corner.allCases.allSatisfy { corner($0) == Prefs.defaultCorner($0) }
+            && cornerApps.isEmpty && !tapToPlay
+    }
+
     func edge(_ side: EdgeSide) -> EdgeFunction { edges[side] ?? .off }
     func corner(_ c: Corner) -> CornerFunction { corners[c] ?? .off }
 
@@ -196,7 +205,7 @@ final class Prefs: ObservableObject {
     /// Puts only the edges and corners back the way Brim ships.
     func resetGestures() {
         edges = Dictionary(uniqueKeysWithValues: EdgeSide.allCases.map { ($0, Prefs.defaultEdge($0)) })
-        corners = Dictionary(uniqueKeysWithValues: Corner.allCases.map { ($0, $0 == .topRight ? .mute : .off) })
+        corners = Dictionary(uniqueKeysWithValues: Corner.allCases.map { ($0, Prefs.defaultCorner($0)) })
         cornerApps = [:]
         tapToPlay = false
     }
@@ -208,7 +217,7 @@ final class Prefs: ObservableObject {
         sensitivity = 1.5
         edgeWidth = 0.05
         edges = Dictionary(uniqueKeysWithValues: EdgeSide.allCases.map { ($0, Prefs.defaultEdge($0)) })
-        corners = Dictionary(uniqueKeysWithValues: Corner.allCases.map { ($0, $0 == .topRight ? .mute : .off) })
+        corners = Dictionary(uniqueKeysWithValues: Corner.allCases.map { ($0, Prefs.defaultCorner($0)) })
         cornerApps = [:]
         bottomQuarterOnly = false
         requireModifier = false

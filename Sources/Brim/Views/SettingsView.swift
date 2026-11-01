@@ -5,8 +5,14 @@ import SwiftUI
 struct SettingsPage: View {
     @Binding var page: MenuPage
     @ObservedObject var prefs = Prefs.shared
-    @State private var showAdvanced = false
+    @State private var showAdvanced: Bool
     @State private var confirmRestore = false
+    @Environment(\.snapshotMode) private var snapshotMode
+
+    init(page: Binding<MenuPage>, showAdvanced: Bool = false) {
+        _page = page
+        _showAdvanced = State(initialValue: showAdvanced)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -79,7 +85,7 @@ struct SettingsPage: View {
                     DisclosureGroup(isExpanded: $showAdvanced) {
                         Card {
                             ToggleRow(icon: "rectangle.bottomthird.inset.filled", title: "Ignore the Top of the Side Edges",
-                                      subtitle: "The top of the left and right edges is ignored", isOn: $prefs.bottomQuarterOnly)
+                                      subtitle: "Only the lower part of the left and right edges responds", isOn: $prefs.bottomQuarterOnly)
                             RowDivider()
                             ToggleRow(icon: "hand.raised", title: "Palm Rejection",
                                       subtitle: "Ignore a hand resting on an edge", isOn: $prefs.palmRejection)
@@ -113,12 +119,13 @@ struct SettingsPage: View {
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.secondary)
                     }
-                    .padding(.leading, 6)
+                    .disclosureGroupStyle(FlushDisclosureStyle())
                     .padding(.top, 4)
                 }
                 .padding(.bottom, 4)
             }
-            .frame(height: 470)
+            // Screenshots of the expanded page show everything; the real popover scrolls.
+            .frame(height: snapshotMode && showAdvanced ? 1060 : 470)
 
             MenuFooter {
                 VStack(alignment: .leading, spacing: 0) {
@@ -245,5 +252,33 @@ private struct AppRow: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
+    }
+}
+
+/// A disclosure that keeps its content flush with the cards above, unlike the default indented style.
+struct FlushDisclosureStyle: DisclosureGroupStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeOut(duration: 0.2)) { configuration.isExpanded.toggle() }
+            } label: {
+                HStack(spacing: 5) {
+                    configuration.label
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(configuration.isExpanded ? 90 : 0))
+                }
+                .padding(.leading, 6)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(configuration.isExpanded ? "Expanded" : "Collapsed")
+            .accessibilityHint("Shows more options")
+            if configuration.isExpanded {
+                configuration.content
+                    .transition(.opacity)
+            }
+        }
     }
 }

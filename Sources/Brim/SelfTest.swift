@@ -144,6 +144,16 @@ enum SelfTest {
         let mc1 = SystemControls.isMuted()
         line(mc1 != mc0, "Bottom-left corner set to Mute works", "\(mc0) → \(mc1)")
 
+        // Edges and Corners map: arrow keys move in the direction pressed.
+        let n = TrackpadMap.neighbor
+        let arrowsOK = n(.edge(.bottom), .right) == .corner(.bottomRight)
+            && n(.edge(.bottom), .up) == .edge(.top)
+            && n(.edge(.left), .right) == .edge(.right)
+            && n(.edge(.left), .down) == .corner(.bottomLeft)
+            && n(.corner(.topLeft), .left) == nil
+            && n(.corner(.topRight), .down) == .edge(.right)
+        line(arrowsOK, "Map arrow keys move spatially", arrowsOK ? "all 6 moves correct" : "wrong neighbor")
+
         // Paused → nothing.
         prefs.paused = true; engine.syncConfig()
         let volPaused = SystemControls.volume() ?? 0

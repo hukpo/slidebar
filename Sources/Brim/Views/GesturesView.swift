@@ -39,29 +39,27 @@ struct GesturesPage: View {
                 SpotEditor(spot: selection)
             }
 
-            HStack(spacing: 8) {
-                Spacer()
+            VStack(alignment: .trailing, spacing: 6) {
                 if confirmReset {
                     Text("Back to brightness, volume, songs and mute?")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                    Button("Cancel") { confirmReset = false }.controlSize(.small)
-                    Button("Reset") { prefs.resetGestures(); confirmReset = false }
-                        .controlSize(.small)
-                        .buttonStyle(.borderedProminent)
+                    HStack(spacing: 8) {
+                        Button("Cancel") { confirmReset = false }.controlSize(.small)
+                        Button("Restore") { prefs.resetGestures(); confirmReset = false }
+                            .controlSize(.small)
+                            .buttonStyle(.borderedProminent)
+                    }
                 } else {
-                    Button("Reset Edges and Corners…") { confirmReset = true }
+                    Button("Restore Defaults…") { confirmReset = true }
                         .controlSize(.small)
-                        .disabled(isDefault)
+                        .disabled(prefs.gesturesAreDefault)
+                        .help("Put edges and corners back the way Brim starts")
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(14)
-    }
-
-    private var isDefault: Bool {
-        EdgeSide.allCases.allSatisfy { prefs.edge($0) == Prefs.defaultEdge($0) }
-            && Corner.allCases.allSatisfy { prefs.corner($0) == ($0 == .topRight ? .mute : .off) }
     }
 }
 
@@ -72,6 +70,7 @@ struct GesturesPage: View {
 struct TrackpadMap: View {
     @Binding var selection: MapSpot
     @ObservedObject var prefs = Prefs.shared
+    @FocusState private var mapFocused: Bool
 
     private let bar: CGFloat = 30
     private let gap: CGFloat = 6
@@ -108,17 +107,49 @@ struct TrackpadMap: View {
             }
         }
         .focusable()
+        .focused($mapFocused)
         .onMoveCommand { direction in
-            guard let i = Self.ring.firstIndex(of: selection) else { return }
-            let step = (direction == .right || direction == .down) ? 1 : -1
-            select(Self.ring[(i + step + Self.ring.count) % Self.ring.count])
+            if let next = Self.neighbor(of: selection, direction) { select(next) }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Trackpad map. Arrow keys move between edges and corners.")
     }
 
+    /// Where each spot sits on a 3×3 grid; the centre is empty.
+    static func cell(_ spot: MapSpot) -> (x: Int, y: Int) {
+        switch spot {
+        case .corner(.topLeft): return (0, 0)
+        case .edge(.top): return (1, 0)
+        case .corner(.topRight): return (2, 0)
+        case .edge(.left): return (0, 1)
+        case .edge(.right): return (2, 1)
+        case .corner(.bottomLeft): return (0, 2)
+        case .edge(.bottom): return (1, 2)
+        case .corner(.bottomRight): return (2, 2)
+        }
+    }
+
+    /// Arrow keys move in the direction pressed, skipping the empty centre.
+    static func neighbor(of spot: MapSpot, _ direction: MoveCommandDirection) -> MapSpot? {
+        var (x, y) = cell(spot)
+        let (dx, dy): (Int, Int)
+        switch direction {
+        case .left: (dx, dy) = (-1, 0)
+        case .right: (dx, dy) = (1, 0)
+        case .up: (dx, dy) = (0, -1)
+        case .down: (dx, dy) = (0, 1)
+        @unknown default: return nil
+        }
+        repeat {
+            x += dx; y += dy
+            guard (0...2).contains(x), (0...2).contains(y) else { return nil }
+        } while x == 1 && y == 1
+        return ring.first { cell($0) == (x, y) }
+    }
+
     private func select(_ spot: MapSpot) {
         selection = spot
+        mapFocused = true
         let text = "\(spot.title), \(title(for: spot)). Options below."
         if let window = NSApp.keyWindow {
             NSAccessibility.post(element: window, notification: .announcementRequested,
@@ -206,7 +237,7 @@ private struct SpotButton<Label: View>: View {
                 background
                 label()
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(selected ? Color.brimAccent : Color.primary)
+                    .foregroundStyle(Color.primary)
             }
             .contentShape(Rectangle())
         }
@@ -314,10 +345,14 @@ private struct SpotEditor: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         if function.isDisruptive {
-            Label("Pick a corner your palm doesn't rest on, so it doesn't happen by accident.", systemImage: "exclamationmark.triangle")
-                .font(.system(size: 11))
-                .foregroundStyle(.orange)
-                .fixedSize(horizontal: false, vertical: true)
+            Label {
+                Text("Pick a corner your palm doesn't rest on, so it doesn't happen by accident.")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } icon: {
+                Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
+            }
+            .font(.system(size: 11))
         }
         if function == .openApp {
             HStack(spacing: 8) {

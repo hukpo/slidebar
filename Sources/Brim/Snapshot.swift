@@ -22,6 +22,8 @@ enum Snapshot {
         render(SetupView(), to: dir.appendingPathComponent("setup\(suffix).png"))
         render(AppsPage(page: .constant(.apps)).frame(width: 340), to: dir.appendingPathComponent("apps\(suffix).png"))
         render(GesturesPage(page: .constant(.gestures(back: .main))).frame(width: 340), to: dir.appendingPathComponent("gestures\(suffix).png"))
+        render(ScrollViewReader { _ in SettingsPage(page: .constant(.settings), showAdvanced: true) }.frame(width: 340),
+               to: dir.appendingPathComponent("settings-advanced\(suffix).png"))
         render(EdgeGlow.preview(level: 0.62).frame(width: 26, height: 260).padding(20).background(Color.gray.opacity(0.3)),
                to: dir.appendingPathComponent("glow\(suffix).png"))
         return true

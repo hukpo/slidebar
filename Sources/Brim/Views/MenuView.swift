@@ -62,7 +62,7 @@ struct MainPage: View {
             NoticeArea()
 
             Card {
-                ToggleRow(icon: "hand.draw", title: "Trackpad Gestures",
+                ToggleRow(icon: "hand.draw", title: "Brim Gestures",
                           subtitle: edgeSlidersSubtitle,
                           isOn: Binding(get: { !prefs.paused }, set: { prefs.paused = !$0 }))
 
@@ -105,7 +105,7 @@ struct MainPage: View {
 
     private var edgeSlidersSubtitle: String {
         if prefs.paused { return "Paused. Your trackpad works as usual." }
-        if prefs.requireModifier { return "Hold Fn or Option while you use them" }
+        if prefs.requireModifier { return "Hold Fn or Option to use your edges and corners" }
         return "Your edges and corners"
     }
 }
@@ -117,11 +117,17 @@ enum GestureSummary {
             let f = prefs.edge(side)
             return f == .off ? nil : f.shortTitle
         }
-        for c in Corner.allCases where prefs.cornerIsActive(c) {
-            let f = prefs.corner(c)
-            parts.append(f == .openApp ? prefs.cornerApps[c].map(AppNames.name(for:)) ?? f.title : f.title)
+        let corners = Corner.allCases.filter { prefs.cornerIsActive($0) }
+        if corners.count <= 2 {
+            for c in corners {
+                let f = prefs.corner(c)
+                parts.append(f == .openApp ? prefs.cornerApps[c].map(AppNames.name(for:)) ?? f.title : f.title)
+            }
+        } else {
+            parts.append("\(corners.count) corners")
         }
-        return parts.isEmpty ? "Nothing assigned yet" : parts.joined(separator: " · ")
+        // A no-break space keeps each dot at the end of a line rather than the start of the next.
+        return parts.isEmpty ? "Nothing assigned yet" : parts.joined(separator: "\u{00A0}· ")
     }
 }
 
