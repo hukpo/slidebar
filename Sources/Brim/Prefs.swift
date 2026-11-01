@@ -84,8 +84,6 @@ final class Prefs: ObservableObject {
     @Published var autoUpdate: Bool { didSet { defaults.set(autoUpdate, forKey: Keys.autoUpdate) } }
     @Published var palmRejection: Bool { didSet { defaults.set(palmRejection, forKey: Keys.palmRejection) } }
     @Published var edgeGlow: Bool { didSet { defaults.set(edgeGlow, forKey: Keys.edgeGlow) } }
-    /// Bundle IDs of apps where edge gestures are off.
-    @Published var excludedApps: [String] { didSet { defaults.set(excludedApps, forKey: Keys.excludedApps) } }
 
     // State
     @Published var paused: Bool { didSet { defaults.set(paused, forKey: Keys.paused) } }
@@ -117,7 +115,6 @@ final class Prefs: ObservableObject {
         static let autoUpdate = "autoUpdate"
         static let palmRejection = "palmRejection"
         static let edgeGlow = "edgeGlow"
-        static let excludedApps = "excludedApps"
         static let setupDone = "setupDone"
         static let didPromptAccess = "didPromptAccess"
         static let accessNoticeDismissed = "accessNoticeDismissed"
@@ -138,7 +135,6 @@ final class Prefs: ObservableObject {
             Keys.autoUpdate: true,
             Keys.palmRejection: true,
             Keys.edgeGlow: true,
-            Keys.excludedApps: [String](),
             Keys.setupDone: false,
         ])
         haptics = HapticStrength(rawValue: defaults.string(forKey: Keys.haptics) ?? "") ?? .medium
@@ -176,7 +172,6 @@ final class Prefs: ObservableObject {
         autoUpdate = defaults.bool(forKey: Keys.autoUpdate)
         palmRejection = defaults.bool(forKey: Keys.palmRejection)
         edgeGlow = defaults.bool(forKey: Keys.edgeGlow)
-        excludedApps = defaults.stringArray(forKey: Keys.excludedApps) ?? []
         hasCompletedSetup = defaults.bool(forKey: Keys.setupDone)
         didPromptAccess = defaults.bool(forKey: Keys.didPromptAccess)
         accessNoticeDismissed = defaults.bool(forKey: Keys.accessNoticeDismissed)

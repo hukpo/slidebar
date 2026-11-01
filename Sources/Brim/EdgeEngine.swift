@@ -33,8 +33,6 @@ final class LiveState: ObservableObject {
     @Published var slideCount = 0
     /// The edge currently being slid, for highlighting in the menu.
     @Published var activeSide: EdgeSide?
-    /// The last app the user was in (not Brim), for "Use in …".
-    @Published var lastApp: NSRunningApplication?
     /// True right after setup, when the menu opens to show where Brim lives.
     @Published var showWelcome = false
     /// Set when a gesture asked for something that needs Accessibility, so the menu can explain.
@@ -180,7 +178,7 @@ final class EdgeEngine {
 
     private func handle(_ touches: [TouchPoint], time: Double) {
         let flags = NSEvent.modifierFlags
-        var allowed = !prefs.paused && !isFrontmostAppExcluded
+        var allowed = !prefs.paused
         if prefs.requireModifier {
             allowed = allowed && (flags.contains(.function) || flags.contains(.option))
         }
@@ -194,12 +192,6 @@ final class EdgeEngine {
         if !recognizer.isTracking, live.activeSide != nil {
             live.activeSide = nil
         }
-    }
-
-    private var isFrontmostAppExcluded: Bool {
-        guard !prefs.excludedApps.isEmpty,
-              let id = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return false }
-        return prefs.excludedApps.contains(id)
     }
 
     private func perform(_ action: EdgeAction) {

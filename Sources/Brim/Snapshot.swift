@@ -20,7 +20,6 @@ enum Snapshot {
         render(MenuView(), to: dir.appendingPathComponent("menu\(suffix).png"))
         render(SettingsPage(page: .constant(.settings)).frame(width: 340), to: dir.appendingPathComponent("settings\(suffix).png"))
         render(SetupView(), to: dir.appendingPathComponent("setup\(suffix).png"))
-        render(AppsPage(page: .constant(.apps)).frame(width: 340), to: dir.appendingPathComponent("apps\(suffix).png"))
         render(ScrollViewReader { _ in SettingsPage(page: .constant(.settings), showAdvanced: true) }.frame(width: 340),
                to: dir.appendingPathComponent("settings-advanced\(suffix).png"))
         render(EdgeGlow.preview(level: 0.62).frame(width: 26, height: 260).padding(20).background(Color.gray.opacity(0.3)),

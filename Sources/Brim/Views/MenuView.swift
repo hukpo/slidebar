@@ -2,7 +2,7 @@ import BrimCore
 import SwiftUI
 
 enum MenuPage: Hashable {
-    case main, settings, apps
+    case main, settings
 }
 
 /// Root view of the menu bar popover.
@@ -18,9 +18,6 @@ struct MenuView: View {
                     .transition(transition(from: .leading))
             case .settings:
                 SettingsPage(page: $page)
-                    .transition(transition(from: .trailing))
-            case .apps:
-                AppsPage(page: $page)
                     .transition(transition(from: .trailing))
             }
         }
@@ -65,19 +62,6 @@ struct MainPage: View {
                 ToggleRow(icon: "hand.draw", title: "Brim Gestures",
                           subtitle: gesturesSubtitle,
                           isOn: Binding(get: { !prefs.paused }, set: { prefs.paused = !$0 }))
-
-                if let app = live.lastApp, let id = app.bundleIdentifier, let name = app.localizedName {
-                    RowDivider()
-                    ToggleRow(icon: "app.dashed", title: "Use in \(name)",
-                              subtitle: "Turn off to pause Brim while \(name) is in front",
-                              isOn: Binding(
-                                get: { !prefs.excludedApps.contains(id) },
-                                set: { on in
-                                    if on { prefs.excludedApps.removeAll { $0 == id } }
-                                    else if !prefs.excludedApps.contains(id) { prefs.excludedApps.append(id) }
-                                }))
-                        .disabled(prefs.paused)
-                }
 
                 RowDivider()
 

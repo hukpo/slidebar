@@ -14,7 +14,7 @@ Everyday Mac users with a MacBook or Magic Trackpad. Not necessarily technical: 
 
 ## Product Purpose
 
-Brim turns the edges of the trackpad into sliders: left edge for brightness, right edge for volume, using the same on-screen display as the keyboard keys. Extras: double-tap the top-right corner to mute, swipe the bottom edge to skip tracks, haptic ticks, fine control (⇧⌥ for quarter steps), cursor freeze, palm rejection, an on-screen edge glow, and a list of apps where Brim stays off. Success: a new user installs it, grants permission without confusion, slides once, and never thinks about it again.
+Brim turns the edges of the trackpad into sliders: left edge for brightness, right edge for volume, using the same on-screen display as the keyboard keys. Extras: double-tap the top-right corner to mute, swipe the bottom edge to skip tracks, haptic ticks, fine control (⇧⌥ for quarter steps), cursor freeze, palm rejection, and an on-screen edge glow. Success: a new user installs it, grants permission without confusion, slides once, and never thinks about it again.
 
 ## Positioning
 

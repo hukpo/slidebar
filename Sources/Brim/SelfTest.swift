@@ -54,7 +54,7 @@ enum SelfTest {
 
         // Right edge → volume, with the on-screen glow showing while the finger is down.
         let volUp = vol0 < 0.5
-        let savedGlow = prefs.edgeGlow, savedExcluded = prefs.excludedApps
+        let savedGlow = prefs.edgeGlow
         prefs.edgeGlow = true
         nextID += 1
         var glowSeen = false
@@ -107,14 +107,6 @@ enum SelfTest {
         line(palmMoved && abs(volRestored - volPalmStart) < 0.01, "Palm slide is undone when a finger lands",
              String(format: "%.3f → moved → %.3f", volPalmStart, volRestored))
 
-        // Front app turned off → nothing.
-        if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier {
-            prefs.excludedApps = [front]
-            let volEx = SystemControls.volume() ?? 0
-            slide(x: 0.98, from: 0.2, to: 0.6)
-            line(abs((SystemControls.volume() ?? 0) - volEx) < 0.001, "Turned off in front app", "\(front): volume unchanged")
-            prefs.excludedApps = savedExcluded
-        }
         prefs.edgeGlow = savedGlow
 
         // Left edge → brightness.
@@ -316,13 +308,12 @@ enum SelfTest {
         func inFront() -> Bool { NSApp.isActive && NSApp.keyWindow?.title.hasPrefix("Brim Check") == true }
 
         let prefs = Prefs.shared, engine = EdgeEngine.shared
-        let saved = prefs.edges, savedPaused = prefs.paused, savedExcluded = prefs.excludedApps
+        let saved = prefs.edges, savedPaused = prefs.paused
         prefs.paused = false
-        prefs.excludedApps = []
         var windows: [NSWindow] = []
         func finish() {
             for w in windows { w.close() }
-            prefs.edges = saved; prefs.paused = savedPaused; prefs.excludedApps = savedExcluded
+            prefs.edges = saved; prefs.paused = savedPaused
         }
         var clock = 3000.0, nextID: Int32 = 950
         func slide(_ side: EdgeSide, up: Bool, travel: Float = 0.15) async -> Bool {
