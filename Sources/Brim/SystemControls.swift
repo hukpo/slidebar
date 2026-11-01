@@ -147,6 +147,14 @@ extension SystemControls {
 
     /// Presses a keyboard shortcut, like the user typing it.
     static func shortcut(_ key: Key, _ flags: CGEventFlags) {
+        var flags = flags
+        // Real arrow and function keys carry these markers, and macOS matches system shortcuts
+        // (like Control-Arrow to switch desktops) only when they are present.
+        switch key {
+        case .leftArrow, .rightArrow: flags.formUnion([.maskSecondaryFn, .maskNumericPad])
+        case .f11: flags.formUnion(.maskSecondaryFn)
+        default: break
+        }
         for down in [true, false] {
             guard let event = CGEvent(keyboardEventSource: nil, virtualKey: key.rawValue, keyDown: down) else { continue }
             event.flags = flags

@@ -172,6 +172,41 @@ enum SelfTest {
         return true
     }
 
+    /// `Brim --check-desktops`: swipes a top edge set to Switch Desktop through the real engine,
+    /// checks the desktop changed, then switches back. Moves your desktop for about two seconds.
+    static func runDesktopCheckIfRequested() -> Bool {
+        guard CommandLine.arguments.contains("--check-desktops") else { return false }
+        func wait(_ s: Double) { RunLoop.main.run(until: Date().addingTimeInterval(s)) }
+        typealias ConnFn = @convention(c) () -> Int32
+        typealias SpaceFn = @convention(c) (Int32) -> UInt64
+        guard let sky = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_NOW),
+              let c = dlsym(sky, "SLSMainConnectionID"), let a = dlsym(sky, "SLSGetActiveSpace") else {
+            print("SKIP  Can't read the current desktop on this macOS"); return true
+        }
+        let space = { unsafeBitCast(a, to: SpaceFn.self)(unsafeBitCast(c, to: ConnFn.self)()) }
+        let prefs = Prefs.shared, engine = EdgeEngine.shared
+        let saved = prefs.edges, savedPaused = prefs.paused
+        prefs.paused = false
+        prefs.edges[.top] = .desktops
+        engine.syncConfig()
+        var clock = 2000.0
+        func swipe(_ from: Float, _ to: Float, id: Int32) {
+            for i in 0...20 {
+                engine.feed([TouchPoint(id: id, x: from + (to - from) * Float(i) / 20, y: 0.96, size: 0.8)], time: clock)
+                clock += 0.012; wait(0.012)
+            }
+            engine.feed([], time: clock); clock += 0.1
+        }
+        let start = space()
+        swipe(0.3, 0.7, id: 900); wait(1.2)
+        let moved = space()
+        print("\(moved != start ? "PASS" : "FAIL")  Top edge swipe switches desktop  (\(start) → \(moved))")
+        if moved != start { wait(1.0); swipe(0.7, 0.3, id: 901); wait(1.5) }
+        print("\(space() == start ? "PASS" : "FAIL")  Swipe back returns to the first desktop")
+        prefs.edges = saved; prefs.paused = savedPaused
+        return true
+    }
+
     static func runIfRequested() -> Bool {
         guard CommandLine.arguments.contains("--selftest") else { return false }
         func line(_ ok: Bool, _ name: String, _ detail: String = "") {
