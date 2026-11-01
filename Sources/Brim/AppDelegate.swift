@@ -11,6 +11,9 @@ final class AppActions {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
     }
 
+    func showLicense() { delegate?.showLicense() }
+    func checkForUpdates() { Task { await Updater.shared.check(userInitiated: true) } }
+
     /// The icon tile without its margin, for the app's own UI.
     lazy var badgeImage: NSImage = Brand.badge(size: 168)
     /// The full icon (with margin), for the About panel.
@@ -24,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
     private var setupWindow: NSWindow?
+    private var licenseWindow: NSWindow?
     private var levelTimer: Timer?
     private var trustTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
@@ -70,8 +74,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             LiveState.shared.refreshTrust()
         }
 
+        // Updates and licensing.
+        Updater.shared.startAutomaticChecks()
+        Licensing.shared.$state
+            .removeDuplicates()
+            .sink { _ in LiveState.shared.objectWillChange.send() }
+            .store(in: &cancellables)
+
         if !prefs.hasCompletedSetup || !live.trusted {
             showSetupGuide()
+        } else if Licensing.shared.state == .expired {
+            showLicense()
         }
     }
 
@@ -94,6 +107,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         } else if let button = statusItem.button {
             LiveState.shared.refreshLevels()
             LiveState.shared.refreshTrust()
+            Licensing.shared.evaluate()
             NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
@@ -129,6 +143,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         NSApp.activate(ignoringOtherApps: true)
         setupWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    func showLicense() {
+        popover.performClose(nil)
+        Licensing.shared.evaluate()
+        if licenseWindow == nil {
+            let view = LicenseView { [weak self] in self?.licenseWindow?.close() }
+            let window = NSWindow(contentViewController: NSHostingController(rootView: view))
+            window.title = "Brim License"
+            window.styleMask = [.titled, .closable]
+            window.isReleasedWhenClosed = false
+            window.center()
+            licenseWindow = window
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        licenseWindow?.makeKeyAndOrderFront(nil)
     }
 
     func showAbout() {

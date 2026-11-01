@@ -43,6 +43,7 @@ struct MainPage: View {
             if live.status == .needsAccess {
                 AccessBanner()
             }
+            NoticeBanners()
 
             VStack(spacing: 10) {
                 HStack(spacing: 11) {
@@ -237,6 +238,72 @@ struct LevelBar: View {
         .animation(.spring(response: 0.25, dampingFraction: 0.8), value: level)
         .animation(.easeOut(duration: 0.15), value: active)
         .help("Drag to adjust")
+    }
+}
+
+/// Trial, license and update notices.
+struct NoticeBanners: View {
+    @ObservedObject var licensing = Licensing.shared
+    @ObservedObject var updater = Updater.shared
+
+    var body: some View {
+        VStack(spacing: 8) {
+            switch licensing.state {
+            case .expired:
+                banner(icon: "clock.badge.exclamationmark.fill", tint: .orange,
+                       text: "Your trial has ended, so edge gestures are paused.",
+                       primary: ("Buy Brim…", { licensing.openCheckout() }),
+                       secondary: ("Enter Key…", { AppActions.shared.showLicense() }))
+            case .trial(let days) where days <= 3:
+                banner(icon: "clock.fill", tint: .brimAccent,
+                       text: "\(days) day\(days == 1 ? "" : "s") left in your trial.",
+                       primary: ("Buy Brim…", { licensing.openCheckout() }),
+                       secondary: ("Enter Key…", { AppActions.shared.showLicense() }))
+            default:
+                EmptyView()
+            }
+            switch updater.phase {
+            case .available(let info):
+                banner(icon: "arrow.down.circle.fill", tint: .brimAccent,
+                       text: "Brim \(info.version) is available.",
+                       primary: ("Install & Relaunch", { Task { await updater.install(info) } }), secondary: nil)
+            case .downloading, .installing:
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(updater.phase == .downloading ? "Downloading update…" : "Installing update…")
+                        .font(.system(size: 11))
+                    Spacer()
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.brimAccent.opacity(0.12)))
+            case .upToDate:
+                banner(icon: "checkmark.circle.fill", tint: .green, text: "Brim \(AppConfig.version) is up to date.", primary: nil, secondary: nil)
+            case .failed(let message):
+                banner(icon: "exclamationmark.triangle.fill", tint: .orange, text: message, primary: nil, secondary: nil)
+            default:
+                EmptyView()
+            }
+        }
+    }
+
+    private func banner(icon: String, tint: Color, text: String,
+                        primary: (String, () -> Void)?, secondary: (String, () -> Void)?) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon).font(.system(size: 15)).foregroundStyle(tint)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(text).font(.system(size: 11)).fixedSize(horizontal: false, vertical: true)
+                if primary != nil || secondary != nil {
+                    HStack(spacing: 6) {
+                        if let primary { Button(primary.0, action: primary.1).controlSize(.small) }
+                        if let secondary { Button(secondary.0, action: secondary.1).controlSize(.small) }
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(tint.opacity(0.12)))
     }
 }
 

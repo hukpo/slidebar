@@ -5,3 +5,5 @@ build/
 .DS_Store
 website/Brim.dmg
 Resources/AppIcon.iconset/
+.secrets/
+website/downloads/

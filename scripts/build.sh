@@ -3,6 +3,14 @@
 #   scripts/build.sh            # release build → build/Brim.app
 #   scripts/build.sh --dmg      # also build/Brim-<version>.dmg
 #   scripts/build.sh --install  # also copy to /Applications and launch
+#
+# Release settings (all optional, via environment):
+#   VERSION=1.1                 marketing version (default 1.0)
+#   WEBSITE_URL=https://…       where website/ is hosted; also sets the update feed to $WEBSITE_URL/appcast.json
+#   UPDATE_FEED_URL=https://…   override the update feed
+#   CHECKOUT_URL=https://…      "Buy" link (Paddle, Lemon Squeezy, Gumroad…)
+#   NOTES="Fix A|Add B"         release notes for appcast.json, separated by |
+#   FREE=1                      no trial/licensing even if .secrets/license-public.key exists
 # Signing: uses $SIGN_IDENTITY, else the first "Apple Development"/"Developer ID" identity, else ad-hoc.
 # A stable identity matters: macOS ties the Accessibility grant to the signature.
 set -euo pipefail
@@ -34,6 +42,18 @@ cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" Resources/Info.plist > "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
+PLIST="$APP/Contents/Info.plist"
+WEBSITE_URL="${WEBSITE_URL:-}"
+UPDATE_FEED_URL="${UPDATE_FEED_URL:-${WEBSITE_URL:+${WEBSITE_URL%/}/appcast.json}}"
+PUBLIC_KEY=""
+if [ -z "${FREE:-}" ] && [ -f .secrets/license-public.key ]; then PUBLIC_KEY="$(cat .secrets/license-public.key)"; fi
+plutil -replace BrimLicensePublicKey -string "$PUBLIC_KEY" "$PLIST"
+plutil -replace BrimUpdateFeedURL -string "$UPDATE_FEED_URL" "$PLIST"
+plutil -replace BrimCheckoutURL -string "${CHECKOUT_URL:-}" "$PLIST"
+plutil -replace BrimWebsiteURL -string "$WEBSITE_URL" "$PLIST"
+echo "   licensing: $([ -n "$PUBLIC_KEY" ] && echo "on (14-day trial)" || echo "off (free)")"
+echo "   updates:   ${UPDATE_FEED_URL:-off}"
+
 IDENTITY="${SIGN_IDENTITY:-}"
 if [ -z "$IDENTITY" ]; then
   IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null | grep -E 'Developer ID Application|Apple Development' | head -1 | sed -E 's/.*"(.*)"/\1/' || true)"
@@ -57,6 +77,24 @@ if [[ " $* " == *" --dmg "* ]]; then
   hdiutil create -volname "Brim" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
   rm -rf "$STAGE"
   cp "$DMG" website/Brim.dmg   # the website's download link
+  mkdir -p website/downloads
+  cp "$DMG" "website/downloads/Brim-$VERSION.dmg"
+
+  echo "→ Writing website/appcast.json"
+  SHA="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
+  python3 -I - "$VERSION" "$BUILD" "$SHA" "${NOTES:-Improvements and fixes.}" > website/appcast.json <<'PY'
+import json, sys, datetime
+version, build, sha, notes = sys.argv[1:5]
+print(json.dumps({
+    "version": version,
+    "build": int(build),
+    "url": f"downloads/Brim-{version}.dmg",
+    "sha256": sha,
+    "date": datetime.date.today().isoformat(),
+    "minimumSystemVersion": "13.0",
+    "notes": [n.strip() for n in notes.split("|") if n.strip()],
+}, indent=2))
+PY
 fi
 
 if [[ " $* " == *" --install "* ]]; then

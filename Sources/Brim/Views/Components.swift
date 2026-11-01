@@ -154,6 +154,8 @@ struct FooterIconButton: View {
 /// The "…" menu shared by both pages.
 struct MoreMenu: View {
     @ObservedObject var prefs = Prefs.shared
+    @ObservedObject var licensing = Licensing.shared
+    @ObservedObject var updater = Updater.shared
 
     var body: some View {
         Menu {
@@ -162,6 +164,16 @@ struct MoreMenu: View {
             Button("Setup Guide…") { AppActions.shared.showSetupGuide() }
             Button("Accessibility Settings…") { Permissions.openAccessibilitySettings() }
             Button("Rescan Trackpads") { EdgeEngine.shared.restart() }
+            Divider()
+            if let update = updater.available {
+                Button("Install Brim \(update.version)…") { Task { await updater.install(update) } }
+            } else {
+                Button("Check for Updates…") { AppActions.shared.checkForUpdates() }
+            }
+            Button(licensing.isLicensed ? "License…" : "Enter License…") { AppActions.shared.showLicense() }
+            if licensing.canBuy {
+                Button("Buy Brim…") { licensing.openCheckout() }
+            }
             Divider()
             Button("About Brim") { AppActions.shared.showAbout() }
         } label: {
@@ -187,12 +199,14 @@ struct StatusPill: View {
             case .needsAccess: return .orange
             case .noTrackpad: return .red
             case .paused: return .gray
+            case .trialEnded: return .orange
             }
         }()
         Button {
             if status == .needsAccess { AppActions.shared.showSetupGuide() }
             if status == .paused { prefs.paused = false }
             if status == .noTrackpad { EdgeEngine.shared.restart() }
+            if status == .trialEnded { AppActions.shared.showLicense() }
         } label: {
             HStack(spacing: 5) {
                 Circle().fill(color).frame(width: 7, height: 7)

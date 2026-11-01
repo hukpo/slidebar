@@ -47,6 +47,8 @@ struct SettingsPage: View {
             }
             ToggleRow(icon: "power", title: "Open at Login", subtitle: nil,
                       isOn: Binding(get: { prefs.openAtLogin }, set: { prefs.setOpenAtLogin($0) }))
+            ToggleRow(icon: "arrow.down.circle", title: "Automatic Updates",
+                      subtitle: "Download and install new versions", isOn: $prefs.autoUpdate)
 
             Divider()
 

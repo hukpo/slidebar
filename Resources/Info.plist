@@ -30,6 +30,19 @@
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>BrimLicensePublicKey</key>
+    <string></string>
+    <key>BrimUpdateFeedURL</key>
+    <string></string>
+    <key>BrimCheckoutURL</key>
+    <string></string>
+    <key>BrimWebsiteURL</key>
+    <string></string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
     <key>NSHumanReadableCopyright</key>
     <string>Brim. Slide the edge.</string>
 </dict>

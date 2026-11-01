@@ -46,6 +46,9 @@ enum SelfTest {
             line(abs(b2 - b0) < 0.01, "Direct brightness set", String(format: "back to %.3f", b2))
         }
         line(BrimHapticActuate(6), "Force Touch actuator")
+        Licensing.shared.evaluate()
+        print("INFO  License state: \(Licensing.shared.state)")
+        print("INFO  Update feed: \(AppConfig.updateFeedURL?.absoluteString ?? "off")")
         print(String(format: "Restored volume %.2f (muted: %@), brightness %.2f",
                      SystemControls.volume() ?? -1, SystemControls.isMuted() ? "yes" : "no", SystemControls.brightness() ?? -1))
         return true

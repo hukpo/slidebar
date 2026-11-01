@@ -67,6 +67,9 @@ final class Prefs: ObservableObject {
     }
 
     // State
+    @Published var autoUpdate: Bool { didSet { defaults.set(autoUpdate, forKey: Keys.autoUpdate) } }
+
+    // State
     @Published var paused: Bool { didSet { defaults.set(paused, forKey: Keys.paused) } }
     @Published var hasCompletedSetup: Bool { didSet { defaults.set(hasCompletedSetup, forKey: Keys.setupDone) } }
     @Published private(set) var openAtLogin: Bool = false
@@ -85,6 +88,7 @@ final class Prefs: ObservableObject {
         static let fineControl = "fineControl"
         static let appearance = "appearance"
         static let paused = "paused"
+        static let autoUpdate = "autoUpdate"
         static let setupDone = "setupDone"
     }
 
@@ -103,6 +107,7 @@ final class Prefs: ObservableObject {
             Keys.fineControl: true,
             Keys.appearance: Appearance.auto.rawValue,
             Keys.paused: false,
+            Keys.autoUpdate: true,
             Keys.setupDone: false,
         ])
         haptics = HapticStrength(rawValue: defaults.string(forKey: Keys.haptics) ?? "") ?? .medium
@@ -118,6 +123,7 @@ final class Prefs: ObservableObject {
         fineControl = defaults.bool(forKey: Keys.fineControl)
         appearance = Appearance(rawValue: defaults.string(forKey: Keys.appearance) ?? "") ?? .auto
         paused = defaults.bool(forKey: Keys.paused)
+        autoUpdate = defaults.bool(forKey: Keys.autoUpdate)
         hasCompletedSetup = defaults.bool(forKey: Keys.setupDone)
         refreshOpenAtLogin()
     }
