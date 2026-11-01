@@ -49,8 +49,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
             button.target = self
             button.setAccessibilityTitle("Brim")
         }
-        prefs.$paused
-            .sink { [weak self] paused in self?.statusItem.button?.image = Brand.menuBarGlyph(paused: paused) }
+        // The glyph shows paused, and a dot when a gesture needs Accessibility.
+        prefs.$paused.combineLatest(live.$blockedAction)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] paused, blocked in
+                self?.statusItem.button?.image = Brand.menuBarGlyph(paused: paused, attention: blocked != nil)
+                self?.statusItem.button?.setAccessibilityTitle(blocked != nil ? "Brim, needs attention" : "Brim")
+            }
             .store(in: &cancellables)
 
         // Popover.

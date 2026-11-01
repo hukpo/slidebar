@@ -20,13 +20,13 @@ struct SetupView: View {
                             Text("Welcome to Brim")
                                 .font(.system(size: 20, weight: .semibold))
                                 .accessibilityAddTraits(.isHeader)
-                            Text("The edges of your trackpad are now volume and brightness sliders.")
+                            Text("Slide along the edges of your trackpad to change things like volume and brightness. You choose what each edge and corner does.")
                                 .font(.system(size: 12))
                                 .foregroundStyle(.white.opacity(0.72))
                         }
                         Spacer()
                     }
-                    TrackpadDemo(left: prefs.edge(.left), right: prefs.edge(.right))
+                    TrackpadDemo(left: prefs.edge(.left), right: prefs.edge(.right), bottom: prefs.edge(.bottom))
                         .frame(height: 180)
                 }
                 .foregroundStyle(.white)
@@ -67,7 +67,7 @@ struct SetupView: View {
                             .buttonStyle(.borderedProminent)
                             .keyboardShortcut(.defaultAction)
                     } else {
-                        Button("Skip for Now") { AppActions.shared.finishSetup() }
+                        Button("Done") { AppActions.shared.finishSetup() }
                     }
                 }
                 .padding(.top, 6)
@@ -93,12 +93,12 @@ struct SetupView: View {
 
     private var accessDetail: String {
         if live.trusted {
-            return "All set. You'll see the usual volume and brightness display, and media gestures work."
+            return "All set. You'll see the usual volume and brightness display, and gestures that press keys, like songs, desktops and Spotlight, work too."
         }
         if prefs.didPromptAccess {
             return "In System Settings, turn on Brim in the Accessibility list. macOS may ask for your password. Then come back here."
         }
-        return "Brim already works. Allowing this once lets it show the usual volume and brightness display and use media gestures. Brim is open source, so anyone can check what it does."
+        return "Brim already works. Allowing this once lets it show the usual volume and brightness display and use gestures that press keys, like songs, desktops and Spotlight. Brim is open source, so anyone can check what it does."
     }
 }
 
@@ -142,6 +142,7 @@ private struct StepRow<Accessory: View>: View {
 private struct TrackpadDemo: View {
     let left: EdgeFunction
     let right: EdgeFunction
+    let bottom: EdgeFunction
     @State private var up = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -160,11 +161,13 @@ private struct TrackpadDemo: View {
                 if left != .off { edge(colors: left.levelColors, label: left.shortTitle, x: 18, h: h) }
                 if right != .off { edge(colors: right.levelColors, label: right.shortTitle, x: w - 18, h: h) }
 
-                Capsule().fill(Color.primary.opacity(0.18))
-                    .frame(width: 70, height: 4)
-                    .position(x: w / 2, y: h - 12)
-                Text("Media Strip").font(.system(size: 10)).foregroundStyle(.secondary)
-                    .position(x: w / 2, y: h - 25)
+                if bottom != .off {
+                    Capsule().fill(Color.primary.opacity(0.18))
+                        .frame(width: 70, height: 4)
+                        .position(x: w / 2, y: h - 12)
+                    Text(bottom.shortTitle).font(.system(size: 10)).foregroundStyle(.secondary)
+                        .position(x: w / 2, y: h - 25)
+                }
 
                 Circle()
                     .fill(Color.white)

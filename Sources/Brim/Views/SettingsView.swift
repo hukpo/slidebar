@@ -15,7 +15,7 @@ struct SettingsPage: View {
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 12) {
                     Card {
-                        NavigationRow(icon: "rectangle.dashed", title: "Edges and Corners",
+                        NavigationRow(icon: "rectangle.and.hand.point.up.left", title: "Edges and Corners",
                                       subtitle: GestureSummary.text(prefs)) {
                             page = .gestures(back: .settings)
                         }
@@ -76,26 +76,9 @@ struct SettingsPage: View {
                         }
                     }
 
-                    Button {
-                        withAnimation(.easeOut(duration: 0.2)) { showAdvanced.toggle() }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Text("Advanced").font(.system(size: 11, weight: .semibold))
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 9, weight: .bold))
-                                .rotationEffect(.degrees(showAdvanced ? 90 : 0))
-                        }
-                        .foregroundStyle(.secondary)
-                        .padding(.leading, 6)
-                        .padding(.top, 4)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityValue(showAdvanced ? "Expanded" : "Collapsed")
-
-                    if showAdvanced {
+                    DisclosureGroup(isExpanded: $showAdvanced) {
                         Card {
-                            ToggleRow(icon: "rectangle.bottomthird.inset.filled", title: "Lower Part of Side Edges Only",
+                            ToggleRow(icon: "rectangle.bottomthird.inset.filled", title: "Ignore the Top of the Side Edges",
                                       subtitle: "The top of the left and right edges is ignored", isOn: $prefs.bottomQuarterOnly)
                             RowDivider()
                             ToggleRow(icon: "hand.raised", title: "Palm Rejection",
@@ -124,8 +107,14 @@ struct SettingsPage: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 7)
                         }
-                        .transition(.opacity)
+                        .padding(.top, 8)
+                    } label: {
+                        Text("Advanced")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
                     }
+                    .padding(.leading, 6)
+                    .padding(.top, 4)
                 }
                 .padding(.bottom, 4)
             }
@@ -176,7 +165,7 @@ struct AppsPage: View {
         VStack(alignment: .leading, spacing: 12) {
             PageHeader(title: "Apps Where Brim Is Off") { page = .settings }
 
-            Text("Edges do nothing while one of these apps is in front. Handy for games, drawing apps and music software.")
+            Text("Edges and corners do nothing while one of these apps is in front. Handy for games, drawing apps and music software.")
                 .font(.system(size: 11.5))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

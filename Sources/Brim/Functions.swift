@@ -36,7 +36,7 @@ enum EdgeFunction: String, CaseIterable, Identifiable {
     /// Fits inside the small trackpad map.
     var shortTitle: String {
         switch self {
-        case .off: return "Off"
+        case .off: return "Nothing"
         case .keyboardBrightness: return "Keyboard"
         case .songs: return "Songs"
         case .desktops: return "Desktops"
@@ -69,10 +69,22 @@ enum EdgeFunction: String, CaseIterable, Identifiable {
         case .volume: return "Slide \(along) to change the volume."
         case .keyboardBrightness: return "Slide \(along) to change the keyboard backlight."
         case .scroll: return "Slide \(along) to scroll whatever is under the pointer."
-        case .zoom: return "Slide \(up) to zoom in and \(down) to zoom out, in apps that support ⌘+ and ⌘−."
+        case .zoom: return "Slide \(up) to zoom in and \(down) to zoom out, in apps like Safari, Preview and Pages."
         case .songs: return "Swipe \(up) for the next song and \(down) for the previous one."
         case .desktops: return "Swipe \(up) to move to the next desktop and \(down) for the previous one."
         case .backForward: return "Swipe \(down) to go back and \(up) to go forward, like in Safari."
+        }
+    }
+
+    /// How the action reads in a sentence ("… needs Accessibility").
+    var blockedName: String {
+        switch self {
+        case .scroll: return "Scrolling"
+        case .zoom: return "Zooming"
+        case .songs: return "Skipping songs"
+        case .desktops: return "Switching desktops"
+        case .backForward: return "Going back and forward"
+        default: return title
         }
     }
 
@@ -141,6 +153,20 @@ enum CornerFunction: String, CaseIterable, Identifiable {
         }
     }
 
+    /// How the action reads in a sentence ("… needs Accessibility").
+    var blockedName: String {
+        switch self {
+        case .playPause: return "Play and pause"
+        case .nextSong, .previousSong: return "Skipping songs"
+        case .showDesktop: return "Show Desktop"
+        case .spotlight: return "Spotlight"
+        default: return title
+        }
+    }
+
+    /// Actions that interrupt you if they happen by accident.
+    var isDisruptive: Bool { self == .lockScreen || self == .sleepDisplay }
+
     /// Grouped for the menu: sound, system, other.
     static let groups: [[CornerFunction]] = [
         [.off],
@@ -162,6 +188,16 @@ extension EdgeSide {
 }
 
 extension Corner {
+    /// "Top-right", for summaries.
+    var shortTitle: String {
+        switch self {
+        case .topLeft: return "Top-left"
+        case .topRight: return "Top-right"
+        case .bottomLeft: return "Bottom-left"
+        case .bottomRight: return "Bottom-right"
+        }
+    }
+
     var title: String {
         switch self {
         case .topLeft: return "Top-Left Corner"

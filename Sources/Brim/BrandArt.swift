@@ -120,7 +120,8 @@ enum Brand {
     // MARK: Menu bar glyph
 
     /// A template image for the status item: a trackpad with two edge levels.
-    static func menuBarGlyph(paused: Bool = false) -> NSImage {
+    /// `attention` adds a small dot, like an unread badge, when Brim needs the user.
+    static func menuBarGlyph(paused: Bool = false, attention: Bool = false) -> NSImage {
         let image = NSImage(size: NSSize(width: 20, height: 16), flipped: false) { _ in
             NSColor.black.set()
             let pad = NSBezierPath(roundedRect: NSRect(x: 1.5, y: 2, width: 17, height: 12), xRadius: 3, yRadius: 3)
@@ -135,6 +136,13 @@ enum Brand {
             } else {
                 NSBezierPath(roundedRect: NSRect(x: 4, y: 4, width: 2, height: 6.5), xRadius: 1, yRadius: 1).fill()
                 NSBezierPath(roundedRect: NSRect(x: 14, y: 4, width: 2, height: 4), xRadius: 1, yRadius: 1).fill()
+            }
+            if attention, let ctx = NSGraphicsContext.current {
+                ctx.compositingOperation = .clear
+                NSBezierPath(ovalIn: NSRect(x: 13, y: 9.5, width: 7.5, height: 7.5)).fill()
+                ctx.compositingOperation = .sourceOver
+                NSColor.black.set()
+                NSBezierPath(ovalIn: NSRect(x: 14.5, y: 11, width: 4.5, height: 4.5)).fill()
             }
             return true
         }

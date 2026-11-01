@@ -19,14 +19,14 @@ struct GesturesPage: View {
     @Binding var page: MenuPage
     var back: MenuPage = .main
     @ObservedObject var prefs = Prefs.shared
-    @ObservedObject var live = LiveState.shared
     @State private var selection: MapSpot = .edge(.right)
+    @State private var confirmReset = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PageHeader(title: "Edges and Corners") { page = back }
 
-            Text("Choose what each edge and corner of your trackpad does. Click one to change it.")
+            Text("Click an edge or corner to choose what it does. Edges respond to a slide or swipe; corners to a double-tap.")
                 .font(.system(size: 11.5))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -39,28 +39,46 @@ struct GesturesPage: View {
                 SpotEditor(spot: selection)
             }
 
-            HStack {
-                Text("Corners respond to a double-tap. Edges respond to a slide or swipe along them.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
+            HStack(spacing: 8) {
+                Spacer()
+                if confirmReset {
+                    Text("Back to brightness, volume, songs and mute?")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Button("Cancel") { confirmReset = false }.controlSize(.small)
+                    Button("Reset") { prefs.resetGestures(); confirmReset = false }
+                        .controlSize(.small)
+                        .buttonStyle(.borderedProminent)
+                } else {
+                    Button("Reset Edges and Corners…") { confirmReset = true }
+                        .controlSize(.small)
+                        .disabled(isDefault)
+                }
             }
-            .padding(.horizontal, 6)
         }
         .padding(14)
+    }
+
+    private var isDefault: Bool {
+        EdgeSide.allCases.allSatisfy { prefs.edge($0) == Prefs.defaultEdge($0) }
+            && Corner.allCases.allSatisfy { prefs.corner($0) == ($0 == .topRight ? .mute : .off) }
     }
 }
 
 // MARK: - Map
 
-/// A small trackpad with a button for every edge and corner, labeled with what it does.
+/// A small trackpad with a button for every edge and corner, showing what each does.
+/// Arrow keys move around it clockwise; VoiceOver reads it in the same order.
 struct TrackpadMap: View {
     @Binding var selection: MapSpot
     @ObservedObject var prefs = Prefs.shared
 
     private let bar: CGFloat = 30
     private let gap: CGFloat = 6
+
+    /// Clockwise from the top-left corner.
+    static let ring: [MapSpot] = [.corner(.topLeft), .edge(.top), .corner(.topRight), .edge(.right),
+                                  .corner(.bottomRight), .edge(.bottom), .corner(.bottomLeft), .edge(.left)]
 
     var body: some View {
         GeometryReader { geo in
@@ -87,27 +105,29 @@ struct TrackpadMap: View {
                 cornerButton(.topRight).offset(x: w - corner - gap, y: gap)
                 cornerButton(.bottomLeft).offset(x: gap, y: h - corner - gap)
                 cornerButton(.bottomRight).offset(x: w - corner - gap, y: h - corner - gap)
-
-                // What's selected, in the middle of the pad.
-                VStack(spacing: 3) {
-                    Text(selection.title)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Text(currentTitle)
-                        .font(.system(size: 14, weight: .semibold))
-                        .multilineTextAlignment(.center)
-                }
-                .frame(width: w - 2 * (bar + 3 * gap) - 20)
-                .position(x: w / 2, y: h / 2)
-                .accessibilityHidden(true)
             }
         }
+        .focusable()
+        .onMoveCommand { direction in
+            guard let i = Self.ring.firstIndex(of: selection) else { return }
+            let step = (direction == .right || direction == .down) ? 1 : -1
+            select(Self.ring[(i + step + Self.ring.count) % Self.ring.count])
+        }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Trackpad map")
+        .accessibilityLabel("Trackpad map. Arrow keys move between edges and corners.")
     }
 
-    private var currentTitle: String {
-        switch selection {
+    private func select(_ spot: MapSpot) {
+        selection = spot
+        let text = "\(spot.title), \(title(for: spot)). Options below."
+        if let window = NSApp.keyWindow {
+            NSAccessibility.post(element: window, notification: .announcementRequested,
+                                 userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+        }
+    }
+
+    private func title(for spot: MapSpot) -> String {
+        switch spot {
         case .edge(let side): return prefs.edge(side).title
         case .corner(let corner):
             let f = prefs.corner(corner)
@@ -116,48 +136,61 @@ struct TrackpadMap: View {
         }
     }
 
+    private func priority(_ spot: MapSpot) -> Double {
+        Double(Self.ring.count - (Self.ring.firstIndex(of: spot) ?? 0))
+    }
+
     private func edgeButton(_ side: EdgeSide) -> some View {
         let function = prefs.edge(side)
-        let selected = selection == .edge(side)
-        return SpotButton(selected: selected, off: function == .off, shape: .capsule) {
-            selection = .edge(side)
+        let spot = MapSpot.edge(side)
+        return SpotButton(selected: selection == spot, off: function == .off, shape: .capsule) {
+            select(spot)
         } label: {
-            Group {
+            if function != .off {
                 if side.isVertical {
                     VStack(spacing: 4) {
                         Image(systemName: function.icon)
-                        if function != .off {
-                            Text(function.shortTitle)
-                                .font(.system(size: 9, weight: .medium))
-                                .fixedSize()
-                                .rotationEffect(.degrees(side == .left ? -90 : 90))
-                                .frame(width: 12, height: 60)
-                        }
+                        Text(function.shortTitle)
+                            .font(.system(size: 9, weight: .medium))
+                            .fixedSize()
+                            .rotationEffect(.degrees(side == .left ? -90 : 90))
+                            .frame(width: 12, height: 60)
                     }
                 } else {
                     HStack(spacing: 5) {
                         Image(systemName: function.icon)
-                        if function != .off { Text(function.shortTitle).font(.system(size: 11, weight: .medium)) }
+                        Text(function.shortTitle).font(.system(size: 11, weight: .medium))
                     }
                 }
             }
         }
+        .help("\(side.title): \(function.title)")
         .accessibilityLabel("\(side.title): \(function.title)")
+        .accessibilityHint("Shows its options below")
+        .accessibilitySortPriority(priority(spot))
     }
 
     private func cornerButton(_ corner: Corner) -> some View {
         let function = prefs.corner(corner)
-        return SpotButton(selected: selection == .corner(corner), off: function == .off, shape: .circle) {
-            selection = .corner(corner)
+        let spot = MapSpot.corner(corner)
+        return SpotButton(selected: selection == spot, off: function == .off, shape: .circle) {
+            select(spot)
         } label: {
-            Image(systemName: function.icon)
+            if function == .openApp, let id = prefs.cornerApps[corner] {
+                AppIcon(bundleID: id).frame(width: 18, height: 18)
+            } else if function != .off {
+                Image(systemName: function.icon)
+            }
         }
         .frame(width: bar, height: bar)
-        .accessibilityLabel("\(corner.title): \(function.title)")
+        .help("\(corner.title): \(title(for: spot))")
+        .accessibilityLabel("\(corner.title): \(title(for: spot))")
+        .accessibilityHint("Shows its options below")
+        .accessibilitySortPriority(priority(spot))
     }
 }
 
-/// One tappable spot on the map. Selected spots take the accent color; empty spots are dashed.
+/// One spot on the map. The selected spot gets an accent ring; empty spots are dashed outlines.
 private struct SpotButton<Label: View>: View {
     enum Shape { case capsule, circle }
     let selected: Bool
@@ -173,7 +206,7 @@ private struct SpotButton<Label: View>: View {
                 background
                 label()
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(selected ? Color.white : (off ? Color.secondary : Color.primary))
+                    .foregroundStyle(selected ? Color.brimAccent : Color.primary)
             }
             .contentShape(Rectangle())
         }
@@ -183,14 +216,17 @@ private struct SpotButton<Label: View>: View {
     }
 
     @ViewBuilder private var background: some View {
-        let fill: Color = selected ? .brimAccent : Color.primary.opacity(hovering ? 0.12 : (off ? 0.03 : 0.08))
+        let fill = Color.primary.opacity(off ? (hovering ? 0.05 : 0) : (hovering ? 0.12 : 0.08))
+        let dash = StrokeStyle(lineWidth: 1, dash: [3, 3])
         switch shape {
         case .capsule:
             Capsule().fill(fill)
-                .overlay(Capsule().strokeBorder(Color.primary.opacity(off && !selected ? 0.2 : 0), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
+                .overlay(Capsule().strokeBorder(Color.primary.opacity(off && !selected ? 0.25 : 0), style: dash))
+                .overlay(Capsule().strokeBorder(Color.brimAccent, lineWidth: selected ? 2 : 0))
         case .circle:
             Circle().fill(fill)
-                .overlay(Circle().strokeBorder(Color.primary.opacity(off && !selected ? 0.25 : 0), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
+                .overlay(Circle().strokeBorder(Color.primary.opacity(off && !selected ? 0.3 : 0), style: dash))
+                .overlay(Circle().strokeBorder(Color.brimAccent, lineWidth: selected ? 2 : 0))
         }
     }
 }
@@ -277,6 +313,12 @@ private struct SpotEditor: View {
             .font(.system(size: 11.5))
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+        if function.isDisruptive {
+            Label("Pick a corner your palm doesn't rest on, so it doesn't happen by accident.", systemImage: "exclamationmark.triangle")
+                .font(.system(size: 11))
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+        }
         if function == .openApp {
             HStack(spacing: 8) {
                 if let id = prefs.cornerApps[corner] {

@@ -201,7 +201,7 @@ final class EdgeEngine {
 
         case .tap(let side):
             if prefs.edge(side) == .songs && prefs.tapToPlay {
-                run(needsAccess: true, name: "Tap to Play or Pause") { SystemControls.press(.play) }
+                run(needsAccess: true, name: "Tap to play or pause") { SystemControls.press(.play) }
             }
 
         case .cornerDoubleTap(let corner):
@@ -234,11 +234,11 @@ final class EdgeEngine {
 
         switch function {
         case .scroll:
-            run(needsAccess: true, name: function.title) {
+            run(needsAccess: true, name: function.blockedName) {
                 SystemControls.scroll(vertical: side.isVertical, towardTopOrRight: up)
             }
         case .zoom:
-            run(needsAccess: true, name: function.title) {
+            run(needsAccess: true, name: function.blockedName) {
                 SystemControls.shortcut(up ? .equal : .minus, .maskCommand)
                 Haptics.tick(prefs.haptics)
             }
@@ -248,7 +248,7 @@ final class EdgeEngine {
     }
 
     private func swipe(_ function: EdgeFunction, forward: Bool) {
-        run(needsAccess: function.needsAccess, name: function.title) {
+        run(needsAccess: function.needsAccess, name: function.blockedName) {
             switch function {
             case .songs: SystemControls.press(forward ? .next : .previous)
             case .desktops: SystemControls.shortcut(forward ? .rightArrow : .leftArrow, .maskControl)
@@ -261,7 +261,7 @@ final class EdgeEngine {
 
     private func cornerAction(_ corner: Corner) {
         let function = prefs.corner(corner)
-        run(needsAccess: function.needsAccess, name: function.title) {
+        run(needsAccess: function.needsAccess, name: function.blockedName) {
             switch function {
             case .off: return
             case .mute:

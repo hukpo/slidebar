@@ -193,6 +193,14 @@ final class Prefs: ObservableObject {
         return f != .off && (f != .openApp || cornerApps[c] != nil)
     }
 
+    /// Puts only the edges and corners back the way Brim ships.
+    func resetGestures() {
+        edges = Dictionary(uniqueKeysWithValues: EdgeSide.allCases.map { ($0, Prefs.defaultEdge($0)) })
+        corners = Dictionary(uniqueKeysWithValues: Corner.allCases.map { ($0, $0 == .topRight ? .mute : .off) })
+        cornerApps = [:]
+        tapToPlay = false
+    }
+
     /// Puts every gesture and option back the way Brim ships. Keeps setup, permission and app-list state.
     func restoreDefaults() {
         haptics = .medium

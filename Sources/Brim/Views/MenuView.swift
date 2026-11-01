@@ -62,7 +62,7 @@ struct MainPage: View {
             NoticeArea()
 
             Card {
-                ToggleRow(icon: "hand.draw", title: "Edge Sliders",
+                ToggleRow(icon: "hand.draw", title: "Trackpad Gestures",
                           subtitle: edgeSlidersSubtitle,
                           isOn: Binding(get: { !prefs.paused }, set: { prefs.paused = !$0 }))
 
@@ -81,7 +81,7 @@ struct MainPage: View {
 
                 RowDivider()
 
-                NavigationRow(icon: "rectangle.dashed", title: "Edges and Corners",
+                NavigationRow(icon: "rectangle.and.hand.point.up.left", title: "Edges and Corners",
                               subtitle: GestureSummary.text(prefs)) {
                     page = .gestures(back: .main)
                 }
@@ -105,21 +105,22 @@ struct MainPage: View {
 
     private var edgeSlidersSubtitle: String {
         if prefs.paused { return "Paused. Your trackpad works as usual." }
-        if prefs.requireModifier { return "Hold Fn or Option while you slide" }
-        return "Slide the edges of your trackpad"
+        if prefs.requireModifier { return "Hold Fn or Option while you use them" }
+        return "Your edges and corners"
     }
 }
 
-/// One short line describing the current edges and corners.
+/// One short line describing the current edges and corners, in map order (left, right, top, bottom, corners).
 enum GestureSummary {
     static func text(_ prefs: Prefs) -> String {
-        var parts: [String] = []
-        for side in [EdgeSide.left, .right, .top, .bottom] where prefs.edge(side) != .off {
-            let name = side.title.replacingOccurrences(of: " Edge", with: "")
-            parts.append("\(name): \(prefs.edge(side).shortTitle)")
+        var parts = [EdgeSide.left, .right, .top, .bottom].compactMap { side -> String? in
+            let f = prefs.edge(side)
+            return f == .off ? nil : f.shortTitle
         }
-        let corners = Corner.allCases.filter { prefs.cornerIsActive($0) }.count
-        if corners > 0 { parts.append("\(corners) corner\(corners == 1 ? "" : "s")") }
+        for c in Corner.allCases where prefs.cornerIsActive(c) {
+            let f = prefs.corner(c)
+            parts.append(f == .openApp ? prefs.cornerApps[c].map(AppNames.name(for:)) ?? f.title : f.title)
+        }
         return parts.isEmpty ? "Nothing assigned yet" : parts.joined(separator: " · ")
     }
 }
@@ -211,7 +212,7 @@ struct EdgeMeters: View {
         VStack(alignment: leading ? .leading : .trailing, spacing: 3) {
             HStack(spacing: 5) {
                 if leading { iconView(icon, tint: tint, function: function) }
-                Text(function == .off ? "Off" : function.shortTitle)
+                Text(function.shortTitle)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.72))
                 if !leading { iconView(icon, tint: tint, function: function) }
@@ -239,7 +240,8 @@ struct EdgeMeters: View {
             .opacity(live.activeSide == nil || active ? 1 : 0.5)
             .animation(.easeOut(duration: 0.15), value: live.activeSide)
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(side.title): \(function.title)")
         // For levels, the bar beside it speaks and adjusts the same value for VoiceOver.
         .accessibilityHidden(function.hasLevel)
     }
