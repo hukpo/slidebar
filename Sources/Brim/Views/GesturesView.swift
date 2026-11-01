@@ -71,6 +71,9 @@ struct TrackpadMap: View {
     @Binding var selection: MapSpot
     @ObservedObject var prefs = Prefs.shared
     @FocusState private var mapFocused: Bool
+    /// Show the focus halo only when the user is navigating by keyboard, like native controls.
+    @State private var keyboardNav = false
+    @State private var clickingFocus = false
 
     private let bar: CGFloat = 30
     private let gap: CGFloat = 6
@@ -109,6 +112,12 @@ struct TrackpadMap: View {
         .focusable()
         .focused($mapFocused)
         .modifier(NoSystemFocusRing())
+        .onChange(of: mapFocused) { focused in
+            // Focus that arrives by Tab (not by a click) shows the halo.
+            if focused && !clickingFocus { keyboardNav = true }
+            if !focused { keyboardNav = false }
+            clickingFocus = false
+        }
         .onMoveCommand { direction in
             if let next = Self.neighbor(of: selection, direction) { select(next, fromKeyboard: true) }
         }
@@ -152,7 +161,14 @@ struct TrackpadMap: View {
         selection = spot
         // Take focus so arrow keys work right after a click. Where the system focus ring can't be
         // hidden (macOS 13), only take it from the keyboard, like native controls.
-        if #available(macOS 14, *) { mapFocused = true } else if fromKeyboard { mapFocused = true }
+        if fromKeyboard {
+            keyboardNav = true
+            mapFocused = true
+        } else if #available(macOS 14, *) {
+            keyboardNav = false
+            clickingFocus = !mapFocused
+            mapFocused = true
+        }
         let text = "\(spot.title), \(title(for: spot)). Options below."
         if let window = NSApp.keyWindow {
             NSAccessibility.post(element: window, notification: .announcementRequested,
@@ -177,7 +193,7 @@ struct TrackpadMap: View {
     private func edgeButton(_ side: EdgeSide) -> some View {
         let function = prefs.edge(side)
         let spot = MapSpot.edge(side)
-        return SpotButton(selected: selection == spot, keyboardFocused: mapFocused, off: function == .off, shape: .capsule) {
+        return SpotButton(selected: selection == spot, keyboardFocused: mapFocused && keyboardNav, off: function == .off, shape: .capsule) {
             select(spot)
         } label: {
             if function != .off {
@@ -207,7 +223,7 @@ struct TrackpadMap: View {
     private func cornerButton(_ corner: Corner) -> some View {
         let function = prefs.corner(corner)
         let spot = MapSpot.corner(corner)
-        return SpotButton(selected: selection == spot, keyboardFocused: mapFocused, off: function == .off, shape: .circle) {
+        return SpotButton(selected: selection == spot, keyboardFocused: mapFocused && keyboardNav, off: function == .off, shape: .circle) {
             select(spot)
         } label: {
             if function == .openApp, let id = prefs.cornerApps[corner] {
