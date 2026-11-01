@@ -21,13 +21,6 @@ struct SettingsPage: View {
             ScrollViewReader { proxy in
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Card {
-                        NavigationRow(icon: "rectangle.and.hand.point.up.left", title: "Edges and Corners",
-                                      subtitle: GestureSummary.text(prefs)) {
-                            page = .gestures(back: .settings)
-                        }
-                    }
-
                     SectionHeader(title: "Feel")
                     Card {
                         SliderRow(icon: "speedometer", title: "Slide Speed",

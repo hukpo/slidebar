@@ -21,7 +21,7 @@ Out of the box:
 | **Double-tap** the top-right corner | Mute / unmute |
 | Hold **⇧⌥** while sliding | Quarter steps |
 
-**Every edge and corner is configurable** (menu → Edges and Corners):
+**Every edge and corner is configurable** (click it on the trackpad map in the menu):
 
 - **Edges** (left, right, top, bottom) can slide **Brightness, Volume, Keyboard Brightness, Microphone Volume, Night Shift Warmth**, step through **Tabs** or **Undo and Redo**, or be swiped for **Next/Previous Song** or **Switch Windows**. Top and bottom edges slide left and right.
 - **Corners** (all four) respond to a double-tap: **Mute Sound, Mute Microphone, Play or Pause, Next Song, Previous Song, Keep Mac Awake, Lock Screen, Turn Off Display, Take a Screenshot, Spotlight, Emoji & Symbols, Run a Shortcut, or Open an App**.
@@ -30,7 +30,7 @@ Brim deliberately leaves out things macOS already does with multi-finger gesture
 
 Brightness, volume and keyboard brightness use the same on-screen display as the keyboard keys. Actions that press keys need Accessibility; Brim says so in place and offers to allow it.
 
-**Menu:** live levels for the left and right edges (drag them, or adjust with VoiceOver), an on/off switch, "Use in [current app]", Edges and Corners, and haptic strength.
+**Menu:** a map of your trackpad showing what every edge and corner does, with live levels filling the edges; click a spot to change it. Plus an on/off switch, "Use in [current app]", and haptic strength.
 
 **Settings:** slide speed, edge width, keep pointer still, edge glow, apps where Brim is off, appearance, open at login, automatic updates; under Advanced: lower part of side edges only, palm rejection, only while holding Fn or Option, smaller steps with Shift-Option, restore defaults.
 
@@ -96,7 +96,7 @@ Sources/
     BrandArt.swift     the app icon and menu bar glyph, drawn in code
     Functions.swift    what edges and corners can do (EdgeFunction, CornerFunction)
     KeyboardBacklight  keyboard backlight level (CoreBrightness)
-    Views/             SwiftUI menu, Edges and Corners map, settings, setup guide
+    Views/             SwiftUI menu with the trackpad map, settings, setup guide
 scripts/
   build.sh             build, bundle, sign, DMG, appcast.json
   IconTool/            renders BrandArt's icon to AppIcon.icns

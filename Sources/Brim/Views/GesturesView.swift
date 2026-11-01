@@ -14,62 +14,15 @@ enum MapSpot: Hashable {
     }
 }
 
-/// "Edges and Corners": a trackpad map to choose what every edge and corner does.
-struct GesturesPage: View {
-    @Binding var page: MenuPage
-    var back: MenuPage = .main
-    @ObservedObject var prefs = Prefs.shared
-    @State private var selection: MapSpot = .edge(.right)
-    @State private var confirmReset = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            PageHeader(title: "Edges and Corners") { page = back }
-
-            Text("Click an edge or corner to choose what it does. Edges respond to a slide or swipe; corners to a double-tap.")
-                .font(.system(size: 11.5))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 6)
-
-            TrackpadMap(selection: $selection)
-                .frame(height: 196)
-
-            Card {
-                SpotEditor(spot: selection)
-            }
-
-            VStack(alignment: .trailing, spacing: 6) {
-                if confirmReset {
-                    Text("Back to brightness, volume, songs and mute?")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                    HStack(spacing: 8) {
-                        Button("Cancel") { confirmReset = false }.controlSize(.small)
-                        Button("Restore") { prefs.resetGestures(); confirmReset = false }
-                            .controlSize(.small)
-                            .buttonStyle(.borderedProminent)
-                    }
-                } else {
-                    Button("Restore Defaults…") { confirmReset = true }
-                        .controlSize(.small)
-                        .disabled(prefs.gesturesAreDefault)
-                        .help("Put edges and corners back the way Brim starts")
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
-        }
-        .padding(14)
-    }
-}
-
 // MARK: - Map
 
-/// A small trackpad with a button for every edge and corner, showing what each does.
+/// The home screen's trackpad: a button for every edge and corner showing what it does, with live
+/// levels filling the edges. Click a spot to change it, click it again to close.
 /// Arrow keys move in the direction pressed; VoiceOver reads the spots clockwise.
 struct TrackpadMap: View {
-    @Binding var selection: MapSpot
+    @Binding var selection: MapSpot?
     @ObservedObject var prefs = Prefs.shared
+    @ObservedObject var live = LiveState.shared
     @FocusState private var mapFocused: Bool
     /// Show the focus halo only when the user is navigating by keyboard, like native controls.
     @State private var keyboardNav = false
@@ -87,10 +40,11 @@ struct TrackpadMap: View {
             let w = geo.size.width, h = geo.size.height
             let corner = bar
             ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.primary.opacity(0.045))
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.12))
+                NightBackground(cornerRadius: 18)
+
+                CenterReadout(selection: selection)
+                    .frame(width: w - 2 * (bar + 2 * gap) - 16, height: h - 2 * (bar + 2 * gap) - 8)
+                    .offset(x: bar + 2 * gap + 8, y: bar + 2 * gap + 4)
 
                 // Edges
                 edgeButton(.top).frame(width: w - 2 * (corner + 2 * gap), height: bar)
@@ -119,8 +73,13 @@ struct TrackpadMap: View {
             clickingFocus = false
         }
         .onMoveCommand { direction in
-            if let next = Self.neighbor(of: selection, direction) { select(next, fromKeyboard: true) }
+            guard let current = selection else { select(.edge(.left), fromKeyboard: true); return }
+            if let next = Self.neighbor(of: current, direction) { select(next, fromKeyboard: true) }
         }
+        .onExitCommand { selection = nil }
+        .environment(\.colorScheme, .dark)
+        .opacity(prefs.paused ? 0.6 : 1)
+        .animation(.easeOut(duration: 0.2), value: prefs.paused)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Trackpad map. Arrow keys move between edges and corners.")
     }
@@ -158,6 +117,11 @@ struct TrackpadMap: View {
     }
 
     private func select(_ spot: MapSpot, fromKeyboard: Bool = false) {
+        // Clicking the open spot again closes its options.
+        if !fromKeyboard && selection == spot {
+            selection = nil
+            return
+        }
         selection = spot
         // Take focus so arrow keys work right after a click. Where the system focus ring can't be
         // hidden (macOS 13), only take it from the keyboard, like native controls.
@@ -194,7 +158,12 @@ struct TrackpadMap: View {
     private func edgeButton(_ side: EdgeSide) -> some View {
         let function = prefs.edge(side)
         let spot = MapSpot.edge(side)
-        return SpotButton(selected: selection == spot, keyboardFocused: mapFocused && keyboardNav, off: function == .off, shape: .capsule) {
+        let level = live.level(of: function).map { CGFloat($0) }
+        let muted = function == .volume && live.muted
+        let percent = muted ? "Muted" : level.map { "\(Int(($0 * 100).rounded()))%" }
+        return SpotButton(selected: selection == spot, keyboardFocused: mapFocused && keyboardNav, off: function == .off,
+                          shape: .capsule, levelValue: function.hasLevel ? level : nil, vertical: side.isVertical,
+                          colors: function.levelColors, dimmed: muted, active: live.activeSide == side) {
             select(spot)
         } label: {
             if function == .off {
@@ -202,23 +171,34 @@ struct TrackpadMap: View {
             } else {
                 if side.isVertical {
                     VStack(spacing: 4) {
-                        Image(systemName: function.icon)
+                        Image(systemName: muted ? "speaker.slash.fill" : function.icon)
                         Text(function.shortTitle)
                             .font(.system(size: 9, weight: .medium))
                             .fixedSize()
                             .rotationEffect(.degrees(side == .left ? -90 : 90))
                             .frame(width: 12, height: 60)
+                        if let percent, !muted {
+                            Text(percent.dropLast())
+                                .font(.system(size: 9, weight: .semibold).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 } else {
                     HStack(spacing: 5) {
                         Image(systemName: function.icon)
                         Text(function.shortTitle).font(.system(size: 11, weight: .medium))
+                        if let percent {
+                            Text(percent)
+                                .font(.system(size: 11, weight: .medium).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
         }
         .help("\(side.title): \(function.title)")
         .accessibilityLabel("\(side.title): \(function.title)")
+        .accessibilityValue(percent ?? "")
         .accessibilityHint("Shows its options below")
         .accessibilitySortPriority(priority(spot))
     }
@@ -253,6 +233,13 @@ private struct SpotButton<Label: View>: View {
     let keyboardFocused: Bool
     let off: Bool
     let shape: Shape
+    /// A live level (0…1) filling the edge from the bottom or the left.
+    var levelValue: CGFloat? = nil
+    var vertical = false
+    var colors: [Color] = []
+    var dimmed = false
+    /// Being slid right now.
+    var active = false
     let action: () -> Void
     @ViewBuilder let label: () -> Label
     @State private var hovering = false
@@ -275,11 +262,12 @@ private struct SpotButton<Label: View>: View {
     }
 
     @ViewBuilder private var background: some View {
-        let fill = Color.primary.opacity(off ? (hovering ? 0.05 : 0) : (hovering ? 0.12 : 0.08))
+        let fill = Color.primary.opacity(off ? (hovering ? 0.05 : 0) : (hovering || active ? 0.14 : 0.08))
         let dash = StrokeStyle(lineWidth: 1, dash: [3, 3])
         switch shape {
         case .capsule:
             Capsule().fill(fill)
+                .overlay(levelFill)
                 .overlay(Capsule().strokeBorder(Color.primary.opacity(off && !selected ? 0.25 : 0), style: dash))
                 .overlay(Capsule().strokeBorder(Color.brimAccent, lineWidth: selected ? 2 : 0))
                 .overlay(Capsule().inset(by: -3).stroke(Color(nsColor: .keyboardFocusIndicatorColor),
@@ -304,11 +292,78 @@ private struct EmptySpotMark: View {
     }
 }
 
+extension SpotButton {
+    @ViewBuilder var levelFill: some View {
+        if let level = levelValue, colors.count > 0 {
+            GeometryReader { g in
+                let v = min(max(level, 0), 1)
+                LinearGradient(colors: colors, startPoint: vertical ? .bottom : .leading, endPoint: vertical ? .top : .trailing)
+                    .frame(width: vertical ? g.size.width : max(g.size.height, g.size.width * v),
+                           height: vertical ? max(g.size.width, g.size.height * v) : g.size.height)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: vertical ? .bottom : .leading)
+            }
+            .clipShape(Capsule())
+            .opacity(dimmed ? 0.12 : (active ? 0.6 : 0.38))
+            .animation(.spring(response: 0.3, dampingFraction: 0.85), value: level)
+            .animation(.easeOut(duration: 0.15), value: active)
+        }
+    }
+}
+
+/// The middle of the map: a hint when nothing is open, the live level while sliding.
+private struct CenterReadout: View {
+    let selection: MapSpot?
+    @ObservedObject var prefs = Prefs.shared
+    @ObservedObject var live = LiveState.shared
+
+    var body: some View {
+        Group {
+            if let side = live.activeSide, prefs.edge(side).hasLevel, let v = live.level(of: prefs.edge(side)) {
+                let function = prefs.edge(side)
+                let muted = function == .volume && live.muted
+                VStack(spacing: 2) {
+                    Label(function.shortTitle, systemImage: muted ? "speaker.slash.fill" : function.icon)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.7))
+                    HStack(alignment: .firstTextBaseline, spacing: 1) {
+                        Text(muted ? "Muted" : "\(Int((v * 100).rounded()))")
+                            .font(.system(size: 34, weight: .medium).monospacedDigit())
+                        if !muted {
+                            Text("%").font(.system(size: 14, weight: .medium)).foregroundStyle(.white.opacity(0.65))
+                        }
+                    }
+                    .foregroundStyle(.white)
+                }
+                .transition(.opacity)
+            } else if prefs.paused {
+                hint("Paused", "Your trackpad works as usual.")
+            } else if selection == nil {
+                hint(nil, "Click an edge or corner\nto choose what it does")
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .animation(.easeOut(duration: 0.15), value: live.activeSide)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func hint(_ title: String?, _ text: String) -> some View {
+        VStack(spacing: 3) {
+            if let title { Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white.opacity(0.85)) }
+            Text(text)
+                .font(.system(size: 11.5))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white.opacity(0.55))
+        }
+    }
+}
+
 // MARK: - Editor
 
 /// Choose the action for the selected spot, with a plain description of the gesture.
-private struct SpotEditor: View {
+struct SpotEditor: View {
     let spot: MapSpot
+    var onClose: (() -> Void)?
     @ObservedObject var prefs = Prefs.shared
     @ObservedObject var live = LiveState.shared
     @State private var shortcuts: [String] = []
@@ -330,8 +385,8 @@ private struct SpotEditor: View {
     private func edgeEditor(_ side: EdgeSide) -> some View {
         let function = prefs.edge(side)
         HStack {
-            Text(side.title).font(.system(size: 13, weight: .semibold))
-            Spacer()
+            Text(side.title).font(.system(size: 13, weight: .semibold)).fixedSize()
+            Spacer(minLength: 8)
             Picker(side.title, selection: Binding(
                 get: { prefs.edge(side) },
                 set: { prefs.edges[side] = $0 }
@@ -347,7 +402,8 @@ private struct SpotEditor: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .fixedSize()
+            .frame(maxWidth: 170)
+            closeButton
         }
         Text(function.detail(on: side))
             .font(.system(size: 11.5))
@@ -365,8 +421,8 @@ private struct SpotEditor: View {
     private func cornerEditor(_ corner: Corner) -> some View {
         let function = prefs.corner(corner)
         HStack {
-            Text(corner.title).font(.system(size: 13, weight: .semibold))
-            Spacer()
+            Text(corner.title).font(.system(size: 13, weight: .semibold)).fixedSize()
+            Spacer(minLength: 8)
             Picker(corner.title, selection: Binding(
                 get: { prefs.corner(corner) },
                 set: { newValue in
@@ -384,7 +440,8 @@ private struct SpotEditor: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .fixedSize()
+            .frame(maxWidth: 170)
+            closeButton
         }
         Text(function == .off ? "This corner works like the rest of the trackpad."
                               : "Double-tap the corner to \(cornerVerb(function, corner)).")
@@ -441,6 +498,19 @@ private struct SpotEditor: View {
             .onAppear(perform: loadShortcuts)
         }
         if function.needsAccess && !live.trusted { NeedsAccessNote() }
+    }
+
+    @ViewBuilder private var closeButton: some View {
+        if let onClose {
+            Button(action: onClose) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.tertiary)
+            }
+            .buttonStyle(.plain)
+            .help("Done")
+            .accessibilityLabel("Done")
+        }
     }
 
     private func loadShortcuts() {
