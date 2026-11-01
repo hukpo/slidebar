@@ -34,7 +34,7 @@ Brightness, volume and keyboard brightness use the same on-screen display as the
 
 **Settings:** slide speed, edge width, keep pointer still, edge glow, apps where Brim is off, appearance, open at login, automatic updates; under Advanced: lower part of side edges only, palm rejection, only while holding Fn or Option, smaller steps with Shift-Option, restore defaults.
 
-Also: a first-run setup guide, per-app off switch, palm rejection, trackpad hot-plug, menu bar only (no Dock icon), and updates that download and install themselves.
+Also: accident protection (deliberate slides only, quick straight swipes, double-taps in the same spot, nothing while typing or while the button is held, and a Recently Triggered list), a first-run setup guide, per-app off switch, palm rejection, trackpad hot-plug, menu bar only (no Dock icon), and updates that download and install themselves.
 
 ## Build
 

@@ -81,7 +81,7 @@ enum EdgeFunction: String, CaseIterable, Identifiable {
         case .nightShift: return "Slide \(up) for warmer colors and \(down) for cooler ones. Turns Night Shift on."
         case .tabs: return "Slide \(up) for the next tab and \(down) for the previous one, in Safari, Chrome, Finder and most apps with tabs."
         case .undo: return "Slide \(down) to undo and \(up) to redo, one change at a time."
-        case .songs: return "Swipe \(up) for the next song and \(down) for the previous one."
+        case .songs: return "Swipe \(up) quickly for the next song and \(down) for the previous one."
         case .windows: return "Swipe \(up) for the app's next window and \(down) for the previous one."
         }
     }

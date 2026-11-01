@@ -172,9 +172,82 @@ final class EdgeRecognizerTests: XCTestCase {
         XCTAssertEqual(run(&r, path: line(from: (0.3, 0.04), to: (0.6, 0.05))), [])
     }
 
-    func testTapOnEdgeIsReported() {
+    func testDoubleTapOnEdgeIsReported() {
         var r = EdgeRecognizer()
-        XCTAssertTrue(run(&r, path: [(0.5, 0.04), (0.5, 0.04)]).contains(.tap(.bottom)))
+        XCTAssertFalse(run(&r, path: [(0.5, 0.04), (0.5, 0.04)], start: 0).contains(.doubleTap(.bottom)))
+        XCTAssertTrue(run(&r, path: [(0.5, 0.04), (0.5, 0.04)], start: 0.2).contains(.doubleTap(.bottom)))
+    }
+
+    // MARK: Accidents
+
+    func testSingleClickOnEdgeDoesNothing() {
+        var r = EdgeRecognizer()
+        let actions = run(&r, path: [(0.5, 0.04), (0.5, 0.04)])
+        XCTAssertFalse(actions.contains { if case .doubleTap = $0 { return true } else { return false } })
+    }
+
+    func testDoubleTapInDifferentPlacesDoesNothing() {
+        var r = EdgeRecognizer()
+        _ = run(&r, path: [(0.3, 0.04), (0.3, 0.04)], start: 0)
+        XCTAssertFalse(run(&r, path: [(0.6, 0.04), (0.6, 0.04)], start: 0.2).contains(.doubleTap(.bottom)))
+    }
+
+    func testDiagonalPointerMoveFromEdgeDoesNotSlide() {
+        var r = EdgeRecognizer()
+        // Starts on the right edge but heads up and into the trackpad, like moving the pointer.
+        let actions = run(&r, path: line(from: (0.98, 0.2), to: (0.85, 0.35)))
+        XCTAssertFalse(actions.contains(.slideBegan(.right)))
+        XCTAssertTrue(steps(actions).isEmpty)
+    }
+
+    func testSmallWiggleDoesNotSlide() {
+        var r = EdgeRecognizer()
+        XCTAssertTrue(steps(run(&r, path: line(from: (0.98, 0.30), to: (0.98, 0.32)))).isEmpty)
+    }
+
+    func testWanderingOffTheEdgeEndsTheSlide() {
+        var r = EdgeRecognizer()
+        // Slides up the edge, then drifts well into the trackpad: steps stop once it leaves the lane.
+        let path = line(from: (0.98, 0.2), to: (0.98, 0.4)) + line(from: (0.98, 0.4), to: (0.6, 0.8))
+        let s = steps(run(&r, path: path))
+        // Staying on the edge for the whole 0.6 of travel would give 22 steps.
+        XCTAssertLessThan(s.count, 13)
+        XCTAssertFalse(s.isEmpty)
+    }
+
+    func testSlowDragAlongBottomDoesNotSwipe() {
+        var r = EdgeRecognizer()
+        // 0.4 of travel over 1.2 s: a pointer move, not a swipe.
+        let actions = run(&r, path: line(from: (0.3, 0.04), to: (0.7, 0.04), frames: 120))
+        XCTAssertFalse(actions.contains(.swipe(.bottom, forward: true)))
+    }
+
+    func testCurvedSwipeDoesNotCount() {
+        var r = EdgeRecognizer()
+        // Leaves the bottom edge on the way: not a swipe along it.
+        XCTAssertFalse(run(&r, path: line(from: (0.3, 0.04), to: (0.6, 0.25))).contains(.swipe(.bottom, forward: true)))
+    }
+
+    func testHoldingTheButtonPreventsGestures() {
+        var r = EdgeRecognizer()
+        let dragging = EdgeContext(gestureAllowed: true, fineKeysHeld: false, buttonHeld: true)
+        XCTAssertEqual(run(&r, path: line(from: (0.98, 0.2), to: (0.98, 0.6)), context: dragging), [])
+    }
+
+    func testPressingTheButtonMidwayCancelsBeforeStart() {
+        var r = EdgeRecognizer()
+        _ = r.process([TouchPoint(id: 1, x: 0.98, y: 0.3)], time: 0)
+        let actions = r.process([TouchPoint(id: 1, x: 0.98, y: 0.305)], time: 0.01,
+                                context: EdgeContext(gestureAllowed: true, fineKeysHeld: false, buttonHeld: true))
+        XCTAssertEqual(actions, [.releaseCursor])
+        XCTAssertFalse(r.isTracking)
+    }
+
+    func testDoubleClickJustOutsideTheCornerDoesNothing() {
+        var r = EdgeRecognizer()
+        // Corners are now the outer 10%; (0.88, 0.88) used to count, now it doesn't.
+        _ = run(&r, path: [(0.88, 0.88), (0.88, 0.88)], start: 0)
+        XCTAssertFalse(run(&r, path: [(0.88, 0.88), (0.88, 0.88)], start: 0.2).contains(.cornerDoubleTap(.topRight)))
     }
 
     // MARK: Corners
@@ -208,8 +281,9 @@ final class EdgeRecognizerTests: XCTestCase {
     func testDisabledCornerFallsThroughToEdge() {
         var r = EdgeRecognizer()
         r.config.corners = []
-        // A tap in the top-right corner is now just a tap on the right edge.
-        XCTAssertTrue(run(&r, path: [(0.98, 0.95), (0.98, 0.95)]).contains(.tap(.right)))
+        // A double-tap in the top-right corner is now just a double-tap on the right edge.
+        _ = run(&r, path: [(0.98, 0.95), (0.98, 0.95)], start: 0)
+        XCTAssertTrue(run(&r, path: [(0.98, 0.95), (0.98, 0.95)], start: 0.2).contains(.doubleTap(.right)))
     }
 
     func testTapsInDifferentCornersDontCombine() {

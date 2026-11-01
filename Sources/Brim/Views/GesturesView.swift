@@ -39,6 +39,8 @@ struct GesturesPage: View {
                 SpotEditor(spot: selection)
             }
 
+            RecentList(selection: $selection)
+
             VStack(alignment: .trailing, spacing: 6) {
                 if confirmReset {
                     Text("Back to brightness, volume, songs and mute?")
@@ -340,7 +342,7 @@ private struct SpotEditor: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         if function == .songs {
-            Toggle("Tap the edge to play or pause", isOn: $prefs.tapToPlay)
+            Toggle("Double-tap the edge to play or pause", isOn: $prefs.tapToPlay)
                 .toggleStyle(.checkbox)
                 .font(.system(size: 12))
         }
@@ -527,5 +529,60 @@ private struct NoSystemFocusRing: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+// MARK: - Recently triggered
+
+/// What Brim did lately and where. Clicking an entry selects that edge or corner, so a spot that
+/// fires by accident is one click from being changed.
+private struct RecentList: View {
+    @Binding var selection: MapSpot
+    @ObservedObject var live = LiveState.shared
+
+    var body: some View {
+        if !live.recent.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Recently Triggered")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 6)
+                    .accessibilityAddTraits(.isHeader)
+                Card {
+                    ForEach(Array(live.recent.prefix(4).enumerated()), id: \.element.id) { index, entry in
+                        if index > 0 { RowDivider(inset: 8) }
+                        Button { if let spot = spot(named: entry.spot) { selection = spot } } label: {
+                            HStack {
+                                Text(entry.action).font(.system(size: 12, weight: .medium))
+                                Text(entry.spot).font(.system(size: 12)).foregroundStyle(.secondary)
+                                Spacer()
+                                Text(entry.date, style: .relative)
+                                    .font(.system(size: 11).monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .hoverHighlight()
+                        .help("Show \(entry.spot) on the map")
+                        .accessibilityLabel("\(entry.action), \(entry.spot)")
+                        .accessibilityHint("Selects it on the map")
+                    }
+                }
+                Text("Something firing by accident? Click it to select that spot, then choose Nothing.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 6)
+            }
+        }
+    }
+
+    private func spot(named title: String) -> MapSpot? {
+        if let side = EdgeSide.allCases.first(where: { $0.title == title }) { return .edge(side) }
+        if let corner = Corner.allCases.first(where: { $0.title == title }) { return .corner(corner) }
+        return nil
     }
 }

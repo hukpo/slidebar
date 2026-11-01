@@ -40,6 +40,25 @@ final class LiveState: ObservableObject {
     /// Set when a gesture asked for something that needs Accessibility, so the menu can explain.
     @Published var blockedAction: String?
 
+    /// What Brim did recently and where, newest first, so accidental triggers are easy to spot.
+    struct Recent: Identifiable, Equatable {
+        let id = UUID()
+        let action: String
+        let spot: String
+        let date: Date
+    }
+    @Published var recent: [Recent] = []
+
+    func record(_ action: String, at spot: String) {
+        // One entry per gesture: a slide that keeps going doesn't fill the list.
+        if let first = recent.first, first.action == action, first.spot == spot, Date().timeIntervalSince(first.date) < 3 {
+            recent[0] = Recent(action: action, spot: spot, date: Date())
+        } else {
+            recent.insert(Recent(action: action, spot: spot, date: Date()), at: 0)
+            if recent.count > 6 { recent.removeLast() }
+        }
+    }
+
     var status: Status {
         if Prefs.shared.paused { return .paused }
         if deviceCount == 0 { return .noTrackpad }
@@ -179,7 +198,11 @@ final class EdgeEngine {
         if prefs.requireModifier {
             allowed = allowed && (flags.contains(.function) || flags.contains(.option))
         }
-        let context = EdgeContext(gestureAllowed: allowed, fineKeysHeld: flags.contains([.shift, .option]))
+        // Like macOS's own palm protection: ignore new edge touches right after typing.
+        let typing = CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: .keyDown) < 0.5
+        let context = EdgeContext(gestureAllowed: allowed && !typing,
+                                  fineKeysHeld: flags.contains([.shift, .option]),
+                                  buttonHeld: NSEvent.pressedMouseButtons != 0)
         let actions = recognizer.process(touches, time: time, context: context)
         for action in actions { perform(action) }
         if !recognizer.isTracking, live.activeSide != nil {
@@ -211,6 +234,7 @@ final class EdgeEngine {
             live.activeSide = side
             pendingSteps = 0
             expectedLevel = currentLevel(function)
+            live.record(function.title, at: side.title)
             if prefs.edgeGlow, function.hasLevel, let level = expectedLevel {
                 EdgeGlow.shared.show(function, on: side, level: level, muted: function == .volume && live.muted)
             }
@@ -219,14 +243,20 @@ final class EdgeEngine {
             step(prefs.edge(side), side: side, up: up, fine: fine)
 
         case .swipe(let side, let forward):
-            swipe(prefs.edge(side), forward: forward)
+            let function = prefs.edge(side)
+            live.record(function == .songs ? (forward ? "Next Song" : "Previous Song")
+                        : function == .windows ? (forward ? "Next Window" : "Previous Window") : function.title,
+                        at: side.title)
+            swipe(function, forward: forward)
 
-        case .tap(let side):
+        case .doubleTap(let side):
             if prefs.edge(side) == .songs && prefs.tapToPlay {
-                run(needsAccess: true, name: "Tap to play or pause") { SystemControls.press(.play) }
+                live.record("Play or Pause", at: side.title)
+                run(needsAccess: true, name: "Play and pause") { SystemControls.press(.play) }
             }
 
         case .cornerDoubleTap(let corner):
+            live.record(prefs.corner(corner).title, at: corner.title)
             cornerAction(corner)
         }
     }

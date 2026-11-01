@@ -63,8 +63,8 @@ public enum EdgeAction: Equatable {
     case step(EdgeSide, up: Bool, fine: Bool)
     /// A swipe along a swipe edge. `forward` means up (left/right edges) or right (top/bottom edges).
     case swipe(EdgeSide, forward: Bool)
-    /// A quick tap on an edge.
-    case tap(EdgeSide)
+    /// Two quick taps in the same place on an edge.
+    case doubleTap(EdgeSide)
     /// Two quick taps in a corner.
     case cornerDoubleTap(Corner)
 }
@@ -94,26 +94,34 @@ public struct EdgeContext: Equatable {
     public var gestureAllowed: Bool
     /// True while ⇧⌥ are held.
     public var fineKeysHeld: Bool
+    /// True while the trackpad (or mouse) button is pressed: the user is clicking or dragging.
+    public var buttonHeld: Bool
 
-    public init(gestureAllowed: Bool = true, fineKeysHeld: Bool = false) {
+    public init(gestureAllowed: Bool = true, fineKeysHeld: Bool = false, buttonHeld: Bool = false) {
         self.gestureAllowed = gestureAllowed
         self.fineKeysHeld = fineKeysHeld
+        self.buttonHeld = buttonHeld
     }
 }
 
 /// Turns raw trackpad frames into edge actions. Pure logic, no system calls.
 public struct EdgeRecognizer {
     // Tuning, in normalized trackpad units.
+    // Accident-proofing: a gesture has to be deliberate before it does anything.
     public static let baseStepDistance: Float = 0.04   // finger travel per step at 1× sensitivity
-    public static let engageDistance: Float = 0.012    // travel along the edge before a slide starts
-    public static let cancelDistance: Float = 0.06     // travel across the edge that cancels a slide
+    public static let engageDistance: Float = 0.025    // travel along the edge before a slide starts
+    public static let straightness: Float = 0.6        // before starting, sideways travel must stay under this × along
+    public static let laneDrift: Float = 0.10          // a started slide stops if the finger wanders this far across
     public static let stripHeight: Float = 0.09        // depth of the top and bottom edges
     public static let bottomQuarter: Float = 0.25
-    public static let cornerSize: Float = 0.14
-    public static let swipeDistance: Float = 0.12
+    public static let cornerSize: Float = 0.10
+    public static let swipeDistance: Float = 0.15
+    public static let swipeStraightness: Float = 0.4
+    public static let swipeMaxDuration: Double = 0.4   // swipes are quick; slow pointer moves along an edge aren't
     public static let tapMaxTravel: Float = 0.03
-    public static let tapMaxDuration: Double = 0.3
-    public static let doubleTapWindow: Double = 0.45
+    public static let tapMaxDuration: Double = 0.25
+    public static let doubleTapWindow: Double = 0.4
+    public static let doubleTapSpread: Float = 0.05    // both taps land in about the same place
 
     struct Gesture {
         var id: Int32
@@ -130,7 +138,8 @@ public struct EdgeRecognizer {
     public var config: EdgeConfig
     var gesture: Gesture?
     var previousIDs: Set<Int32> = []
-    var lastCornerTap: [Corner: Double] = [:]
+    /// The last single tap (time and place), waiting for a second one.
+    var lastTap: (zone: EdgeZone, time: Double, x: Float, y: Float)?
 
     public init(config: EdgeConfig = EdgeConfig()) {
         self.config = config
@@ -140,6 +149,7 @@ public struct EdgeRecognizer {
 
     /// Feed one trackpad frame (only fingers that are touching). Returns the actions to perform.
     public mutating func process(_ touches: [TouchPoint], time: Double, context: EdgeContext = EdgeContext()) -> [EdgeAction] {
+        lastTime = time
         let ids = Set(touches.map(\.id))
         defer { previousIDs = ids }
         var actions: [EdgeAction] = []
@@ -152,8 +162,8 @@ public struct EdgeRecognizer {
                 actions.append(.releaseCursor)
                 return actions
             }
-            // A second finger, or the contact grows into a palm, before the slide started: let it go.
-            if !g.engaged && (touches.count > 1 || isPalm(t)) {
+            // A second finger, a palm, or a press of the button before the gesture started: let it go.
+            if !g.engaged && (touches.count > 1 || isPalm(t) || context.buttonHeld) {
                 gesture = nil
                 actions.append(.releaseCursor)
                 return actions
@@ -169,6 +179,7 @@ public struct EdgeRecognizer {
 
         // Only start on a single fresh finger, so sliding in from the middle never triggers.
         guard context.gestureAllowed,
+              !context.buttonHeld,
               touches.count == 1,
               previousIDs.isEmpty,
               let t = touches.first,
@@ -256,6 +267,8 @@ public struct EdgeRecognizer {
         let along = side.isVertical ? dy : dx
         let across = side.isVertical ? dx : dy
         let position = side.isVertical ? t.y : t.x
+        // How far the finger may stray from the edge before it clearly isn't an edge gesture.
+        let zoneDepth = side.isVertical ? config.edgeWidth : Self.stripHeight
 
         switch config.kind(side) {
         case .off:
@@ -263,25 +276,28 @@ public struct EdgeRecognizer {
 
         case .swipe:
             if !g.engaged {
-                if abs(along) >= Self.swipeDistance && abs(along) > abs(across) * 1.5 {
+                if abs(across) > zoneDepth * 1.5 { return false }               // left the edge
+                if timeSinceStart(g) > Self.swipeMaxDuration { return false }  // too slow: a pointer move
+                if abs(along) >= Self.swipeDistance {
+                    guard abs(across) <= abs(along) * Self.swipeStraightness else { return false }
                     g.engaged = true
                     actions.append(.swipe(side, forward: along > 0))
-                } else if abs(across) > Self.swipeDistance {
-                    return false // moved into the trackpad, not along the edge
                 }
             }
             return true
 
         case .slider:
             if !g.engaged {
-                if abs(across) >= Self.cancelDistance && abs(across) > abs(along) {
-                    return false // moving across the trackpad, not along the edge
-                }
+                if abs(across) > zoneDepth * 1.5 { return false }  // left the edge before starting
                 guard abs(along) >= Self.engageDistance else { return true }
+                guard abs(across) <= abs(along) * Self.straightness else { return false } // diagonal: a pointer move
                 g.engaged = true
                 actions.append(.slideBegan(side))
                 // g.last still holds the start, so the travel so far counts.
             }
+
+            // Once sliding, wandering far off the edge ends the slide.
+            if abs(across) > Self.laneDrift { return false }
 
             let stepDistance = Self.baseStepDistance / max(config.sensitivity, 0.1)
             g.accumulated += position - g.last
@@ -300,22 +316,26 @@ public struct EdgeRecognizer {
         }
     }
 
+    var lastTime: Double = 0
+
+    func timeSinceStart(_ g: Gesture) -> Double { lastTime - g.startTime }
+
     mutating func finish(_ g: Gesture, time: Double, actions: inout [EdgeAction]) {
         let isTap = !g.engaged
             && g.maxTravel <= Self.tapMaxTravel
             && time - g.startTime <= Self.tapMaxDuration
-        guard isTap else { return }
+        guard isTap else { lastTap = nil; return }
 
-        switch g.zone {
-        case .edge(let side):
-            actions.append(.tap(side))
-        case .corner(let corner):
-            if let last = lastCornerTap[corner], time - last <= Self.doubleTapWindow {
-                lastCornerTap[corner] = nil
-                actions.append(.cornerDoubleTap(corner))
-            } else {
-                lastCornerTap = [corner: time]
+        // Only a second tap, soon after and in the same place, counts.
+        if let last = lastTap, last.zone == g.zone, g.startTime - last.time <= Self.doubleTapWindow,
+           abs(g.startX - last.x) <= Self.doubleTapSpread, abs(g.startY - last.y) <= Self.doubleTapSpread {
+            lastTap = nil
+            switch g.zone {
+            case .edge(let side): actions.append(.doubleTap(side))
+            case .corner(let corner): actions.append(.cornerDoubleTap(corner))
             }
+        } else {
+            lastTap = (g.zone, time, g.startX, g.startY)
         }
     }
 }
