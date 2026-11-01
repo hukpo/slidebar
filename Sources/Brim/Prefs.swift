@@ -68,6 +68,10 @@ final class Prefs: ObservableObject {
 
     // State
     @Published var autoUpdate: Bool { didSet { defaults.set(autoUpdate, forKey: Keys.autoUpdate) } }
+    @Published var palmRejection: Bool { didSet { defaults.set(palmRejection, forKey: Keys.palmRejection) } }
+    @Published var edgeGlow: Bool { didSet { defaults.set(edgeGlow, forKey: Keys.edgeGlow) } }
+    /// Bundle IDs of apps where edge gestures are off.
+    @Published var excludedApps: [String] { didSet { defaults.set(excludedApps, forKey: Keys.excludedApps) } }
 
     // State
     @Published var paused: Bool { didSet { defaults.set(paused, forKey: Keys.paused) } }
@@ -89,6 +93,9 @@ final class Prefs: ObservableObject {
         static let appearance = "appearance"
         static let paused = "paused"
         static let autoUpdate = "autoUpdate"
+        static let palmRejection = "palmRejection"
+        static let edgeGlow = "edgeGlow"
+        static let excludedApps = "excludedApps"
         static let setupDone = "setupDone"
     }
 
@@ -108,6 +115,9 @@ final class Prefs: ObservableObject {
             Keys.appearance: Appearance.auto.rawValue,
             Keys.paused: false,
             Keys.autoUpdate: true,
+            Keys.palmRejection: true,
+            Keys.edgeGlow: true,
+            Keys.excludedApps: [String](),
             Keys.setupDone: false,
         ])
         haptics = HapticStrength(rawValue: defaults.string(forKey: Keys.haptics) ?? "") ?? .medium
@@ -124,6 +134,9 @@ final class Prefs: ObservableObject {
         appearance = Appearance(rawValue: defaults.string(forKey: Keys.appearance) ?? "") ?? .auto
         paused = defaults.bool(forKey: Keys.paused)
         autoUpdate = defaults.bool(forKey: Keys.autoUpdate)
+        palmRejection = defaults.bool(forKey: Keys.palmRejection)
+        edgeGlow = defaults.bool(forKey: Keys.edgeGlow)
+        excludedApps = defaults.stringArray(forKey: Keys.excludedApps) ?? []
         hasCompletedSetup = defaults.bool(forKey: Keys.setupDone)
         refreshOpenAtLogin()
     }

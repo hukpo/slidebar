@@ -341,10 +341,18 @@ struct MoreMenu: View {
     @ObservedObject var prefs = Prefs.shared
     @ObservedObject var licensing = Licensing.shared
     @ObservedObject var updater = Updater.shared
+    @ObservedObject var live = LiveState.shared
 
     var body: some View {
         Menu {
             Button(prefs.paused ? "Resume Brim" : "Pause Brim") { prefs.paused.toggle() }
+            if let app = live.lastApp, let id = app.bundleIdentifier, let name = app.localizedName {
+                if prefs.excludedApps.contains(id) {
+                    Button("Turn On in \(name)") { prefs.excludedApps.removeAll { $0 == id } }
+                } else {
+                    Button("Turn Off in \(name)") { prefs.excludedApps.append(id) }
+                }
+            }
             Divider()
             Button("Setup Guide…") { AppActions.shared.showSetupGuide() }
             Button("Accessibility Settings…") { Permissions.openAccessibilitySettings() }

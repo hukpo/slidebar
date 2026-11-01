@@ -2,7 +2,7 @@ import BrimCore
 import SwiftUI
 
 enum MenuPage {
-    case main, settings
+    case main, settings, apps
 }
 
 /// Root view of the menu bar popover.
@@ -17,6 +17,9 @@ struct MenuView: View {
                     .transition(.asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .leading)).combined(with: .opacity))
             case .settings:
                 SettingsPage(page: $page)
+                    .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)).combined(with: .opacity))
+            case .apps:
+                AppsPage(page: $page)
                     .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .trailing)).combined(with: .opacity))
             }
         }

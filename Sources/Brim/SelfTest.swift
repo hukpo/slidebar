@@ -18,11 +18,11 @@ enum SelfTest {
         var clock = 1000.0
         var nextID: Int32 = 100
 
-        func slide(x: Float, from y0: Float, to y1: Float) {
+        func slide(x: Float, from y0: Float, to y1: Float, size: Float = 0.8) {
             nextID += 1
             for i in 0...30 {
                 let y = y0 + (y1 - y0) * Float(i) / 30
-                engine.feed([TouchPoint(id: nextID, x: x, y: y)], time: clock)
+                engine.feed([TouchPoint(id: nextID, x: x, y: y, size: size)], time: clock)
                 clock += 0.012
                 wait(0.012)
             }
@@ -38,11 +38,43 @@ enum SelfTest {
         let vol0 = SystemControls.volume() ?? 0.5, muted0 = SystemControls.isMuted()
         let b0 = SystemControls.brightness() ?? 0.5
 
-        // Right edge → volume.
+        // Right edge → volume, with the on-screen glow showing while the finger is down.
         let volUp = vol0 < 0.5
-        slide(x: 0.98, from: volUp ? 0.2 : 0.6, to: volUp ? 0.6 : 0.2)
+        let savedGlow = prefs.edgeGlow, savedExcluded = prefs.excludedApps
+        prefs.edgeGlow = true
+        nextID += 1
+        var glowSeen = false
+        for i in 0...30 {
+            let t = Float(i) / 30
+            let y: Float = volUp ? 0.2 + 0.4 * t : 0.6 - 0.4 * t
+            engine.feed([TouchPoint(id: nextID, x: 0.98, y: y, size: 0.8)], time: clock)
+            clock += 0.012
+            wait(0.012)
+            if i == 20 { glowSeen = NSApp.windows.contains { $0 is NSPanel && $0.isVisible && $0.frame.width < 40 } }
+        }
+        engine.feed([], time: clock); clock += 0.05
+        wait(0.5)
         let vol1 = SystemControls.volume() ?? vol0
         line(volUp ? vol1 > vol0 + 0.05 : vol1 < vol0 - 0.05, "Right edge slide changes volume", String(format: "%.2f → %.2f", vol0, vol1))
+        line(glowSeen, "Edge glow shows while sliding", glowSeen ? "visible" : "not visible")
+        wait(1.3)
+        let glowGone = !NSApp.windows.contains { $0 is NSPanel && $0.isVisible && $0.frame.width < 40 }
+        line(glowGone, "Edge glow fades after release", glowGone ? "hidden" : "still visible")
+
+        // A palm on the edge → nothing.
+        let volPalm = SystemControls.volume() ?? 0
+        slide(x: 0.98, from: 0.2, to: 0.6, size: 4)
+        line(abs((SystemControls.volume() ?? 0) - volPalm) < 0.001, "Palm on the edge is ignored", "volume unchanged")
+
+        // Front app turned off → nothing.
+        if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier {
+            prefs.excludedApps = [front]
+            let volEx = SystemControls.volume() ?? 0
+            slide(x: 0.98, from: 0.2, to: 0.6)
+            line(abs((SystemControls.volume() ?? 0) - volEx) < 0.001, "Turned off in front app", "\(front): volume unchanged")
+            prefs.excludedApps = savedExcluded
+        }
+        prefs.edgeGlow = savedGlow
 
         // Left edge → brightness.
         let bUp = b0 < 0.5
@@ -92,6 +124,8 @@ enum SelfTest {
         BrimMTStop()
         line(devices > 0, "Trackpads found", "\(devices)")
         line(Permissions.isTrusted, "Accessibility granted")
+        DeviceWatcher.shared.start()
+        line(DeviceWatcher.shared.isWatching, "Watching for trackpads being connected")
 
         let vol0 = SystemControls.volume()
         let muted0 = SystemControls.isMuted()

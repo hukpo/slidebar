@@ -18,6 +18,9 @@ enum Snapshot {
         render(SettingsPage(page: .constant(.settings)).frame(width: 340), to: dir.appendingPathComponent("settings\(suffix).png"))
         render(SetupView(onDone: {}), to: dir.appendingPathComponent("setup\(suffix).png"))
         render(LicenseView(onClose: {}), to: dir.appendingPathComponent("license\(suffix).png"))
+        render(AppsPage(page: .constant(.apps)).frame(width: 340), to: dir.appendingPathComponent("apps\(suffix).png"))
+        render(EdgeGlow.preview(level: 0.62).frame(width: 26, height: 260).padding(20).background(Color.gray.opacity(0.3)),
+               to: dir.appendingPathComponent("glow\(suffix).png"))
         return true
     }
 

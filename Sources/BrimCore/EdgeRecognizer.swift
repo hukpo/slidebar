@@ -6,11 +6,14 @@ public struct TouchPoint: Equatable {
     public var id: Int32
     public var x: Float
     public var y: Float
+    /// Contact size as reported by the trackpad. Palms are much larger than fingertips.
+    public var size: Float
 
-    public init(id: Int32, x: Float, y: Float) {
+    public init(id: Int32, x: Float, y: Float, size: Float = 0) {
         self.id = id
         self.x = x
         self.y = y
+        self.size = size
     }
 }
 
@@ -47,6 +50,9 @@ public struct EdgeConfig: Equatable {
     public var tapToPlay = false
     public var freezeCursor = true
     public var fineControl = true
+    /// Ignore contacts bigger than `palmSize` (a resting palm or thumb base).
+    public var palmRejection = true
+    public var palmSize: Float = 2.4
 
     public init() {}
 }
@@ -123,8 +129,8 @@ public struct EdgeRecognizer {
                 actions.append(.releaseCursor)
                 return actions
             }
-            // A second finger before the slide started: probably a scroll, let it go.
-            if !g.engaged && touches.count > 1 {
+            // A second finger, or the contact grows into a palm, before the slide started: let it go.
+            if !g.engaged && (touches.count > 1 || isPalm(t)) {
                 gesture = nil
                 actions.append(.releaseCursor)
                 return actions
@@ -143,6 +149,7 @@ public struct EdgeRecognizer {
               touches.count == 1,
               previousIDs.isEmpty,
               let t = touches.first,
+              !isPalm(t),
               let zone = classify(t)
         else { return actions }
 
@@ -154,6 +161,10 @@ public struct EdgeRecognizer {
     }
 
     // MARK: - Zones
+
+    func isPalm(_ t: TouchPoint) -> Bool {
+        config.palmRejection && t.size > config.palmSize
+    }
 
     func sideAllowed(atY y: Float) -> Bool {
         !config.bottomQuarterOnly || y <= Self.bottomQuarter

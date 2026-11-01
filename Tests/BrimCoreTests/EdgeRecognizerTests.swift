@@ -170,6 +170,34 @@ final class EdgeRecognizerTests: XCTestCase {
         XCTAssertLessThan(steps(run(&low, path: path)).count, steps(run(&high, path: path)).count)
     }
 
+    func testPalmIsIgnored() {
+        var r = EdgeRecognizer()
+        var actions: [EdgeAction] = []
+        for i in 0...30 {
+            actions += r.process([TouchPoint(id: 1, x: 0.98, y: 0.2 + Float(i) * 0.015, size: 4)], time: Double(i) * 0.01)
+        }
+        actions += r.process([], time: 1)
+        XCTAssertEqual(actions, [])
+    }
+
+    func testContactGrowingIntoPalmCancels() {
+        var r = EdgeRecognizer()
+        _ = r.process([TouchPoint(id: 1, x: 0.98, y: 0.3, size: 0.8)], time: 0)
+        XCTAssertTrue(r.isTracking)
+        XCTAssertEqual(r.process([TouchPoint(id: 1, x: 0.98, y: 0.3, size: 3.5)], time: 0.01), [.releaseCursor])
+        XCTAssertFalse(r.isTracking)
+    }
+
+    func testPalmRejectionCanBeTurnedOff() {
+        var r = EdgeRecognizer()
+        r.config.palmRejection = false
+        var actions: [EdgeAction] = []
+        for i in 0...30 {
+            actions += r.process([TouchPoint(id: 1, x: 0.98, y: 0.2 + Float(i) * 0.015, size: 4)], time: Double(i) * 0.01)
+        }
+        XCTAssertTrue(actions.contains(.slideBegan(.volume)))
+    }
+
     func testWiderEdge() {
         var r = EdgeRecognizer()
         XCTAssertTrue(steps(run(&r, path: line(from: (0.9, 0.2), to: (0.9, 0.6)))).isEmpty)

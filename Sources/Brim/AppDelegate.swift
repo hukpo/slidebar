@@ -61,8 +61,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover.animates = true
         popover.delegate = self
 
-        // Trackpad listening.
+        // Trackpad listening, including trackpads connected later.
         EdgeEngine.shared.start()
+        DeviceWatcher.shared.start()
+
+        // Remember the last app the user was in, for "Turn Off in …".
+        live.lastApp = NSWorkspace.shared.frontmostApplication.flatMap { $0.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : $0 }
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app.bundleIdentifier != Bundle.main.bundleIdentifier else { return }
+            LiveState.shared.lastApp = app
+        }
         live.refreshLevels()
 
         let center = NSWorkspace.shared.notificationCenter

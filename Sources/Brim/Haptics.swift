@@ -5,6 +5,13 @@ import CBrimPrivate
 enum Haptics {
     private static var actuatorWorks = true
 
+    /// A firmer bump for hitting the end of a range.
+    static func bump(_ strength: HapticStrength) {
+        guard strength != .off else { return }
+        if actuatorWorks, BrimHapticActuate(6) { return }
+        NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
+    }
+
     static func tick(_ strength: HapticStrength) {
         guard strength != .off else { return }
 

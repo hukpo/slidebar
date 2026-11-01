@@ -30,6 +30,8 @@ final class LiveState: ObservableObject {
     @Published var slideCount = 0
     /// The control currently being slid, for highlighting in the menu.
     @Published var activeControl: EdgeControl?
+    /// The last app the user was in (not Brim), for "Turn Off in …".
+    @Published var lastApp: NSRunningApplication?
 
     var status: Status {
         if !Licensing.shared.allowsGestures { return .trialEnded }
@@ -65,6 +67,8 @@ final class EdgeEngine {
     private var cursorFrozen = false
     private var brightnessKeysWork: Bool?
     private var refreshScheduled = false
+    /// The level we expect after the steps sent so far in this slide (key events land asynchronously).
+    private var expectedLevel: Float?
 
     private init() {
         // Keep the recognizer's config in sync with settings.
@@ -90,6 +94,7 @@ final class EdgeEngine {
         c.tapToPlay = prefs.tapToPlay
         c.freezeCursor = prefs.freezeCursor
         c.fineControl = prefs.fineControl
+        c.palmRejection = prefs.palmRejection
         recognizer.config = c
     }
 
@@ -103,7 +108,7 @@ final class EdgeEngine {
             if let touches, count > 0 {
                 points.reserveCapacity(Int(count))
                 for t in UnsafeBufferPointer(start: touches, count: Int(count)) where t.state == 3 || t.state == 4 {
-                    points.append(TouchPoint(id: t.identifier, x: t.x, y: t.y))
+                    points.append(TouchPoint(id: t.identifier, x: t.x, y: t.y, size: t.size))
                 }
             }
             let engine = Unmanaged<EdgeEngine>.fromOpaque(context).takeUnretainedValue()
@@ -131,7 +136,7 @@ final class EdgeEngine {
 
     private func handle(_ touches: [TouchPoint], time: Double) {
         let flags = NSEvent.modifierFlags
-        var allowed = !prefs.paused && Licensing.shared.allowsGestures
+        var allowed = !prefs.paused && Licensing.shared.allowsGestures && !isFrontmostAppExcluded
         if prefs.requireModifier {
             allowed = allowed && (flags.contains(.function) || flags.contains(.option))
         }
@@ -143,21 +148,44 @@ final class EdgeEngine {
         }
     }
 
+    private var isFrontmostAppExcluded: Bool {
+        guard !prefs.excludedApps.isEmpty,
+              let id = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return false }
+        return prefs.excludedApps.contains(id)
+    }
+
     private func perform(_ action: EdgeAction) {
         switch action {
         case .freezeCursor:
             freezeCursor()
         case .releaseCursor:
-            if live.activeControl != nil { live.slideCount += 1 }
+            if live.activeControl != nil {
+                live.slideCount += 1
+                EdgeGlow.shared.hide()
+            }
+            expectedLevel = nil
             releaseCursor()
         case .slideBegan(let control):
             live.activeControl = control
+            expectedLevel = level(of: control)
+            if prefs.edgeGlow, let level = expectedLevel {
+                EdgeGlow.shared.show(control, onLeft: (control == .brightness) != prefs.swapSides, level: level,
+                                     muted: control == .volume && live.muted)
+            }
         case .step(let control, let up, let fine):
+            let delta: Float = (fine ? 1 / 64 : 1 / 16) * (up ? 1 : -1)
+            let before = expectedLevel ?? level(of: control) ?? 0.5
+            let after = min(max(before + delta, 0), 1)
+            expectedLevel = after
             switch control {
             case .volume: stepVolume(up: up, fine: fine)
             case .brightness: stepBrightness(up: up, fine: fine)
             }
-            Haptics.tick(prefs.haptics)
+            // A tick per step, a firmer bump on reaching 0% or 100%, then silence at the limit.
+            if after != before {
+                if after == 0 || after == 1 { Haptics.bump(prefs.haptics) } else { Haptics.tick(prefs.haptics) }
+            }
+            if prefs.edgeGlow { EdgeGlow.shared.update(level: after, muted: false) }
             scheduleRefresh()
         case .toggleMute:
             if live.trusted {
@@ -180,6 +208,10 @@ final class EdgeEngine {
     }
 
     // MARK: Controls
+
+    private func level(of control: EdgeControl) -> Float? {
+        control == .volume ? SystemControls.volume() : SystemControls.brightness()
+    }
 
     private func stepVolume(up: Bool, fine: Bool) {
         if live.trusted {
