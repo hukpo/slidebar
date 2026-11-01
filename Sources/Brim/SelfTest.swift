@@ -236,6 +236,23 @@ enum SelfTest {
             && n(.corner(.topRight), .down) == .edge(.right)
         line(arrowsOK, "Map arrow keys move spatially", arrowsOK ? "all 6 moves correct" : "wrong neighbor")
 
+        // Clicking a spot opens its actions menu; choosing an item changes it.
+        do {
+            let edgeMenu = SpotMenu.make(for: .edge(.right))
+            let volumeItem = edgeMenu.items.first { $0.title == EdgeFunction.volume.title }
+            let checkedRight = edgeMenu.items.first { $0.state == .on }?.title
+            prefs.edges[.right] = .off
+            if let volumeItem, let action = volumeItem.action { _ = (volumeItem.target as AnyObject).perform(action) }
+            let edgeOK = prefs.edge(.right) == .volume && checkedRight == EdgeFunction.volume.title
+            let cornerMenu = SpotMenu.make(for: .corner(.bottomRight))
+            let hasLock = cornerMenu.items.contains { $0.title == CornerFunction.lockScreen.title }
+            let hasShortcuts = cornerMenu.items.first { $0.title == CornerFunction.runShortcut.title }?.submenu != nil
+            line(edgeOK && hasLock && hasShortcuts, "Spot menus list actions and apply the choice",
+                 "\(edgeMenu.items.count) edge items, \(cornerMenu.items.count) corner items")
+            prefs.edges = [.left: .brightness, .right: .volume, .top: .off, .bottom: .songs]
+            engine.syncConfig()
+        }
+
         // Paused → nothing.
         prefs.paused = true; engine.syncConfig()
         let volPaused = SystemControls.volume() ?? 0

@@ -43,13 +43,8 @@ struct MainPage: View {
     @Binding var page: MenuPage
     @ObservedObject var prefs = Prefs.shared
     @ObservedObject var live = LiveState.shared
+    /// The spot whose menu is open (or that has keyboard focus).
     @State private var selection: MapSpot?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    init(page: Binding<MenuPage>, selection: MapSpot? = nil) {
-        _page = page
-        _selection = State(initialValue: selection)
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -65,13 +60,6 @@ struct MainPage: View {
 
             TrackpadMap(selection: $selection)
                 .frame(height: 212)
-
-            if let spot = selection {
-                Card {
-                    SpotEditor(spot: spot) { selection = nil }
-                }
-                .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-            }
 
             Card {
                 ToggleRow(icon: "hand.draw", title: "Brim Gestures",
@@ -106,7 +94,6 @@ struct MainPage: View {
             }
         }
         .padding(14)
-        .animation(reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.3, dampingFraction: 0.9), value: selection)
     }
 
     private var gesturesSubtitle: String {

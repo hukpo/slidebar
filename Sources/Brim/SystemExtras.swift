@@ -173,6 +173,18 @@ enum KeepAwake {
 
 /// The user's Shortcuts, through the `shortcuts` command-line tool.
 enum UserShortcuts {
+    /// The last list read, so menus can show it instantly.
+    private(set) static var cached: [String] = []
+    private(set) static var loaded = false
+
+    /// Reads the list in the background, ready for the next menu.
+    static func preload() {
+        list { names in
+            cached = names
+            loaded = true
+        }
+    }
+
     /// Names of the user's shortcuts, read off the main thread.
     static func list(_ completion: @escaping ([String]) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {

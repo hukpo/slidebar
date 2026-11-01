@@ -24,6 +24,7 @@ struct TrackpadMap: View {
     @ObservedObject var prefs = Prefs.shared
     @ObservedObject var live = LiveState.shared
     @FocusState private var mapFocused: Bool
+    @State private var anchors = AnchorStore()
     /// Show the focus halo only when the user is navigating by keyboard, like native controls.
     @State private var keyboardNav = false
     @State private var clickingFocus = false
@@ -77,6 +78,8 @@ struct TrackpadMap: View {
             if let next = Self.neighbor(of: current, direction) { select(next, fromKeyboard: true) }
         }
         .onExitCommand { selection = nil }
+        .modifier(OpenWithKeys { if let spot = selection { open(spot, fromKeyboard: true) } })
+        .onAppear { UserShortcuts.preload() }
         .environment(\.colorScheme, .dark)
         .opacity(prefs.paused ? 0.6 : 1)
         .animation(.easeOut(duration: 0.2), value: prefs.paused)
@@ -116,12 +119,15 @@ struct TrackpadMap: View {
         return ring.first { cell($0) == (x, y) }
     }
 
+    /// Opens a spot's actions menu right under it; the spot stays highlighted while it's open.
+    private func open(_ spot: MapSpot, fromKeyboard: Bool = false) {
+        select(spot, fromKeyboard: fromKeyboard)
+        guard let view = anchors.anchor(spot).view else { return }
+        SpotMenu.show(for: spot, under: view)
+        if !keyboardNav { selection = nil }
+    }
+
     private func select(_ spot: MapSpot, fromKeyboard: Bool = false) {
-        // Clicking the open spot again closes its options.
-        if !fromKeyboard && selection == spot {
-            selection = nil
-            return
-        }
         selection = spot
         // Take focus so arrow keys work right after a click. Where the system focus ring can't be
         // hidden (macOS 13), only take it from the keyboard, like native controls.
@@ -133,7 +139,7 @@ struct TrackpadMap: View {
             clickingFocus = !mapFocused
             mapFocused = true
         }
-        let text = "\(spot.title), \(title(for: spot)). Options below."
+        let text = "\(spot.title), \(title(for: spot))."
         if let window = NSApp.keyWindow {
             NSAccessibility.post(element: window, notification: .announcementRequested,
                                  userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
@@ -163,8 +169,9 @@ struct TrackpadMap: View {
         let percent = muted ? "Muted" : level.map { "\(Int(($0 * 100).rounded()))%" }
         return SpotButton(selected: selection == spot, keyboardFocused: mapFocused && keyboardNav, off: function == .off,
                           shape: .capsule, levelValue: function.hasLevel ? level : nil, vertical: side.isVertical,
-                          colors: function.levelColors, dimmed: muted, active: live.activeSide == side) {
-            select(spot)
+                          colors: function.levelColors, dimmed: muted, active: live.activeSide == side,
+                          anchor: anchors.anchor(spot)) {
+            open(spot)
         } label: {
             if function == .off {
                 EmptySpotMark()
@@ -196,18 +203,19 @@ struct TrackpadMap: View {
                 }
             }
         }
-        .help("\(side.title): \(function.title)")
+        .help("\(side.title): \(function.title). Click to change.")
         .accessibilityLabel("\(side.title): \(function.title)")
         .accessibilityValue(percent ?? "")
-        .accessibilityHint("Shows its options below")
+        .accessibilityHint("Opens a menu of actions")
         .accessibilitySortPriority(priority(spot))
     }
 
     private func cornerButton(_ corner: Corner) -> some View {
         let function = prefs.corner(corner)
         let spot = MapSpot.corner(corner)
-        return SpotButton(selected: selection == spot, keyboardFocused: mapFocused && keyboardNav, off: function == .off, shape: .circle) {
-            select(spot)
+        return SpotButton(selected: selection == spot, keyboardFocused: mapFocused && keyboardNav, off: function == .off,
+                          shape: .circle, anchor: anchors.anchor(spot)) {
+            open(spot)
         } label: {
             if function == .openApp, let id = prefs.cornerApps[corner] {
                 AppIcon(bundleID: id).frame(width: 18, height: 18)
@@ -218,9 +226,9 @@ struct TrackpadMap: View {
             }
         }
         .frame(width: bar, height: bar)
-        .help("\(corner.title): \(title(for: spot))")
+        .help("\(corner.title): \(title(for: spot)). Click to change.")
         .accessibilityLabel("\(corner.title): \(title(for: spot))")
-        .accessibilityHint("Shows its options below")
+        .accessibilityHint("Opens a menu of actions")
         .accessibilitySortPriority(priority(spot))
     }
 }
@@ -240,6 +248,8 @@ private struct SpotButton<Label: View>: View {
     var dimmed = false
     /// Being slid right now.
     var active = false
+    /// Where the actions menu opens from.
+    let anchor: MenuAnchor
     let action: () -> Void
     @ViewBuilder let label: () -> Label
     @State private var hovering = false
@@ -253,6 +263,7 @@ private struct SpotButton<Label: View>: View {
                     .foregroundStyle(Color.primary)
             }
             .contentShape(Rectangle())
+            .background(AnchorView(anchor: anchor))
         }
         .buttonStyle(.plain)
         // The map is one Tab stop with arrow keys inside, like a native radio group.
@@ -358,199 +369,116 @@ private struct CenterReadout: View {
     }
 }
 
-// MARK: - Editor
+// MARK: - Actions menu
 
-/// Choose the action for the selected spot, with a plain description of the gesture.
-struct SpotEditor: View {
-    let spot: MapSpot
-    var onClose: (() -> Void)?
-    @ObservedObject var prefs = Prefs.shared
-    @ObservedObject var live = LiveState.shared
-    @State private var shortcuts: [String] = []
-    @State private var shortcutsLoaded = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            switch spot {
-            case .edge(let side): edgeEditor(side)
-            case .corner(let corner): cornerEditor(corner)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
+/// The native menu that opens under an edge or corner when you click it: every action it can
+/// have, the current one checked, plus that action's own options.
+enum SpotMenu {
+    /// Shows the menu under `view` and returns when it closes.
+    static func show(for spot: MapSpot, under view: NSView) {
+        make(for: spot).popUp(positioning: nil, at: NSPoint(x: 0, y: -6), in: view)
     }
 
-    @ViewBuilder
-    private func edgeEditor(_ side: EdgeSide) -> some View {
-        let function = prefs.edge(side)
-        HStack {
-            Text(side.title).font(.system(size: 13, weight: .semibold)).fixedSize()
-            Spacer(minLength: 8)
-            Picker(side.title, selection: Binding(
-                get: { prefs.edge(side) },
-                set: { prefs.edges[side] = $0 }
-            )) {
-                ForEach(EdgeFunction.available.filter { $0.kind == .off }) { Text($0.title).tag($0) }
-                Divider()
-                Section("Slide") {
-                    ForEach(EdgeFunction.available.filter { $0.kind == .slider }) { option($0.title, $0.icon).tag($0) }
-                }
-                Section("Swipe") {
-                    ForEach(EdgeFunction.available.filter { $0.kind == .swipe }) { option($0.title, $0.icon).tag($0) }
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .frame(maxWidth: 170)
-            closeButton
+    static func make(for spot: MapSpot) -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        switch spot {
+        case .edge(let side): buildEdge(menu, side)
+        case .corner(let corner): buildCorner(menu, corner)
         }
-        Text(function.detail(on: side))
-            .font(.system(size: 11.5))
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-        if function == .songs {
-            Toggle("Double-tap the edge to play or pause", isOn: $prefs.tapToPlay)
-                .toggleStyle(.checkbox)
-                .font(.system(size: 12))
-        }
-        if function.needsAccess && !live.trusted { NeedsAccessNote() }
+        return menu
     }
 
-    @ViewBuilder
-    private func cornerEditor(_ corner: Corner) -> some View {
-        let function = prefs.corner(corner)
-        HStack {
-            Text(corner.title).font(.system(size: 13, weight: .semibold)).fixedSize()
-            Spacer(minLength: 8)
-            Picker(corner.title, selection: Binding(
-                get: { prefs.corner(corner) },
-                set: { newValue in
-                    prefs.corners[corner] = newValue
-                    if newValue == .openApp && prefs.cornerApps[corner] == nil { chooseApp(for: corner) }
-                    if newValue == .runShortcut { loadShortcuts() }
-                }
-            )) {
-                ForEach(Array(CornerFunction.groups.enumerated()), id: \.offset) { index, group in
-                    if index > 0 { Divider() }
-                    ForEach(group.filter(isAvailable)) { f in
-                        if f == .off { Text(f.title).tag(f) } else { option(f.title, f.icon).tag(f) }
+    // MARK: Edges
+
+    private static func buildEdge(_ menu: NSMenu, _ side: EdgeSide) {
+        let prefs = Prefs.shared
+        let current = prefs.edge(side)
+        menu.addItem(header(side.title))
+        let choose: (EdgeFunction) -> Void = { f in
+            prefs.edges[side] = f
+            explainAccessIfNeeded(f.needsAccess, f.blockedName)
+        }
+        menu.addItem(item(EdgeFunction.off.title, nil, checked: current == .off) { choose(.off) })
+        menu.addItem(.separator())
+        menu.addItem(header("Slide"))
+        for f in EdgeFunction.available where f.kind == .slider {
+            menu.addItem(item(f.title, f.icon, checked: current == f, tip: f.detail(on: side)) { choose(f) })
+        }
+        menu.addItem(.separator())
+        menu.addItem(header("Swipe"))
+        for f in EdgeFunction.available where f.kind == .swipe {
+            menu.addItem(item(f.title, f.icon, checked: current == f, tip: f.detail(on: side)) { choose(f) })
+        }
+        if current == .songs {
+            menu.addItem(.separator())
+            menu.addItem(item("Double-Tap the Edge to Play or Pause", nil, checked: prefs.tapToPlay) {
+                prefs.tapToPlay.toggle()
+            })
+        }
+    }
+
+    // MARK: Corners
+
+    private static func buildCorner(_ menu: NSMenu, _ corner: Corner) {
+        let prefs = Prefs.shared
+        let current = prefs.corner(corner)
+        menu.addItem(header("\(corner.title): Double-Tap"))
+        let choose: (CornerFunction) -> Void = { f in
+            prefs.corners[corner] = f
+            explainAccessIfNeeded(f.needsAccess, f.blockedName)
+        }
+        for (index, group) in CornerFunction.groups.enumerated() {
+            if index > 0 { menu.addItem(.separator()) }
+            for f in group where isAvailable(f) {
+                switch f {
+                case .openApp:
+                    let app = current == .openApp ? prefs.cornerApps[corner] : nil
+                    let title = app.map { "Open \(AppNames.name(for: $0))" } ?? "Open an App…"
+                    let open = item(title, f.icon, checked: app != nil) { chooseApp(for: corner) }
+                    if let app, let url = AppNames.url(for: app) {
+                        let icon = NSWorkspace.shared.icon(forFile: url.path)
+                        icon.size = NSSize(width: 16, height: 16)
+                        open.image = icon
                     }
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .frame(maxWidth: 170)
-            closeButton
-        }
-        Text(function == .off ? "This corner works like the rest of the trackpad."
-                              : "Double-tap the corner to \(cornerVerb(function, corner)).")
-            .font(.system(size: 11.5))
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-        if function.isDisruptive {
-            Label {
-                Text("Pick a corner your palm doesn't rest on, so it doesn't happen by accident.")
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } icon: {
-                Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
-            }
-            .font(.system(size: 11))
-        }
-        if function == .openApp {
-            HStack(spacing: 8) {
-                if let id = prefs.cornerApps[corner] {
-                    AppIcon(bundleID: id).frame(width: 18, height: 18)
-                    Text(AppNames.name(for: id)).font(.system(size: 12, weight: .medium))
-                } else {
-                    Text("No app chosen yet").font(.system(size: 12)).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button(prefs.cornerApps[corner] == nil ? "Choose App…" : "Change…") { chooseApp(for: corner) }
-                    .controlSize(.small)
-            }
-        }
-        if function == .runShortcut {
-            HStack(spacing: 8) {
-                if shortcuts.isEmpty {
-                    Text(shortcutsLoaded ? "You don't have any shortcuts yet." : "Loading your shortcuts…")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Open Shortcuts") { SystemControls.openSystemApp("/System/Applications/Shortcuts.app") }
-                        .controlSize(.small)
-                } else {
-                    Text("Shortcut").font(.system(size: 12, weight: .medium))
-                    Spacer()
-                    Picker("Shortcut", selection: Binding(
-                        get: { prefs.cornerShortcuts[corner] ?? "" },
-                        set: { prefs.cornerShortcuts[corner] = $0.isEmpty ? nil : $0 }
-                    )) {
-                        Text("Choose…").tag("")
-                        ForEach(shortcuts, id: \.self) { Text($0).tag($0) }
+                    menu.addItem(open)
+                    if app != nil {
+                        menu.addItem(item("Choose Another App…", nil, indent: 1) { chooseApp(for: corner) })
                     }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: 190)
+                case .runShortcut:
+                    let run = item(f.title, f.icon, checked: current == .runShortcut)
+                    run.submenu = shortcutsMenu(corner, chosen: current == .runShortcut ? prefs.cornerShortcuts[corner] : nil)
+                    menu.addItem(run)
+                default:
+                    let tip = f.isDisruptive ? "Pick a corner your palm doesn't rest on, so it doesn't happen by accident." : nil
+                    menu.addItem(item(f.title, f == .off ? nil : f.icon, checked: current == f, tip: tip) { choose(f) })
                 }
             }
-            .onAppear(perform: loadShortcuts)
-        }
-        if function.needsAccess && !live.trusted { NeedsAccessNote() }
-    }
-
-    @ViewBuilder private var closeButton: some View {
-        if let onClose {
-            Button(action: onClose) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.tertiary)
-            }
-            .buttonStyle(.plain)
-            .help("Done")
-            .accessibilityLabel("Done")
         }
     }
 
-    private func loadShortcuts() {
-        UserShortcuts.list { names in
-            shortcuts = names
-            shortcutsLoaded = true
+    private static func shortcutsMenu(_ corner: Corner, chosen: String?) -> NSMenu {
+        let sub = NSMenu()
+        sub.autoenablesItems = false
+        let names = UserShortcuts.cached
+        if names.isEmpty {
+            let none = item(UserShortcuts.loaded ? "You don't have any shortcuts yet" : "Loading your shortcuts…", nil)
+            none.isEnabled = false
+            sub.addItem(none)
         }
-    }
-
-    private func isAvailable(_ f: CornerFunction) -> Bool {
-        switch f {
-        case .screenshot: return SystemControls.hasScreenshotApp
-        default: return true
+        for name in names {
+            sub.addItem(item(name, nil, checked: name == chosen) {
+                Prefs.shared.cornerShortcuts[corner] = name
+                Prefs.shared.corners[corner] = .runShortcut
+            })
         }
+        sub.addItem(.separator())
+        sub.addItem(item("Open Shortcuts", nil) { SystemControls.openSystemApp("/System/Applications/Shortcuts.app") })
+        return sub
     }
 
-    private func cornerVerb(_ f: CornerFunction, _ corner: Corner) -> String {
-        switch f {
-        case .off: return ""
-        case .mute: return "mute or unmute the sound"
-        case .muteMicrophone: return "mute or unmute your microphone, handy on calls"
-        case .playPause: return "play or pause"
-        case .nextSong: return "skip to the next song"
-        case .previousSong: return "go back to the previous song"
-        case .keepAwake: return "keep your Mac and its display from sleeping, and again to let it sleep"
-        case .spotlight: return "open Spotlight"
-        case .emoji: return "open Emoji & Symbols where you're typing"
-        case .screenshot: return "take a screenshot"
-        case .lockScreen: return "lock your Mac"
-        case .sleepDisplay: return "turn off the display"
-        case .runShortcut: return prefs.cornerShortcuts[corner].map { "run \u{201C}\($0)\u{201D}" } ?? "run the shortcut you choose"
-        case .openApp: return prefs.cornerApps[corner].map { "open \(AppNames.name(for: $0))" } ?? "open the app you choose"
-        }
-    }
-
-    private func option(_ title: String, _ icon: String) -> some View {
-        Label(title, systemImage: icon)
-    }
-
-    private func chooseApp(for corner: Corner) {
+    private static func chooseApp(for corner: Corner) {
+        let prefs = Prefs.shared
         let panel = NSOpenPanel()
         panel.title = "Choose an App for the \(corner.title)"
         panel.prompt = "Choose"
@@ -559,29 +487,93 @@ struct SpotEditor: View {
         NSApp.activate(ignoringOtherApps: true)
         if panel.runModal() == .OK, let url = panel.url, let id = Bundle(url: url)?.bundleIdentifier {
             prefs.cornerApps[corner] = id
-        } else if prefs.cornerApps[corner] == nil {
-            prefs.corners[corner] = .off
+            prefs.corners[corner] = .openApp
+        }
+    }
+
+    private static func isAvailable(_ f: CornerFunction) -> Bool {
+        f == .screenshot ? SystemControls.hasScreenshotApp : true
+    }
+
+    /// Keys-pressing actions need Accessibility: say so in the menu's notice area right away.
+    private static func explainAccessIfNeeded(_ needsAccess: Bool, _ name: String) {
+        if needsAccess && !LiveState.shared.trusted { LiveState.shared.blockedAction = name }
+    }
+
+    // MARK: Items
+
+    private static func header(_ title: String) -> NSMenuItem {
+        if #available(macOS 14, *) { return NSMenuItem.sectionHeader(title: title) }
+        let h = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        h.isEnabled = false
+        return h
+    }
+
+    private static func item(_ title: String, _ icon: String?, checked: Bool = false, tip: String? = nil,
+                             indent: Int = 0, _ handler: (() -> Void)? = nil) -> NSMenuItem {
+        let item = ClosureMenuItem(title: title, handler: handler)
+        if let icon { item.image = NSImage(systemSymbolName: icon, accessibilityDescription: nil) }
+        item.state = checked ? .on : .off
+        item.toolTip = tip
+        item.indentationLevel = indent
+        return item
+    }
+}
+
+/// A menu item that runs a closure.
+private final class ClosureMenuItem: NSMenuItem {
+    private let handler: (() -> Void)?
+
+    init(title: String, handler: (() -> Void)?) {
+        self.handler = handler
+        super.init(title: title, action: handler == nil ? nil : #selector(run), keyEquivalent: "")
+        target = self
+    }
+
+    required init(coder: NSCoder) { fatalError("not used") }
+
+    @objc private func run() { handler?() }
+}
+
+/// Holds the AppKit view under a spot, so its menu can open right below it.
+final class MenuAnchor {
+    weak var view: NSView?
+}
+
+/// One anchor per spot, kept for the life of the map.
+final class AnchorStore {
+    private var anchors: [MapSpot: MenuAnchor] = [:]
+    func anchor(_ spot: MapSpot) -> MenuAnchor {
+        if let a = anchors[spot] { return a }
+        let a = MenuAnchor()
+        anchors[spot] = a
+        return a
+    }
+}
+
+/// Return or Space opens the selected spot's menu (macOS 14 and later).
+private struct OpenWithKeys: ViewModifier {
+    let action: () -> Void
+    func body(content: Content) -> some View {
+        if #available(macOS 14, *) {
+            content.onKeyPress(keys: [.return, .space]) { _ in
+                action()
+                return .handled
+            }
+        } else {
+            content
         }
     }
 }
 
-/// Explains, in place, that an action needs Accessibility, with a way to allow it.
-struct NeedsAccessNote: View {
-    var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "lock")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-            Text("This needs Accessibility, so Brim can press keys for you.")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 4)
-            Button("Allow…") { Permissions.ask() }
-                .controlSize(.small)
-        }
+private struct AnchorView: NSViewRepresentable {
+    let anchor: MenuAnchor
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        anchor.view = view
+        return view
     }
+    func updateNSView(_ nsView: NSView, context: Context) { anchor.view = nsView }
 }
 
 // MARK: - App names and icons
