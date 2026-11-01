@@ -12,8 +12,12 @@ enum SelfTest {
         func line(_ ok: Bool, _ name: String, _ detail: String) { print("\(ok ? "PASS" : "FAIL")  \(name)  (\(detail))") }
         let engine = EdgeEngine.shared
         let prefs = Prefs.shared
-        let savedPaused = prefs.paused, savedSwap = prefs.swapSides, savedModifier = prefs.requireModifier
-        prefs.paused = false; prefs.swapSides = false; prefs.requireModifier = false
+        let savedPaused = prefs.paused, savedModifier = prefs.requireModifier
+        let savedEdges = prefs.edges, savedCorners = prefs.corners, savedApps = prefs.cornerApps
+        prefs.paused = false; prefs.requireModifier = false
+        // Test the shipping layout: brightness left, volume right, songs bottom, mute top-right.
+        prefs.edges = [.left: .brightness, .right: .volume, .top: .off, .bottom: .songs]
+        prefs.corners = [.topLeft: .off, .topRight: .mute, .bottomLeft: .off, .bottomRight: .off]
         engine.syncConfig()
         var clock = 1000.0
         var nextID: Int32 = 100
@@ -23,6 +27,16 @@ enum SelfTest {
             for i in 0...30 {
                 let y = y0 + (y1 - y0) * Float(i) / 30
                 engine.feed([TouchPoint(id: nextID, x: x, y: y, size: size)], time: clock)
+                clock += 0.012
+                wait(0.012)
+            }
+            engine.feed([], time: clock); clock += 0.05
+            wait(0.5)
+        }
+        func slideAcross(y: Float, from x0: Float, to x1: Float) {
+            nextID += 1
+            for i in 0...30 {
+                engine.feed([TouchPoint(id: nextID, x: x0 + (x1 - x0) * Float(i) / 30, y: y, size: 0.8)], time: clock)
                 clock += 0.012
                 wait(0.012)
             }
@@ -97,6 +111,39 @@ enum SelfTest {
         let m1 = SystemControls.isMuted()
         line(m1 != m0, "Corner double-tap toggles mute", "\(m0) → \(m1)")
 
+        // Custom layout: top edge set to volume, slid left to right.
+        prefs.edges[.top] = .volume
+        engine.syncConfig()
+        wait(0.3)
+        let vTop0 = SystemControls.volume() ?? 0
+        let topUp = vTop0 < 0.5
+        slideAcross(y: 0.96, from: topUp ? 0.3 : 0.7, to: topUp ? 0.7 : 0.3)
+        wait(0.4)
+        let vTop1 = SystemControls.volume() ?? vTop0
+        line(topUp ? vTop1 > vTop0 + 0.05 : vTop1 < vTop0 - 0.05, "Top edge set to Volume works sideways", String(format: "%.2f → %.2f", vTop0, vTop1))
+        prefs.edges[.top] = .off
+
+        // Custom layout: left edge set to keyboard brightness.
+        if KeyboardBacklight.isAvailable, let k0 = KeyboardBacklight.level() {
+            prefs.edges[.left] = .keyboardBrightness
+            engine.syncConfig()
+            let kUp = k0 < 0.5
+            slide(x: 0.02, from: kUp ? 0.2 : 0.6, to: kUp ? 0.6 : 0.2)
+            let k1 = KeyboardBacklight.level() ?? k0
+            line(kUp ? k1 > k0 + 0.05 : k1 < k0 - 0.05, "Left edge set to Keyboard Brightness works", String(format: "%.2f → %.2f", k0, k1))
+            KeyboardBacklight.setLevel(k0)
+            prefs.edges[.left] = .brightness
+        }
+
+        // Custom layout: bottom-left corner set to mute (toggles mute back).
+        prefs.corners[.bottomLeft] = .mute
+        engine.syncConfig()
+        let mc0 = SystemControls.isMuted()
+        tap(x: 0.05, y: 0.05); tap(x: 0.05, y: 0.05)
+        wait(0.5)
+        let mc1 = SystemControls.isMuted()
+        line(mc1 != mc0, "Bottom-left corner set to Mute works", "\(mc0) → \(mc1)")
+
         // Paused → nothing.
         prefs.paused = true; engine.syncConfig()
         let volPaused = SystemControls.volume() ?? 0
@@ -104,7 +151,8 @@ enum SelfTest {
         line(abs((SystemControls.volume() ?? 0) - volPaused) < 0.001, "Paused ignores slides", "volume unchanged")
 
         // Restore everything.
-        prefs.paused = savedPaused; prefs.swapSides = savedSwap; prefs.requireModifier = savedModifier
+        prefs.paused = savedPaused; prefs.requireModifier = savedModifier
+        prefs.edges = savedEdges; prefs.corners = savedCorners; prefs.cornerApps = savedApps
         SystemControls.setVolume(vol0)
         SystemControls.setMuted(muted0)
         SystemControls.setBrightness(b0)

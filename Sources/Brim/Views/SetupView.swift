@@ -1,3 +1,4 @@
+import BrimCore
 import SwiftUI
 
 /// First-run guide: try a slide, optionally allow Accessibility, then finish in the menu bar.
@@ -25,7 +26,7 @@ struct SetupView: View {
                         }
                         Spacer()
                     }
-                    TrackpadDemo(swap: prefs.swapSides)
+                    TrackpadDemo(left: prefs.edge(.left), right: prefs.edge(.right))
                         .frame(height: 180)
                 }
                 .foregroundStyle(.white)
@@ -41,7 +42,7 @@ struct SetupView: View {
                         title: live.deviceCount == 0 ? "Connect a trackpad" : "Try it now",
                         detail: live.deviceCount == 0
                             ? "Brim can't find a trackpad. Turn on or connect your Magic Trackpad, then try again."
-                            : "Rest one finger on the \(prefs.swapSides ? "left" : "right") edge of your trackpad and slide up. The volume goes up.") {
+                            : firstTryText) {
                     EmptyView()
                 }
 
@@ -75,6 +76,19 @@ struct SetupView: View {
         }
         .frame(width: 440)
         .animation(.easeOut(duration: 0.2), value: live.trusted)
+    }
+
+    /// Points at the edge that does something the user will notice, preferring volume.
+    private var firstTryText: String {
+        let order: [EdgeFunction] = [.volume, .brightness, .keyboardBrightness]
+        for f in order {
+            if let side = EdgeSide.allCases.first(where: { prefs.edge($0) == f }) {
+                let way = side.isVertical ? "up" : "to the right"
+                let what = f == .volume ? "The volume goes up." : f == .brightness ? "The screen gets brighter." : "The keyboard lights up."
+                return "Rest one finger on the \(side.title.lowercased().replacingOccurrences(of: " edge", with: "")) edge of your trackpad and slide \(way). \(what)"
+            }
+        }
+        return "Slide one finger along an edge of your trackpad. You can choose what each edge does in Brim's menu."
     }
 
     private var accessDetail: String {
@@ -126,9 +140,13 @@ private struct StepRow<Accessory: View>: View {
 
 /// A trackpad showing a finger sliding up the volume edge. Still under Reduce Motion.
 private struct TrackpadDemo: View {
-    let swap: Bool
+    let left: EdgeFunction
+    let right: EdgeFunction
     @State private var up = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Demonstrate on the volume edge when there is one, otherwise the right edge.
+    private var fingerOnLeft: Bool { left == .volume && right != .volume || (right == .off && left != .off) }
 
     var body: some View {
         GeometryReader { geo in
@@ -139,8 +157,8 @@ private struct TrackpadDemo: View {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1.5)
 
-                edge(colors: [.brimAmber, .brimAmberTop], label: "Brightness", x: swap ? w - 18 : 18, h: h)
-                edge(colors: [.brimViolet, .brimCyan], label: "Volume", x: swap ? 18 : w - 18, h: h)
+                if left != .off { edge(colors: left.levelColors, label: left.shortTitle, x: 18, h: h) }
+                if right != .off { edge(colors: right.levelColors, label: right.shortTitle, x: w - 18, h: h) }
 
                 Capsule().fill(Color.primary.opacity(0.18))
                     .frame(width: 70, height: 4)
@@ -153,11 +171,11 @@ private struct TrackpadDemo: View {
                     .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
                     .overlay(Circle().stroke(Color.primary.opacity(0.15)))
                     .frame(width: 22, height: 22)
-                    .position(x: swap ? 18 : w - 18, y: up ? h * 0.25 : h * 0.78)
+                    .position(x: fingerOnLeft ? 18 : w - 18, y: up ? h * 0.25 : h * 0.78)
             }
         }
         .accessibilityElement()
-        .accessibilityLabel("Illustration: a finger slides up the \(swap ? "left" : "right") edge of the trackpad to raise the volume.")
+        .accessibilityLabel("Illustration: a finger slides up the \(fingerOnLeft ? "left" : "right") edge of the trackpad.")
         .onAppear {
             guard !reduceMotion else { up = true; return }
             withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) { up = true }

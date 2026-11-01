@@ -253,7 +253,8 @@ struct SliderRow: View {
             }
             HStack(spacing: 8) {
                 Text(lowLabel)
-                Slider(value: $value, in: range, step: step) { Text(title) }
+                // Continuous slider (no tick marks) that still snaps to whole steps.
+                Slider(value: Binding(get: { value }, set: { value = ($0 / step).rounded() * step }), in: range) { Text(title) }
                     .labelsHidden()
                     .controlSize(.small)
                     .accessibilityValue(valueDescription)
@@ -374,13 +375,14 @@ struct MenuFooter<Leading: View>: View {
 
 // MARK: - Status
 
+/// Read-only status. Anything that needs action appears as a notice with a button instead.
 struct StatusPill: View {
     @ObservedObject var live = LiveState.shared
     @ObservedObject var prefs = Prefs.shared
 
     var body: some View {
         let status = live.status
-        let label = HStack(spacing: 5) {
+        HStack(spacing: 5) {
             Circle()
                 .fill(dotColor(status))
                 .frame(width: 6, height: 6)
@@ -391,31 +393,13 @@ struct StatusPill: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
         .background(Capsule().fill(Color.primary.opacity(0.06)))
-
-        switch status {
-        case .ready:
-            label
-                .help("Brim is listening to your trackpad")
-                .accessibilityElement(children: .combine)
-        case .needsAccess:
-            Button { AppActions.shared.showSetupGuide() } label: { label }
-                .buttonStyle(.plain)
-                .help("Volume and brightness work. Allow Accessibility for the on-screen display and media gestures.")
-        case .paused:
-            Button { prefs.paused = false } label: { label }
-                .buttonStyle(.plain)
-                .help("Turn edge sliders back on")
-        case .noTrackpad:
-            Button { EdgeEngine.shared.restart() } label: { label }
-                .buttonStyle(.plain)
-                .help("No trackpad found. Click to look again.")
-        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Status: \(status.title)")
     }
 
     private func dotColor(_ status: LiveState.Status) -> Color {
         switch status {
         case .ready: return .green
-        case .needsAccess: return .gray
         case .noTrackpad: return .orange
         case .paused: return .gray
         }

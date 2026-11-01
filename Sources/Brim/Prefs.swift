@@ -1,4 +1,5 @@
 import AppKit
+import BrimCore
 import Combine
 import ServiceManagement
 
@@ -47,14 +48,23 @@ final class Prefs: ObservableObject {
 
     // Main menu
     @Published var haptics: HapticStrength { didSet { defaults.set(haptics.rawValue, forKey: Keys.haptics) } }
-    @Published var quickMute: Bool { didSet { defaults.set(quickMute, forKey: Keys.quickMute) } }
-    @Published var mediaStrip: Bool { didSet { defaults.set(mediaStrip, forKey: Keys.mediaStrip) } }
     @Published var tapToPlay: Bool { didSet { defaults.set(tapToPlay, forKey: Keys.tapToPlay) } }
     @Published var sensitivity: Double { didSet { defaults.set(sensitivity, forKey: Keys.sensitivity) } }
     @Published var edgeWidth: Double { didSet { defaults.set(edgeWidth, forKey: Keys.edgeWidth) } }
 
+    // Edges and corners
+    @Published var edges: [EdgeSide: EdgeFunction] {
+        didSet { for (side, f) in edges { defaults.set(f.rawValue, forKey: Keys.edge(side)) } }
+    }
+    @Published var corners: [Corner: CornerFunction] {
+        didSet { for (c, f) in corners { defaults.set(f.rawValue, forKey: Keys.corner(c)) } }
+    }
+    /// For corners set to "Open an App": the app's bundle ID.
+    @Published var cornerApps: [Corner: String] {
+        didSet { for c in Corner.allCases { defaults.set(cornerApps[c], forKey: Keys.cornerApp(c)) } }
+    }
+
     // Settings page
-    @Published var swapSides: Bool { didSet { defaults.set(swapSides, forKey: Keys.swapSides) } }
     @Published var bottomQuarterOnly: Bool { didSet { defaults.set(bottomQuarterOnly, forKey: Keys.bottomQuarterOnly) } }
     @Published var requireModifier: Bool { didSet { defaults.set(requireModifier, forKey: Keys.requireModifier) } }
     @Published var freezeCursor: Bool { didSet { defaults.set(freezeCursor, forKey: Keys.freezeCursor) } }
@@ -84,12 +94,15 @@ final class Prefs: ObservableObject {
 
     private enum Keys {
         static let haptics = "haptics"
-        static let quickMute = "quickMute"
-        static let mediaStrip = "mediaStrip"
+        static let quickMute = "quickMute"       // legacy, read once for migration
+        static let mediaStrip = "mediaStrip"     // legacy
+        static let swapSides = "swapSides"       // legacy
+        static func edge(_ side: EdgeSide) -> String { "edge.\(side.rawValue)" }
+        static func corner(_ c: Corner) -> String { "corner.\(c.rawValue)" }
+        static func cornerApp(_ c: Corner) -> String { "cornerApp.\(c.rawValue)" }
         static let tapToPlay = "tapToPlay"
         static let sensitivity = "sensitivity"
         static let edgeWidth = "edgeWidth"
-        static let swapSides = "swapSides"
         static let bottomQuarterOnly = "bottomQuarterOnly"
         static let requireModifier = "requireModifier"
         static let freezeCursor = "freezeCursor"
@@ -108,12 +121,9 @@ final class Prefs: ObservableObject {
     private init() {
         defaults.register(defaults: [
             Keys.haptics: HapticStrength.medium.rawValue,
-            Keys.quickMute: true,
-            Keys.mediaStrip: true,
             Keys.tapToPlay: false,
             Keys.sensitivity: 1.5,
             Keys.edgeWidth: 0.05,
-            Keys.swapSides: false,
             Keys.bottomQuarterOnly: false,
             Keys.requireModifier: false,
             Keys.freezeCursor: true,
@@ -127,12 +137,28 @@ final class Prefs: ObservableObject {
             Keys.setupDone: false,
         ])
         haptics = HapticStrength(rawValue: defaults.string(forKey: Keys.haptics) ?? "") ?? .medium
-        quickMute = defaults.bool(forKey: Keys.quickMute)
-        mediaStrip = defaults.bool(forKey: Keys.mediaStrip)
         tapToPlay = defaults.bool(forKey: Keys.tapToPlay)
         sensitivity = defaults.double(forKey: Keys.sensitivity)
         edgeWidth = defaults.double(forKey: Keys.edgeWidth)
-        swapSides = defaults.bool(forKey: Keys.swapSides)
+        // Edges and corners, carrying over the older Swap Sides / Media Strip / Quick Mute switches.
+        let legacy = (swap: defaults.bool(forKey: Keys.swapSides),
+                      strip: defaults.object(forKey: Keys.mediaStrip) as? Bool ?? true,
+                      mute: defaults.object(forKey: Keys.quickMute) as? Bool ?? true)
+        var edges: [EdgeSide: EdgeFunction] = [:]
+        for side in EdgeSide.allCases {
+            let fallback = Prefs.defaultEdge(side, swap: legacy.swap, strip: legacy.strip)
+            edges[side] = defaults.string(forKey: Keys.edge(side)).flatMap(EdgeFunction.init(rawValue:)) ?? fallback
+        }
+        self.edges = edges
+        var corners: [Corner: CornerFunction] = [:]
+        var apps: [Corner: String] = [:]
+        for c in Corner.allCases {
+            let fallback: CornerFunction = (c == .topRight && legacy.mute) ? .mute : .off
+            corners[c] = defaults.string(forKey: Keys.corner(c)).flatMap(CornerFunction.init(rawValue:)) ?? fallback
+            apps[c] = defaults.string(forKey: Keys.cornerApp(c))
+        }
+        self.corners = corners
+        self.cornerApps = apps
         bottomQuarterOnly = defaults.bool(forKey: Keys.bottomQuarterOnly)
         requireModifier = defaults.bool(forKey: Keys.requireModifier)
         freezeCursor = defaults.bool(forKey: Keys.freezeCursor)
@@ -147,6 +173,42 @@ final class Prefs: ObservableObject {
         didPromptAccess = defaults.bool(forKey: Keys.didPromptAccess)
         accessNoticeDismissed = defaults.bool(forKey: Keys.accessNoticeDismissed)
         refreshOpenAtLogin()
+    }
+
+    static func defaultEdge(_ side: EdgeSide, swap: Bool = false, strip: Bool = true) -> EdgeFunction {
+        switch side {
+        case .left: return swap ? .volume : .brightness
+        case .right: return swap ? .brightness : .volume
+        case .top: return .off
+        case .bottom: return strip ? .songs : .off
+        }
+    }
+
+    func edge(_ side: EdgeSide) -> EdgeFunction { edges[side] ?? .off }
+    func corner(_ c: Corner) -> CornerFunction { corners[c] ?? .off }
+
+    /// A corner counts as active only when it has something to do.
+    func cornerIsActive(_ c: Corner) -> Bool {
+        let f = corner(c)
+        return f != .off && (f != .openApp || cornerApps[c] != nil)
+    }
+
+    /// Puts every gesture and option back the way Brim ships. Keeps setup, permission and app-list state.
+    func restoreDefaults() {
+        haptics = .medium
+        tapToPlay = false
+        sensitivity = 1.5
+        edgeWidth = 0.05
+        edges = Dictionary(uniqueKeysWithValues: EdgeSide.allCases.map { ($0, Prefs.defaultEdge($0)) })
+        corners = Dictionary(uniqueKeysWithValues: Corner.allCases.map { ($0, $0 == .topRight ? .mute : .off) })
+        cornerApps = [:]
+        bottomQuarterOnly = false
+        requireModifier = false
+        freezeCursor = true
+        fineControl = true
+        palmRejection = true
+        edgeGlow = true
+        paused = false
     }
 
     func applyAppearance() {

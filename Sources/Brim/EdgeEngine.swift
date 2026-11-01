@@ -8,12 +8,11 @@ final class LiveState: ObservableObject {
     static let shared = LiveState()
 
     enum Status: Equatable {
-        case ready, needsAccess, noTrackpad, paused
+        case ready, noTrackpad, paused
 
         var title: String {
             switch self {
             case .ready: return "Ready"
-            case .needsAccess: return "Limited"
             case .noTrackpad: return "No Trackpad"
             case .paused: return "Paused"
             }
@@ -22,23 +21,37 @@ final class LiveState: ObservableObject {
 
     @Published var brightness: Float?
     @Published var volume: Float?
+    @Published var keyboardBrightness: Float?
     @Published var muted = false
     @Published var trusted = Permissions.isTrusted
     @Published var deviceCount = 0
     /// Bumped every time the user completes a slide (used by the setup guide).
     @Published var slideCount = 0
-    /// The control currently being slid, for highlighting in the menu.
-    @Published var activeControl: EdgeControl?
-    /// The last app the user was in (not Brim), for "Turn Off in …".
+    /// The edge currently being slid, for highlighting in the menu.
+    @Published var activeSide: EdgeSide?
+    /// The last app the user was in (not Brim), for "Use in …".
     @Published var lastApp: NSRunningApplication?
     /// True right after setup, when the menu opens to show where Brim lives.
     @Published var showWelcome = false
+    /// Set when a gesture asked for something that needs Accessibility, so the menu can explain.
+    @Published var blockedAction: String?
 
     var status: Status {
         if Prefs.shared.paused { return .paused }
         if deviceCount == 0 { return .noTrackpad }
-        if !trusted && !Prefs.shared.accessNoticeDismissed { return .needsAccess }
         return .ready
+    }
+
+    /// Accessibility is optional; mention it until the user allows it or says no thanks.
+    var showAccessNotice: Bool { !trusted && !Prefs.shared.accessNoticeDismissed }
+
+    func level(of function: EdgeFunction) -> Float? {
+        switch function {
+        case .brightness: return brightness
+        case .volume: return volume
+        case .keyboardBrightness: return keyboardBrightness
+        default: return nil
+        }
     }
 
     func refreshLevels() {
@@ -48,15 +61,22 @@ final class LiveState: ObservableObject {
         if b != brightness { brightness = b }
         if v != volume { volume = v }
         if m != muted { muted = m }
+        if Prefs.shared.edges.values.contains(.keyboardBrightness) {
+            let k = KeyboardBacklight.level()
+            if k != keyboardBrightness { keyboardBrightness = k }
+        }
     }
 
     func refreshTrust() {
         let t = Permissions.isTrusted
-        if t != trusted { trusted = t }
+        if t != trusted {
+            trusted = t
+            if t { blockedAction = nil }
+        }
     }
 }
 
-/// Connects raw trackpad frames to the recognizer and performs its actions.
+/// Connects raw trackpad frames to the recognizer and performs what the user assigned.
 final class EdgeEngine {
     static let shared = EdgeEngine()
 
@@ -87,14 +107,12 @@ final class EdgeEngine {
         var c = EdgeConfig()
         c.edgeWidth = Float(prefs.edgeWidth)
         c.sensitivity = Float(prefs.sensitivity)
-        c.swapSides = prefs.swapSides
         c.bottomQuarterOnly = prefs.bottomQuarterOnly
-        c.quickMute = prefs.quickMute
-        c.mediaStrip = prefs.mediaStrip
-        c.tapToPlay = prefs.tapToPlay
         c.freezeCursor = prefs.freezeCursor
         c.fineControl = prefs.fineControl
         c.palmRejection = prefs.palmRejection
+        c.edges = Dictionary(uniqueKeysWithValues: EdgeSide.allCases.map { ($0, prefs.edge($0).kind) })
+        c.corners = Set(Corner.allCases.filter { prefs.cornerIsActive($0) })
         recognizer.config = c
     }
 
@@ -143,8 +161,8 @@ final class EdgeEngine {
         let context = EdgeContext(gestureAllowed: allowed, fineKeysHeld: flags.contains([.shift, .option]))
         let actions = recognizer.process(touches, time: time, context: context)
         for action in actions { perform(action) }
-        if !recognizer.isTracking, live.activeControl != nil {
-            live.activeControl = nil
+        if !recognizer.isTracking, live.activeSide != nil {
+            live.activeSide = nil
         }
     }
 
@@ -158,28 +176,52 @@ final class EdgeEngine {
         switch action {
         case .freezeCursor:
             freezeCursor()
+
         case .releaseCursor:
-            if live.activeControl != nil {
+            if live.activeSide != nil {
                 live.slideCount += 1
                 EdgeGlow.shared.hide()
             }
             expectedLevel = nil
             releaseCursor()
-        case .slideBegan(let control):
-            live.activeControl = control
-            expectedLevel = level(of: control)
-            if prefs.edgeGlow, let level = expectedLevel {
-                EdgeGlow.shared.show(control, onLeft: (control == .brightness) != prefs.swapSides, level: level,
-                                     muted: control == .volume && live.muted)
+
+        case .slideBegan(let side):
+            let function = prefs.edge(side)
+            live.activeSide = side
+            expectedLevel = currentLevel(function)
+            if prefs.edgeGlow, function.hasLevel, let level = expectedLevel {
+                EdgeGlow.shared.show(function, on: side, level: level, muted: function == .volume && live.muted)
             }
-        case .step(let control, let up, let fine):
+
+        case .step(let side, let up, let fine):
+            step(prefs.edge(side), side: side, up: up, fine: fine)
+
+        case .swipe(let side, let forward):
+            swipe(prefs.edge(side), forward: forward)
+
+        case .tap(let side):
+            if prefs.edge(side) == .songs && prefs.tapToPlay {
+                run(needsAccess: true, name: "Tap to Play or Pause") { SystemControls.press(.play) }
+            }
+
+        case .cornerDoubleTap(let corner):
+            cornerAction(corner)
+        }
+    }
+
+    // MARK: Edge functions
+
+    private func step(_ function: EdgeFunction, side: EdgeSide, up: Bool, fine: Bool) {
+        if function.hasLevel {
             let delta: Float = (fine ? 1 / 64 : 1 / 16) * (up ? 1 : -1)
-            let before = expectedLevel ?? level(of: control) ?? 0.5
+            let before = expectedLevel ?? currentLevel(function) ?? 0.5
             let after = min(max(before + delta, 0), 1)
             expectedLevel = after
-            switch control {
+            switch function {
             case .volume: stepVolume(up: up, fine: fine)
             case .brightness: stepBrightness(up: up, fine: fine)
+            case .keyboardBrightness: KeyboardBacklight.setLevel(after)
+            default: break
             }
             // A tick per step, a firmer bump on reaching 0% or 100%, then silence at the limit.
             if after != before {
@@ -187,30 +229,79 @@ final class EdgeEngine {
             }
             if prefs.edgeGlow { EdgeGlow.shared.update(level: after, muted: false) }
             scheduleRefresh()
-        case .toggleMute:
-            if live.trusted {
-                SystemControls.press(.mute)
-            } else {
-                SystemControls.setMuted(!SystemControls.isMuted())
+            return
+        }
+
+        switch function {
+        case .scroll:
+            run(needsAccess: true, name: function.title) {
+                SystemControls.scroll(vertical: side.isVertical, towardTopOrRight: up)
             }
-            Haptics.tick(prefs.haptics)
-            scheduleRefresh()
-        case .playPause:
-            SystemControls.press(.play)
-            Haptics.tick(prefs.haptics)
-        case .nextTrack:
-            SystemControls.press(.next)
-            Haptics.tick(prefs.haptics)
-        case .previousTrack:
-            SystemControls.press(.previous)
+        case .zoom:
+            run(needsAccess: true, name: function.title) {
+                SystemControls.shortcut(up ? .equal : .minus, .maskCommand)
+                Haptics.tick(prefs.haptics)
+            }
+        default:
+            break
+        }
+    }
+
+    private func swipe(_ function: EdgeFunction, forward: Bool) {
+        run(needsAccess: function.needsAccess, name: function.title) {
+            switch function {
+            case .songs: SystemControls.press(forward ? .next : .previous)
+            case .desktops: SystemControls.shortcut(forward ? .rightArrow : .leftArrow, .maskControl)
+            case .backForward: SystemControls.shortcut(forward ? .rightBracket : .leftBracket, .maskCommand)
+            default: return
+            }
             Haptics.tick(prefs.haptics)
         }
     }
 
-    // MARK: Controls
+    private func cornerAction(_ corner: Corner) {
+        let function = prefs.corner(corner)
+        run(needsAccess: function.needsAccess, name: function.title) {
+            switch function {
+            case .off: return
+            case .mute:
+                if live.trusted { SystemControls.press(.mute) } else { SystemControls.setMuted(!SystemControls.isMuted()) }
+                scheduleRefresh()
+            case .playPause: SystemControls.press(.play)
+            case .nextSong: SystemControls.press(.next)
+            case .previousSong: SystemControls.press(.previous)
+            case .missionControl: SystemControls.openSystemApp("/System/Applications/Mission Control.app")
+            case .showDesktop: SystemControls.shortcut(.f11, [])
+            case .spotlight: SystemControls.shortcut(.space, .maskCommand)
+            case .screenshot: SystemControls.openSystemApp("/System/Applications/Utilities/Screenshot.app")
+            case .lockScreen: SystemControls.lockScreen()
+            case .sleepDisplay: SystemControls.sleepDisplay()
+            case .openApp:
+                if let id = prefs.cornerApps[corner] { SystemControls.openApp(bundleID: id) }
+            }
+            Haptics.tick(prefs.haptics)
+        }
+    }
 
-    private func level(of control: EdgeControl) -> Float? {
-        control == .volume ? SystemControls.volume() : SystemControls.brightness()
+    /// Runs an action, or explains in the menu why it can't run yet.
+    private func run(needsAccess: Bool, name: String, _ body: () -> Void) {
+        guard !needsAccess || live.trusted else {
+            live.blockedAction = name
+            Haptics.bump(prefs.haptics)
+            return
+        }
+        body()
+    }
+
+    // MARK: Levels
+
+    private func currentLevel(_ function: EdgeFunction) -> Float? {
+        switch function {
+        case .volume: return SystemControls.volume()
+        case .brightness: return SystemControls.brightness()
+        case .keyboardBrightness: return KeyboardBacklight.level()
+        default: return nil
+        }
     }
 
     private func stepVolume(up: Bool, fine: Bool) {

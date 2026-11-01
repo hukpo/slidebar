@@ -7,27 +7,29 @@ final class EdgeGlow {
     static let shared = EdgeGlow()
 
     final class Model: ObservableObject {
-        @Published var control: EdgeControl = .volume
+        @Published var function: EdgeFunction = .volume
+        @Published var side: EdgeSide = .right
         @Published var level: Float = 0
         @Published var muted = false
         @Published var visible = false
-        @Published var onLeft = false
     }
 
     private let model = Model()
+    private var panel: NSPanel?
+    private var hideWork: DispatchWorkItem?
+    private static let thickness: CGFloat = 26
 
     /// A static bar for screenshots.
-    static func preview(level: Float) -> some View {
+    static func preview(level: Float, function: EdgeFunction = .volume, side: EdgeSide = .right) -> some View {
         let m = Model()
         m.level = level
+        m.function = function
+        m.side = side
         m.visible = true
         return GlowBar(model: m)
     }
-    private var panel: NSPanel?
-    private var hideWork: DispatchWorkItem?
-    private static let width: CGFloat = 26
 
-    func show(_ control: EdgeControl, onLeft: Bool, level: Float, muted: Bool) {
+    func show(_ function: EdgeFunction, on side: EdgeSide, level: Float, muted: Bool) {
         hideWork?.cancel()
         let panel = self.panel ?? makePanel()
         self.panel = panel
@@ -36,12 +38,19 @@ final class EdgeGlow {
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }) ?? NSScreen.main
         guard let frame = screen?.visibleFrame else { return }
-        let height = min(frame.height * 0.5, 420)
-        let x = onLeft ? frame.minX : frame.maxX - Self.width
-        panel.setFrame(NSRect(x: x, y: frame.midY - height / 2, width: Self.width, height: height), display: false)
+        let t = Self.thickness
+        let rect: NSRect
+        if side.isVertical {
+            let height = min(frame.height * 0.5, 420)
+            rect = NSRect(x: side == .left ? frame.minX : frame.maxX - t, y: frame.midY - height / 2, width: t, height: height)
+        } else {
+            let width = min(frame.width * 0.4, 520)
+            rect = NSRect(x: frame.midX - width / 2, y: side == .bottom ? frame.minY : frame.maxY - t, width: width, height: t)
+        }
+        panel.setFrame(rect, display: false)
 
-        model.control = control
-        model.onLeft = onLeft
+        model.function = function
+        model.side = side
         model.level = level
         model.muted = muted
         panel.orderFrontRegardless()
@@ -82,28 +91,52 @@ final class EdgeGlow {
     }
 }
 
+extension EdgeFunction {
+    /// Bottom-to-top colors used for this function's level.
+    var levelColors: [Color] {
+        switch self {
+        case .brightness: return [.brimAmber, .brimAmberTop]
+        case .keyboardBrightness: return [Color(white: 0.7), .white]
+        default: return [.brimViolet, .brimCyan]
+        }
+    }
+}
+
 private struct GlowBar: View {
     @ObservedObject var model: EdgeGlow.Model
 
     var body: some View {
-        let colors: [Color] = model.control == .brightness ? [.brimAmber, .brimAmberTop] : [.brimViolet, .brimCyan]
+        let colors = model.function.levelColors
+        let vertical = model.side.isVertical
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         GeometryReader { geo in
-            ZStack(alignment: .bottom) {
+            let length = max(10, (vertical ? geo.size.height : geo.size.width) - 16)
+            ZStack(alignment: vertical ? .bottom : .leading) {
                 Capsule()
                     .fill(Color.black.opacity(0.35))
                     .overlay(Capsule().strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5))
                 Capsule()
-                    .fill(LinearGradient(colors: colors, startPoint: .bottom, endPoint: .top))
-                    .frame(height: max(6, geo.size.height * CGFloat(model.level)))
+                    .fill(LinearGradient(colors: colors, startPoint: vertical ? .bottom : .leading, endPoint: vertical ? .top : .trailing))
+                    .frame(width: vertical ? nil : max(6, length * CGFloat(model.level)),
+                           height: vertical ? max(6, length * CGFloat(model.level)) : nil)
                     .opacity(model.muted ? 0.35 : 1)
                     .shadow(color: colors[1].opacity(0.7), radius: 6)
             }
-            .frame(width: 6)
-            .frame(maxWidth: .infinity, alignment: model.onLeft ? .leading : .trailing)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 8)
+            .frame(width: vertical ? 6 : length, height: vertical ? length : 6)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
+            .padding(vertical ? .horizontal : .vertical, 6)
         }
         .opacity(model.visible ? 1 : 0)
-        .offset(x: model.visible || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : (model.onLeft ? -14 : 14))
+        .offset(x: !vertical || reduceMotion || model.visible ? 0 : (model.side == .left ? -14 : 14),
+                y: vertical || reduceMotion || model.visible ? 0 : (model.side == .bottom ? 14 : -14))
+    }
+
+    private var alignment: Alignment {
+        switch model.side {
+        case .left: return .leading
+        case .right: return .trailing
+        case .top: return .top
+        case .bottom: return .bottom
+        }
     }
 }

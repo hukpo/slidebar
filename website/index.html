@@ -130,8 +130,8 @@
   .theme { display: inline-flex; margin-top: 26px; padding: 3px; border-radius: 99px; background: rgba(255,255,255,0.07); border: 1px solid var(--line); }
   .theme button { font: inherit; font-size: 13px; color: var(--ink-2); background: none; border: 0; padding: 6px 16px; border-radius: 99px; cursor: pointer; }
   .theme button[aria-pressed="true"] { background: var(--ink); color: var(--bg); font-weight: 600; }
-  .shots { display: flex; justify-content: center; gap: 48px; margin-top: 48px; align-items: flex-start; flex-wrap: wrap; }
-  .shots figure { width: 330px; max-width: 100%; }
+  .shots { display: flex; justify-content: center; gap: 28px; margin-top: 48px; align-items: flex-start; flex-wrap: wrap; }
+  .shots figure { width: 320px; max-width: 100%; }
   .shots img { border-radius: 16px; box-shadow: 0 28px 60px -18px rgba(0,0,0,0.65); }
   .shots figcaption { margin-top: 20px; color: var(--ink-2); font-size: 15px; }
   .shots figcaption strong { color: var(--ink); display: block; font-size: 17px; margin-bottom: 2px; }
@@ -235,7 +235,7 @@
     <div class="wrap">
       <div class="center">
         <h2 id="features-title">Made to feel right.</h2>
-        <p class="sub">Brightness lives on the left edge, volume on the right. Brim presses the same keys your keyboard does, so you see the display you already know.</p>
+        <p class="sub">Out of the box, brightness lives on the left edge and volume on the right, with the same display your keyboard shows. Then make every edge and corner do what you want.</p>
       </div>
       <div class="groups">
         <div class="group">
@@ -247,11 +247,11 @@
           </dl>
         </div>
         <div class="group">
-          <h3><span class="swatch cool" aria-hidden="true"></span>Handy extras</h3>
+          <h3><span class="swatch cool" aria-hidden="true"></span>Make it yours</h3>
           <dl>
-            <dt>Quick Mute</dt><dd>Double-tap the top-right corner of the trackpad.</dd>
-            <dt>Media Strip</dt><dd>Swipe along the bottom edge to skip to the next or previous song.</dd>
-            <dt>Swap Sides</dt><dd>Volume on the left and brightness on the right, if you prefer.</dd>
+            <dt>Any Edge, Any Slider</dt><dd>Each of the four edges can control brightness, volume, keyboard brightness, scrolling or zoom.</dd>
+            <dt>Or a Swipe</dt><dd>Swipe an edge to skip songs, switch desktops, or go back and forward.</dd>
+            <dt>Four Corners</dt><dd>Double-tap a corner to mute, play or pause, open Mission Control, lock your Mac, take a screenshot or open any app.</dd>
           </dl>
         </div>
         <div class="group">
@@ -270,7 +270,7 @@
   <section id="menu" aria-labelledby="menu-title">
     <div class="wrap center">
       <h2 id="menu-title">Lives in your menu bar.</h2>
-      <p class="sub">Your levels at a glance, one switch to pause, and everything else one click away.</p>
+      <p class="sub">Your levels at a glance, one switch to pause, and every edge and corner one click away.</p>
       <div class="theme" role="group" aria-label="Screenshot appearance">
         <button type="button" id="themeLight" aria-pressed="false">Light</button><button type="button" id="themeDark" aria-pressed="true">Dark</button>
       </div>
@@ -280,8 +280,12 @@
           <figcaption><strong>At a glance</strong>Drag the level bars to set brightness or volume directly.</figcaption>
         </figure>
         <figure>
-          <img id="shotSettings" src="img/settings-dark.png" width="340" alt="Brim Settings: gestures, edge width, palm rejection, speed, and more.">
-          <figcaption><strong>Set once</strong>Gestures, edge width, speed and the apps where Brim stays off.</figcaption>
+          <img id="shotGestures" src="img/gestures-dark.png" width="340" alt="Edges and Corners: a map of the trackpad where you choose what each edge and corner does.">
+          <figcaption><strong>Make it yours</strong>Click an edge or corner on the map and pick what it does.</figcaption>
+        </figure>
+        <figure>
+          <img id="shotSettings" src="img/settings-dark.png" width="340" alt="Brim Settings: slide speed, edge width, edge glow, apps and more.">
+          <figcaption><strong>Set once</strong>Speed, edge width, the glow, and the apps where Brim stays off.</figcaption>
         </figure>
       </div>
     </div>
@@ -379,6 +383,7 @@
   const setTheme = dark => {
     document.getElementById('shotMenu').src = `img/menu${dark ? '-dark' : ''}.png`;
     document.getElementById('shotSettings').src = `img/settings${dark ? '-dark' : ''}.png`;
+    document.getElementById('shotGestures').src = `img/gestures${dark ? '-dark' : ''}.png`;
     document.getElementById('shotSetup').src = `img/setup${dark ? '-dark' : ''}.png`;
     document.getElementById('themeDark').setAttribute('aria-pressed', dark);
     document.getElementById('themeLight').setAttribute('aria-pressed', !dark);

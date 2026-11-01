@@ -1,11 +1,12 @@
 import SwiftUI
 
-/// The set-once options, inside the popover. Grouped by what they affect, and scrollable so it
-/// never runs off a small screen.
+/// The set-once options, inside the popover. Everyday options first, expert ones folded away,
+/// and scrollable so it never runs off a small screen.
 struct SettingsPage: View {
     @Binding var page: MenuPage
     @ObservedObject var prefs = Prefs.shared
-    @ObservedObject var live = LiveState.shared
+    @State private var showAdvanced = false
+    @State private var confirmRestore = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -13,52 +14,27 @@ struct SettingsPage: View {
 
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 12) {
-                    SectionHeader(title: "Gestures")
                     Card {
-                        ToggleRow(icon: "speaker.slash", title: "Quick Mute",
-                                  subtitle: "Double-tap the top-right corner", isOn: $prefs.quickMute)
-                        RowDivider()
-                        ToggleRow(icon: "forward", title: "Media Strip",
-                                  subtitle: live.trusted ? "Swipe the bottom edge to skip songs" : "Needs Accessibility to work", isOn: $prefs.mediaStrip)
-                        RowDivider()
-                        ToggleRow(icon: nil, title: "Tap to Play or Pause",
-                                  subtitle: "Tap the bottom edge. Clicks count too.", isOn: $prefs.tapToPlay)
-                            .disabled(!prefs.mediaStrip)
-                        RowDivider()
-                        ToggleRow(icon: "arrow.left.arrow.right", title: "Swap Sides",
-                                  subtitle: prefs.swapSides ? "Volume left, brightness right" : "Brightness left, volume right",
-                                  isOn: $prefs.swapSides)
+                        NavigationRow(icon: "rectangle.dashed", title: "Edges and Corners",
+                                      subtitle: GestureSummary.text(prefs)) {
+                            page = .gestures(back: .settings)
+                        }
                     }
 
-                    SectionHeader(title: "Edges")
-                    Card {
-                        SliderRow(icon: "arrow.left.and.right", title: "Edge Width",
-                                  lowLabel: "Narrow", highLabel: "Wide",
-                                  value: $prefs.edgeWidth, range: Prefs.edgeWidthRange, step: Prefs.edgeWidthStep,
-                                  valueDescription: "\(Int((prefs.edgeWidth * 100).rounded())) percent of the trackpad")
-                        RowDivider()
-                        ToggleRow(icon: "rectangle.bottomthird.inset.filled", title: "Bottom Quarter Only",
-                                  subtitle: "Only the lower part responds", isOn: $prefs.bottomQuarterOnly)
-                        RowDivider()
-                        ToggleRow(icon: "hand.raised", title: "Palm Rejection",
-                                  subtitle: "Ignore a hand resting on an edge", isOn: $prefs.palmRejection)
-                        RowDivider()
-                        ToggleRow(icon: "option", title: "Only While Holding Fn or Option",
-                                  subtitle: "Edges respond only while a key is held", isOn: $prefs.requireModifier)
-                    }
-
-                    SectionHeader(title: "While Sliding")
+                    SectionHeader(title: "Feel")
                     Card {
                         SliderRow(icon: "speedometer", title: "Slide Speed",
                                   lowLabel: "Slower", highLabel: "Faster",
                                   value: $prefs.sensitivity, range: Prefs.sensitivityRange, step: Prefs.sensitivityStep,
                                   valueDescription: String(format: "%g times", prefs.sensitivity))
                         RowDivider()
+                        SliderRow(icon: "arrow.left.and.right", title: "Edge Width",
+                                  lowLabel: "Narrow", highLabel: "Wide",
+                                  value: $prefs.edgeWidth, range: Prefs.edgeWidthRange, step: Prefs.edgeWidthStep,
+                                  valueDescription: "\(Int((prefs.edgeWidth * 100).rounded())) percent of the trackpad")
+                        RowDivider()
                         ToggleRow(icon: "cursorarrow", title: "Keep Pointer Still",
                                   subtitle: "The pointer stays put while you slide", isOn: $prefs.freezeCursor)
-                        RowDivider()
-                        ToggleRow(icon: "plusminus", title: "Smaller Steps with Shift-Option",
-                                  subtitle: "Hold Shift and Option for finer changes", isOn: $prefs.fineControl)
                         RowDivider()
                         ToggleRow(icon: "rectangle.righthalf.inset.filled", title: "Edge Glow",
                                   subtitle: "A level bar on the edge of your screen", isOn: $prefs.edgeGlow)
@@ -98,6 +74,57 @@ struct SettingsPage: View {
                             ToggleRow(icon: "arrow.triangle.2.circlepath", title: "Install Updates Automatically",
                                       subtitle: "New versions install themselves", isOn: $prefs.autoUpdate)
                         }
+                    }
+
+                    Button {
+                        withAnimation(.easeOut(duration: 0.2)) { showAdvanced.toggle() }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text("Advanced").font(.system(size: 11, weight: .semibold))
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 9, weight: .bold))
+                                .rotationEffect(.degrees(showAdvanced ? 90 : 0))
+                        }
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 6)
+                        .padding(.top, 4)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityValue(showAdvanced ? "Expanded" : "Collapsed")
+
+                    if showAdvanced {
+                        Card {
+                            ToggleRow(icon: "rectangle.bottomthird.inset.filled", title: "Lower Part of Side Edges Only",
+                                      subtitle: "The top of the left and right edges is ignored", isOn: $prefs.bottomQuarterOnly)
+                            RowDivider()
+                            ToggleRow(icon: "hand.raised", title: "Palm Rejection",
+                                      subtitle: "Ignore a hand resting on an edge", isOn: $prefs.palmRejection)
+                            RowDivider()
+                            ToggleRow(icon: "option", title: "Only While Holding Fn or Option",
+                                      subtitle: "Edges respond only while a key is held", isOn: $prefs.requireModifier)
+                            RowDivider()
+                            ToggleRow(icon: "plusminus", title: "Smaller Steps with Shift-Option",
+                                      subtitle: "Hold Shift and Option for finer changes", isOn: $prefs.fineControl)
+                            RowDivider()
+                            HStack(spacing: 10) {
+                                FeatureIcon(systemName: "arrow.counterclockwise")
+                                RowLabel(title: "Restore Defaults",
+                                         subtitle: confirmRestore ? "All gestures and options go back to how Brim starts." : "Your app list stays as it is")
+                                Spacer(minLength: 8)
+                                if confirmRestore {
+                                    Button("Cancel") { confirmRestore = false }.controlSize(.small)
+                                    Button("Restore") { prefs.restoreDefaults(); confirmRestore = false }
+                                        .controlSize(.small)
+                                        .buttonStyle(.borderedProminent)
+                                } else {
+                                    Button("Restore…") { confirmRestore = true }.controlSize(.small)
+                                }
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 7)
+                        }
+                        .transition(.opacity)
                     }
                 }
                 .padding(.bottom, 4)

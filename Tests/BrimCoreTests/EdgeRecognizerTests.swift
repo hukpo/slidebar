@@ -5,11 +5,11 @@ final class EdgeRecognizerTests: XCTestCase {
 
     /// Drives a single finger along a path, one frame every 10 ms, then lifts it.
     private func run(_ r: inout EdgeRecognizer, path: [(Float, Float)], start: Double = 0,
-                     context: EdgeContext = EdgeContext(), id: Int32 = 1) -> [EdgeAction] {
+                     context: EdgeContext = EdgeContext(), size: Float = 0.8) -> [EdgeAction] {
         var actions: [EdgeAction] = []
         var time = start
         for (x, y) in path {
-            actions += r.process([TouchPoint(id: id, x: x, y: y)], time: time, context: context)
+            actions += r.process([TouchPoint(id: 1, x: x, y: y, size: size)], time: time, context: context)
             time += 0.01
         }
         actions += r.process([], time: time, context: context)
@@ -27,32 +27,25 @@ final class EdgeRecognizerTests: XCTestCase {
         actions.filter { if case .step = $0 { return true } else { return false } }
     }
 
-    func testRightEdgeSlideUpRaisesVolume() {
+    // MARK: Side sliders
+
+    func testRightEdgeSlideUp() {
         var r = EdgeRecognizer()
         let actions = run(&r, path: line(from: (0.98, 0.2), to: (0.98, 0.6)))
         XCTAssertEqual(actions.first, .freezeCursor)
-        XCTAssertTrue(actions.contains(.slideBegan(.volume)))
+        XCTAssertTrue(actions.contains(.slideBegan(.right)))
         let s = steps(actions)
         // 0.4 travel at 1.5× sensitivity → 0.4 / (0.04 / 1.5) = 15 steps
         XCTAssertEqual(s.count, 15)
-        XCTAssertTrue(s.allSatisfy { $0 == .step(.volume, up: true, fine: false) })
+        XCTAssertTrue(s.allSatisfy { $0 == .step(.right, up: true, fine: false) })
         XCTAssertEqual(actions.last, .releaseCursor)
     }
 
-    func testLeftEdgeSlideDownLowersBrightness() {
+    func testLeftEdgeSlideDown() {
         var r = EdgeRecognizer()
         let s = steps(run(&r, path: line(from: (0.02, 0.7), to: (0.02, 0.3))))
         XCTAssertFalse(s.isEmpty)
-        XCTAssertTrue(s.allSatisfy { $0 == .step(.brightness, up: false, fine: false) })
-    }
-
-    func testSwapSides() {
-        var config = EdgeConfig()
-        config.swapSides = true
-        var r = EdgeRecognizer(config: config)
-        let s = steps(run(&r, path: line(from: (0.02, 0.2), to: (0.02, 0.5))))
-        XCTAssertTrue(s.allSatisfy { $0 == .step(.volume, up: true, fine: false) })
-        XCTAssertFalse(s.isEmpty)
+        XCTAssertTrue(s.allSatisfy { $0 == .step(.left, up: false, fine: false) })
     }
 
     func testMiddleOfTrackpadDoesNothing() {
@@ -62,14 +55,12 @@ final class EdgeRecognizerTests: XCTestCase {
 
     func testFingerMovingIntoEdgeDoesNotTrigger() {
         var r = EdgeRecognizer()
-        // Starts in the middle and ends at the edge: must stay a normal pointer move.
         XCTAssertEqual(run(&r, path: line(from: (0.5, 0.5), to: (0.99, 0.5)) + line(from: (0.99, 0.5), to: (0.99, 0.9))), [])
     }
 
-    func testHorizontalMoveFromEdgeCancels() {
+    func testHorizontalMoveFromSideEdgeCancels() {
         var r = EdgeRecognizer()
         let actions = run(&r, path: line(from: (0.02, 0.5), to: (0.4, 0.51)))
-        XCTAssertTrue(steps(actions).isEmpty)
         XCTAssertEqual(actions, [.freezeCursor, .releaseCursor])
         XCTAssertFalse(r.isTracking)
     }
@@ -86,14 +77,14 @@ final class EdgeRecognizerTests: XCTestCase {
         var r = EdgeRecognizer()
         let fine = EdgeContext(gestureAllowed: true, fineKeysHeld: true)
         let s = steps(run(&r, path: line(from: (0.98, 0.2), to: (0.98, 0.4)), context: fine))
-        XCTAssertTrue(s.allSatisfy { $0 == .step(.volume, up: true, fine: true) })
+        XCTAssertTrue(s.allSatisfy { $0 == .step(.right, up: true, fine: true) })
 
         r.config.fineControl = false
         let s2 = steps(run(&r, path: line(from: (0.98, 0.2), to: (0.98, 0.4)), start: 5, context: fine))
-        XCTAssertTrue(s2.allSatisfy { $0 == .step(.volume, up: true, fine: false) })
+        XCTAssertTrue(s2.allSatisfy { $0 == .step(.right, up: true, fine: false) })
     }
 
-    func testRequireModifierGate() {
+    func testGestureNotAllowed() {
         var r = EdgeRecognizer()
         let blocked = EdgeContext(gestureAllowed: false)
         XCTAssertEqual(run(&r, path: line(from: (0.98, 0.2), to: (0.98, 0.6)), context: blocked), [])
@@ -107,60 +98,6 @@ final class EdgeRecognizerTests: XCTestCase {
         XCTAssertFalse(r.isTracking)
     }
 
-    func testDoubleTapCornerMutes() {
-        var r = EdgeRecognizer()
-        let tap1 = run(&r, path: [(0.95, 0.95), (0.95, 0.95)], start: 0)
-        XCTAssertEqual(tap1, [.releaseCursor])
-        let tap2 = run(&r, path: [(0.95, 0.95), (0.95, 0.95)], start: 0.2)
-        XCTAssertTrue(tap2.contains(.toggleMute))
-    }
-
-    func testSlowSecondCornerTapDoesNotMute() {
-        var r = EdgeRecognizer()
-        _ = run(&r, path: [(0.95, 0.95), (0.95, 0.95)], start: 0)
-        XCTAssertFalse(run(&r, path: [(0.95, 0.95), (0.95, 0.95)], start: 2).contains(.toggleMute))
-    }
-
-    func testCornerStartedSlideBecomesVolume() {
-        var r = EdgeRecognizer()
-        let actions = run(&r, path: line(from: (0.98, 0.95), to: (0.98, 0.5)))
-        XCTAssertTrue(actions.contains(.slideBegan(.volume)))
-        XCTAssertTrue(steps(actions).allSatisfy { $0 == .step(.volume, up: false, fine: false) })
-    }
-
-    func testMediaStripSwipes() {
-        var r = EdgeRecognizer()
-        XCTAssertTrue(run(&r, path: line(from: (0.3, 0.04), to: (0.6, 0.05))).contains(.nextTrack))
-        XCTAssertTrue(run(&r, path: line(from: (0.6, 0.04), to: (0.3, 0.05)), start: 5).contains(.previousTrack))
-    }
-
-    func testSwipeFiresOnce() {
-        var r = EdgeRecognizer()
-        let actions = run(&r, path: line(from: (0.2, 0.04), to: (0.8, 0.04)))
-        XCTAssertEqual(actions.filter { $0 == .nextTrack }.count, 1)
-    }
-
-    func testTapToPlayIsOptIn() {
-        var r = EdgeRecognizer()
-        XCTAssertFalse(run(&r, path: [(0.5, 0.04), (0.5, 0.04)]).contains(.playPause))
-        r.config.tapToPlay = true
-        XCTAssertTrue(run(&r, path: [(0.5, 0.04), (0.5, 0.04)], start: 5).contains(.playPause))
-    }
-
-    func testMediaStripCanBeDisabled() {
-        var config = EdgeConfig()
-        config.mediaStrip = false
-        var r = EdgeRecognizer(config: config)
-        XCTAssertEqual(run(&r, path: line(from: (0.3, 0.04), to: (0.6, 0.05))), [])
-    }
-
-    func testFreezeCursorOff() {
-        var config = EdgeConfig()
-        config.freezeCursor = false
-        var r = EdgeRecognizer(config: config)
-        XCTAssertFalse(run(&r, path: line(from: (0.98, 0.2), to: (0.98, 0.6))).contains(.freezeCursor))
-    }
-
     func testHigherSensitivityGivesMoreSteps() {
         var low = EdgeRecognizer()
         low.config.sensitivity = 1
@@ -170,14 +107,137 @@ final class EdgeRecognizerTests: XCTestCase {
         XCTAssertLessThan(steps(run(&low, path: path)).count, steps(run(&high, path: path)).count)
     }
 
+    func testWiderEdge() {
+        var r = EdgeRecognizer()
+        XCTAssertTrue(steps(run(&r, path: line(from: (0.9, 0.2), to: (0.9, 0.6)))).isEmpty)
+        r.config.edgeWidth = 0.12
+        XCTAssertFalse(steps(run(&r, path: line(from: (0.9, 0.2), to: (0.9, 0.6)), start: 5)).isEmpty)
+    }
+
+    func testFreezeCursorOff() {
+        var r = EdgeRecognizer()
+        r.config.freezeCursor = false
+        XCTAssertFalse(run(&r, path: line(from: (0.98, 0.2), to: (0.98, 0.6))).contains(.freezeCursor))
+    }
+
+    // MARK: Configurable edges
+
+    func testEdgeTurnedOffDoesNothing() {
+        var r = EdgeRecognizer()
+        r.config.edges[.right] = .off
+        XCTAssertEqual(run(&r, path: line(from: (0.98, 0.2), to: (0.98, 0.6))), [])
+    }
+
+    func testTopEdgeSliderUsesHorizontalTravel() {
+        var r = EdgeRecognizer()
+        r.config.edges[.top] = .slider
+        // 0.41 of travel (just past 15 steps, away from a rounding boundary).
+        let actions = run(&r, path: line(from: (0.3, 0.96), to: (0.71, 0.96)))
+        XCTAssertTrue(actions.contains(.slideBegan(.top)))
+        let s = steps(actions)
+        XCTAssertEqual(s.count, 15)
+        XCTAssertTrue(s.allSatisfy { $0 == .step(.top, up: true, fine: false) })
+    }
+
+    func testTopEdgeSlideLeftGoesDown() {
+        var r = EdgeRecognizer()
+        r.config.edges[.top] = .slider
+        let s = steps(run(&r, path: line(from: (0.7, 0.96), to: (0.3, 0.96))))
+        XCTAssertTrue(!s.isEmpty && s.allSatisfy { $0 == .step(.top, up: false, fine: false) })
+    }
+
+    func testBottomSwipeDirections() {
+        var r = EdgeRecognizer()
+        XCTAssertTrue(run(&r, path: line(from: (0.3, 0.04), to: (0.6, 0.05))).contains(.swipe(.bottom, forward: true)))
+        XCTAssertTrue(run(&r, path: line(from: (0.6, 0.04), to: (0.3, 0.05)), start: 5).contains(.swipe(.bottom, forward: false)))
+    }
+
+    func testSwipeFiresOnce() {
+        var r = EdgeRecognizer()
+        let actions = run(&r, path: line(from: (0.2, 0.04), to: (0.8, 0.04)))
+        XCTAssertEqual(actions.filter { $0 == .swipe(.bottom, forward: true) }.count, 1)
+    }
+
+    func testSideEdgeAsSwipeUsesVerticalTravel() {
+        var r = EdgeRecognizer()
+        r.config.edges[.left] = .swipe
+        let actions = run(&r, path: line(from: (0.02, 0.3), to: (0.02, 0.6)))
+        XCTAssertTrue(actions.contains(.swipe(.left, forward: true)))
+        XCTAssertTrue(steps(actions).isEmpty)
+    }
+
+    func testBottomEdgeOffDoesNothing() {
+        var r = EdgeRecognizer()
+        r.config.edges[.bottom] = .off
+        XCTAssertEqual(run(&r, path: line(from: (0.3, 0.04), to: (0.6, 0.05))), [])
+    }
+
+    func testTapOnEdgeIsReported() {
+        var r = EdgeRecognizer()
+        XCTAssertTrue(run(&r, path: [(0.5, 0.04), (0.5, 0.04)]).contains(.tap(.bottom)))
+    }
+
+    // MARK: Corners
+
+    func testDoubleTapTopRightCorner() {
+        var r = EdgeRecognizer()
+        // The first tap does nothing visible (corners never freeze the pointer).
+        XCTAssertEqual(run(&r, path: [(0.95, 0.95), (0.95, 0.95)], start: 0), [.releaseCursor])
+        XCTAssertTrue(run(&r, path: [(0.95, 0.95), (0.95, 0.95)], start: 0.2).contains(.cornerDoubleTap(.topRight)))
+    }
+
+    func testSlowSecondTapDoesNothing() {
+        var r = EdgeRecognizer()
+        _ = run(&r, path: [(0.95, 0.95), (0.95, 0.95)], start: 0)
+        XCTAssertFalse(run(&r, path: [(0.95, 0.95), (0.95, 0.95)], start: 2).contains(.cornerDoubleTap(.topRight)))
+    }
+
+    func testEveryCornerCanBeEnabled() {
+        var r = EdgeRecognizer()
+        r.config.corners = Set(Corner.allCases)
+        let points: [(Corner, Float, Float)] = [(.topLeft, 0.05, 0.95), (.topRight, 0.95, 0.95),
+                                                (.bottomLeft, 0.05, 0.05), (.bottomRight, 0.95, 0.05)]
+        var t = 0.0
+        for (corner, x, y) in points {
+            _ = run(&r, path: [(x, y), (x, y)], start: t)
+            XCTAssertTrue(run(&r, path: [(x, y), (x, y)], start: t + 0.2).contains(.cornerDoubleTap(corner)), "\(corner)")
+            t += 5
+        }
+    }
+
+    func testDisabledCornerFallsThroughToEdge() {
+        var r = EdgeRecognizer()
+        r.config.corners = []
+        // A tap in the top-right corner is now just a tap on the right edge.
+        XCTAssertTrue(run(&r, path: [(0.98, 0.95), (0.98, 0.95)]).contains(.tap(.right)))
+    }
+
+    func testTapsInDifferentCornersDontCombine() {
+        var r = EdgeRecognizer()
+        r.config.corners = [.topLeft, .topRight]
+        _ = run(&r, path: [(0.05, 0.95), (0.05, 0.95)], start: 0)
+        XCTAssertFalse(run(&r, path: [(0.95, 0.95), (0.95, 0.95)], start: 0.2).contains(.cornerDoubleTap(.topRight)))
+    }
+
+    func testCornerStartedSlideBecomesEdgeSlide() {
+        var r = EdgeRecognizer()
+        let actions = run(&r, path: line(from: (0.98, 0.95), to: (0.98, 0.5)))
+        XCTAssertTrue(actions.contains(.slideBegan(.right)))
+        XCTAssertTrue(steps(actions).allSatisfy { $0 == .step(.right, up: false, fine: false) })
+    }
+
+    func testCornerStartedHorizontalSlideBecomesTopSlide() {
+        var r = EdgeRecognizer()
+        r.config.edges[.top] = .slider
+        let actions = run(&r, path: line(from: (0.95, 0.97), to: (0.5, 0.97)))
+        XCTAssertTrue(actions.contains(.slideBegan(.top)))
+    }
+
+    // MARK: Palms
+
     func testPalmIsIgnored() {
         var r = EdgeRecognizer()
-        var actions: [EdgeAction] = []
-        for i in 0...30 {
-            actions += r.process([TouchPoint(id: 1, x: 0.98, y: 0.2 + Float(i) * 0.015, size: 4)], time: Double(i) * 0.01)
-        }
-        actions += r.process([], time: 1)
-        XCTAssertEqual(actions, [])
+        XCTAssertEqual(run(&r, path: line(from: (0.98, 0.2), to: (0.98, 0.6)), size: 4), [])
     }
 
     func testContactGrowingIntoPalmCancels() {
@@ -191,17 +251,6 @@ final class EdgeRecognizerTests: XCTestCase {
     func testPalmRejectionCanBeTurnedOff() {
         var r = EdgeRecognizer()
         r.config.palmRejection = false
-        var actions: [EdgeAction] = []
-        for i in 0...30 {
-            actions += r.process([TouchPoint(id: 1, x: 0.98, y: 0.2 + Float(i) * 0.015, size: 4)], time: Double(i) * 0.01)
-        }
-        XCTAssertTrue(actions.contains(.slideBegan(.volume)))
-    }
-
-    func testWiderEdge() {
-        var r = EdgeRecognizer()
-        XCTAssertTrue(steps(run(&r, path: line(from: (0.9, 0.2), to: (0.9, 0.6)))).isEmpty)
-        r.config.edgeWidth = 0.12
-        XCTAssertFalse(steps(run(&r, path: line(from: (0.9, 0.2), to: (0.9, 0.6)), start: 5)).isEmpty)
+        XCTAssertTrue(run(&r, path: line(from: (0.98, 0.2), to: (0.98, 0.6)), size: 4).contains(.slideBegan(.right)))
     }
 }

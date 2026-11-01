@@ -17,12 +17,38 @@ public struct TouchPoint: Equatable {
     }
 }
 
-public enum EdgeZone: Equatable {
-    case left, right, bottom, corner
+/// The four edges of the trackpad.
+public enum EdgeSide: String, CaseIterable, Codable, Hashable {
+    case left, right, top, bottom
+
+    /// Left and right edges are slid up and down; top and bottom edges left and right.
+    public var isVertical: Bool { self == .left || self == .right }
 }
 
-public enum EdgeControl: Equatable {
-    case brightness, volume
+/// The four corners of the trackpad.
+public enum Corner: String, CaseIterable, Codable, Hashable {
+    case topLeft, topRight, bottomLeft, bottomRight
+
+    var isRight: Bool { self == .topRight || self == .bottomRight }
+    var isTop: Bool { self == .topLeft || self == .topRight }
+    /// The edges that meet at this corner.
+    var verticalEdge: EdgeSide { isRight ? .right : .left }
+    var horizontalEdge: EdgeSide { isTop ? .top : .bottom }
+}
+
+/// How an edge responds.
+public enum EdgeKind: Equatable {
+    /// Ignored.
+    case off
+    /// Continuous: one step per bit of travel (volume, brightness, scrolling…).
+    case slider
+    /// One action per swipe along the edge (next song, next desktop…).
+    case swipe
+}
+
+public enum EdgeZone: Equatable {
+    case edge(EdgeSide)
+    case corner(Corner)
 }
 
 public enum EdgeAction: Equatable {
@@ -30,31 +56,36 @@ public enum EdgeAction: Equatable {
     case freezeCursor
     /// Let the pointer move again (safe to send when not frozen).
     case releaseCursor
-    /// A slide along a side edge was recognized.
-    case slideBegan(EdgeControl)
-    /// Move a control one step. `fine` means a quarter step (⇧⌥).
-    case step(EdgeControl, up: Bool, fine: Bool)
-    case toggleMute
-    case playPause
-    case nextTrack
-    case previousTrack
+    /// A slide along an edge was recognized.
+    case slideBegan(EdgeSide)
+    /// One step along a slider edge. `up` means toward the top (left/right edges)
+    /// or toward the right (top/bottom edges). `fine` means a quarter step (⇧⌥).
+    case step(EdgeSide, up: Bool, fine: Bool)
+    /// A swipe along a swipe edge. `forward` means up (left/right edges) or right (top/bottom edges).
+    case swipe(EdgeSide, forward: Bool)
+    /// A quick tap on an edge.
+    case tap(EdgeSide)
+    /// Two quick taps in a corner.
+    case cornerDoubleTap(Corner)
 }
 
 public struct EdgeConfig: Equatable {
     public var edgeWidth: Float = 0.05
     public var sensitivity: Float = 1.5
-    public var swapSides = false
+    /// Only the lower part of the left and right edges responds.
     public var bottomQuarterOnly = false
-    public var quickMute = true
-    public var mediaStrip = true
-    public var tapToPlay = false
     public var freezeCursor = true
     public var fineControl = true
     /// Ignore contacts bigger than `palmSize` (a resting palm or thumb base).
     public var palmRejection = true
     public var palmSize: Float = 2.4
+    public var edges: [EdgeSide: EdgeKind] = [.left: .slider, .right: .slider, .top: .off, .bottom: .swipe]
+    /// Corners that respond to a double-tap.
+    public var corners: Set<Corner> = [.topRight]
 
     public init() {}
+
+    public func kind(_ side: EdgeSide) -> EdgeKind { edges[side] ?? .off }
 }
 
 /// Per-frame input that isn't about touches.
@@ -74,9 +105,9 @@ public struct EdgeContext: Equatable {
 public struct EdgeRecognizer {
     // Tuning, in normalized trackpad units.
     public static let baseStepDistance: Float = 0.04   // finger travel per step at 1× sensitivity
-    public static let engageDistance: Float = 0.012    // vertical travel before a slide starts
-    public static let cancelDistance: Float = 0.06     // sideways travel that cancels a slide
-    public static let bottomStripHeight: Float = 0.09
+    public static let engageDistance: Float = 0.012    // travel along the edge before a slide starts
+    public static let cancelDistance: Float = 0.06     // travel across the edge that cancels a slide
+    public static let stripHeight: Float = 0.09        // depth of the top and bottom edges
     public static let bottomQuarter: Float = 0.25
     public static let cornerSize: Float = 0.14
     public static let swipeDistance: Float = 0.12
@@ -90,7 +121,7 @@ public struct EdgeRecognizer {
         var startX: Float
         var startY: Float
         var startTime: Double
-        var lastY: Float
+        var last: Float
         var maxTravel: Float = 0
         var engaged = false
         var accumulated: Float = 0
@@ -99,21 +130,13 @@ public struct EdgeRecognizer {
     public var config: EdgeConfig
     var gesture: Gesture?
     var previousIDs: Set<Int32> = []
-    var lastCornerTap: Double?
+    var lastCornerTap: [Corner: Double] = [:]
 
     public init(config: EdgeConfig = EdgeConfig()) {
         self.config = config
     }
 
     public var isTracking: Bool { gesture != nil }
-
-    public func control(for zone: EdgeZone) -> EdgeControl? {
-        switch zone {
-        case .left: return config.swapSides ? .volume : .brightness
-        case .right: return config.swapSides ? .brightness : .volume
-        case .bottom, .corner: return nil
-        }
-    }
 
     /// Feed one trackpad frame (only fingers that are touching). Returns the actions to perform.
     public mutating func process(_ touches: [TouchPoint], time: Double, context: EdgeContext = EdgeContext()) -> [EdgeAction] {
@@ -153,8 +176,10 @@ public struct EdgeRecognizer {
               let zone = classify(t)
         else { return actions }
 
-        gesture = Gesture(id: t.id, zone: zone, startX: t.x, startY: t.y, startTime: time, lastY: t.y)
-        if config.freezeCursor && zone != .corner {
+        let start: Float
+        if case .edge(let side) = zone { start = side.isVertical ? t.y : t.x } else { start = 0 }
+        gesture = Gesture(id: t.id, zone: zone, startX: t.x, startY: t.y, startTime: time, last: start)
+        if config.freezeCursor, case .edge = zone {
             actions.append(.freezeCursor)
         }
         return actions
@@ -170,17 +195,33 @@ public struct EdgeRecognizer {
         !config.bottomQuarterOnly || y <= Self.bottomQuarter
     }
 
+    func corner(at t: TouchPoint) -> Corner? {
+        let c = Self.cornerSize
+        let right = t.x >= 1 - c, left = t.x <= c, top = t.y >= 1 - c, bottom = t.y <= c
+        switch (left, right, top, bottom) {
+        case (true, _, true, _): return .topLeft
+        case (_, true, true, _): return .topRight
+        case (true, _, _, true): return .bottomLeft
+        case (_, true, _, true): return .bottomRight
+        default: return nil
+        }
+    }
+
+    func inEdge(_ side: EdgeSide, _ t: TouchPoint) -> Bool {
+        switch side {
+        case .left: return t.x <= config.edgeWidth && sideAllowed(atY: t.y)
+        case .right: return t.x >= 1 - config.edgeWidth && sideAllowed(atY: t.y)
+        case .top: return t.y >= 1 - Self.stripHeight
+        case .bottom: return t.y <= Self.stripHeight
+        }
+    }
+
     func classify(_ t: TouchPoint) -> EdgeZone? {
-        let w = config.edgeWidth
-        if config.quickMute && t.x >= 1 - Self.cornerSize && t.y >= 1 - Self.cornerSize {
-            return .corner
+        if let c = corner(at: t), config.corners.contains(c) {
+            return .corner(c)
         }
-        if sideAllowed(atY: t.y) {
-            if t.x <= w { return .left }
-            if t.x >= 1 - w { return .right }
-        }
-        if config.mediaStrip && t.y <= Self.bottomStripHeight {
-            return .bottom
+        for side in [EdgeSide.left, .right, .bottom, .top] where config.kind(side) != .off && inEdge(side, t) {
+            return .edge(side)
         }
         return nil
     }
@@ -194,84 +235,87 @@ public struct EdgeRecognizer {
         g.maxTravel = max(g.maxTravel, (dx * dx + dy * dy).squareRoot())
 
         switch g.zone {
-        case .left, .right:
-            return updateSlide(&g, t, dx: dx, dy: dy, context: context, actions: &actions)
+        case .edge(let side):
+            return updateEdge(side, &g, t, dx: dx, dy: dy, context: context, actions: &actions)
 
-        case .bottom:
-            if !g.engaged {
-                if abs(dx) >= Self.swipeDistance && abs(dx) > abs(dy) * 1.5 {
-                    g.engaged = true
-                    actions.append(dx > 0 ? .nextTrack : .previousTrack)
-                } else if dy > Self.swipeDistance {
-                    return false // moved up into the trackpad, not a strip gesture
-                }
-            }
-            return true
-
-        case .corner:
-            if g.maxTravel > Self.tapMaxTravel {
-                // A slide that started in the corner but runs down the right edge.
-                if g.startX >= 1 - config.edgeWidth, abs(dy) > abs(dx), sideAllowed(atY: g.startY) {
-                    g.zone = .right
-                    if config.freezeCursor { actions.append(.freezeCursor) }
-                    return updateSlide(&g, t, dx: dx, dy: dy, context: context, actions: &actions)
-                }
-                return false
-            }
-            return true
+        case .corner(let corner):
+            guard g.maxTravel > Self.tapMaxTravel else { return true }
+            // A slide that starts in a corner but runs along one of its edges belongs to that edge.
+            let start = TouchPoint(id: t.id, x: g.startX, y: g.startY)
+            let side = abs(dy) > abs(dx) ? corner.verticalEdge : corner.horizontalEdge
+            guard config.kind(side) != .off, inEdge(side, start) else { return false }
+            g.zone = .edge(side)
+            g.last = side.isVertical ? g.startY : g.startX
+            if config.freezeCursor { actions.append(.freezeCursor) }
+            return updateEdge(side, &g, t, dx: dx, dy: dy, context: context, actions: &actions)
         }
     }
 
-    mutating func updateSlide(_ g: inout Gesture, _ t: TouchPoint, dx: Float, dy: Float, context: EdgeContext, actions: inout [EdgeAction]) -> Bool {
-        guard let control = control(for: g.zone) else { return false }
+    mutating func updateEdge(_ side: EdgeSide, _ g: inout Gesture, _ t: TouchPoint, dx: Float, dy: Float,
+                             context: EdgeContext, actions: inout [EdgeAction]) -> Bool {
+        let along = side.isVertical ? dy : dx
+        let across = side.isVertical ? dx : dy
+        let position = side.isVertical ? t.y : t.x
 
-        if !g.engaged {
-            if abs(dx) >= Self.cancelDistance && abs(dx) > abs(dy) {
-                return false // moving across the trackpad, not along the edge
+        switch config.kind(side) {
+        case .off:
+            return false
+
+        case .swipe:
+            if !g.engaged {
+                if abs(along) >= Self.swipeDistance && abs(along) > abs(across) * 1.5 {
+                    g.engaged = true
+                    actions.append(.swipe(side, forward: along > 0))
+                } else if abs(across) > Self.swipeDistance {
+                    return false // moved into the trackpad, not along the edge
+                }
             }
-            guard abs(dy) >= Self.engageDistance else { return true }
-            g.engaged = true
-            actions.append(.slideBegan(control))
-            // g.lastY still holds the start, so the travel so far counts.
-        }
+            return true
 
-        let sensitivity = max(config.sensitivity, 0.1)
-        let stepDistance = Self.baseStepDistance / sensitivity
-        g.accumulated += t.y - g.lastY
-        g.lastY = t.y
+        case .slider:
+            if !g.engaged {
+                if abs(across) >= Self.cancelDistance && abs(across) > abs(along) {
+                    return false // moving across the trackpad, not along the edge
+                }
+                guard abs(along) >= Self.engageDistance else { return true }
+                g.engaged = true
+                actions.append(.slideBegan(side))
+                // g.last still holds the start, so the travel so far counts.
+            }
 
-        let fine = config.fineControl && context.fineKeysHeld
-        while g.accumulated >= stepDistance {
-            g.accumulated -= stepDistance
-            actions.append(.step(control, up: true, fine: fine))
+            let stepDistance = Self.baseStepDistance / max(config.sensitivity, 0.1)
+            g.accumulated += position - g.last
+            g.last = position
+
+            let fine = config.fineControl && context.fineKeysHeld
+            while g.accumulated >= stepDistance {
+                g.accumulated -= stepDistance
+                actions.append(.step(side, up: true, fine: fine))
+            }
+            while g.accumulated <= -stepDistance {
+                g.accumulated += stepDistance
+                actions.append(.step(side, up: false, fine: fine))
+            }
+            return true
         }
-        while g.accumulated <= -stepDistance {
-            g.accumulated += stepDistance
-            actions.append(.step(control, up: false, fine: fine))
-        }
-        return true
     }
 
     mutating func finish(_ g: Gesture, time: Double, actions: inout [EdgeAction]) {
         let isTap = !g.engaged
             && g.maxTravel <= Self.tapMaxTravel
             && time - g.startTime <= Self.tapMaxDuration
+        guard isTap else { return }
 
         switch g.zone {
-        case .bottom:
-            if isTap && config.tapToPlay {
-                actions.append(.playPause)
-            }
-        case .corner:
-            guard isTap else { return }
-            if let last = lastCornerTap, time - last <= Self.doubleTapWindow {
-                lastCornerTap = nil
-                actions.append(.toggleMute)
+        case .edge(let side):
+            actions.append(.tap(side))
+        case .corner(let corner):
+            if let last = lastCornerTap[corner], time - last <= Self.doubleTapWindow {
+                lastCornerTap[corner] = nil
+                actions.append(.cornerDoubleTap(corner))
             } else {
-                lastCornerTap = time
+                lastCornerTap = [corner: time]
             }
-        case .left, .right:
-            break
         }
     }
 }

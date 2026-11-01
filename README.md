@@ -11,22 +11,28 @@
 
 ## What it does
 
+Out of the box:
+
 | Gesture | Result |
 | --- | --- |
 | Slide along the **left edge** | Brightness up / down |
 | Slide along the **right edge** | Volume up / down |
+| **Swipe** along the bottom edge | Next / previous song |
 | **Double-tap** the top-right corner | Mute / unmute |
-| **Swipe** along the bottom edge | Next / previous track |
-| **Tap** the bottom edge (opt-in) | Play / pause |
 | Hold **⇧⌥** while sliding | Quarter steps |
 
-Brim sends the same key events as the keyboard's brightness and volume keys, so you get the normal macOS on-screen display.
+**Every edge and corner is configurable** (menu → Edges and Corners):
 
-**Menu:** live brightness and volume meters (drag them, or adjust with VoiceOver), an on/off switch, "Off in [current app]", and haptic strength (Off / Light / Medium / Strong).
+- **Edges** (left, right, top, bottom) can slide **Brightness, Volume, Keyboard Brightness, Scroll or Zoom**, or be swiped for **Next/Previous Song, Switch Desktop or Back/Forward**. Top and bottom edges slide left and right.
+- **Corners** (all four) respond to a double-tap: **Mute, Play or Pause, Next Song, Previous Song, Mission Control, Show Desktop, Spotlight, Take a Screenshot, Lock Screen, Turn Off Display, or Open an App** you choose.
 
-**Settings:** Quick Mute, Media Strip, Tap to Play, Swap Sides, Edge Width, Bottom Quarter Only, Palm Rejection, Only While Holding Fn or Option, Speed, Keep Pointer Still, Smaller Steps with Shift-Option, Edge Glow, Apps Where Brim Is Off, Appearance, Open at Login, automatic updates.
+Brightness, volume and keyboard brightness use the same on-screen display as the keyboard keys. Actions that press keys need Accessibility; Brim says so in place and offers to allow it.
 
-Also: a first-run setup guide, Pause / Resume, rescan after sleep, menu bar only (no Dock icon), palm rejection, an on-screen edge glow, per-app off switch, and updates that download and install themselves.
+**Menu:** live levels for the left and right edges (drag them, or adjust with VoiceOver), an on/off switch, "Use in [current app]", Edges and Corners, and haptic strength.
+
+**Settings:** slide speed, edge width, keep pointer still, edge glow, apps where Brim is off, appearance, open at login, automatic updates; under Advanced: lower part of side edges only, palm rejection, only while holding Fn or Option, smaller steps with Shift-Option, restore defaults.
+
+Also: a first-run setup guide, per-app off switch, palm rejection, trackpad hot-plug, menu bar only (no Dock icon), and updates that download and install themselves.
 
 ## Build
 
@@ -84,7 +90,9 @@ Sources/
     Config.swift       build-time settings from Info.plist (AppConfig)
     Updater.swift      update feed check, download, verify, swap and relaunch
     BrandArt.swift     the app icon and menu bar glyph, drawn in code
-    Views/             SwiftUI menu, settings page, setup guide
+    Functions.swift    what edges and corners can do (EdgeFunction, CornerFunction)
+    KeyboardBacklight  keyboard backlight level (CoreBrightness)
+    Views/             SwiftUI menu, Edges and Corners map, settings, setup guide
 scripts/
   build.sh             build, bundle, sign, DMG, appcast.json
   IconTool/            renders BrandArt's icon to AppIcon.icns
