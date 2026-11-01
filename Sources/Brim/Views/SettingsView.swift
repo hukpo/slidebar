@@ -18,6 +18,7 @@ struct SettingsPage: View {
         VStack(alignment: .leading, spacing: 10) {
             PageHeader(title: "Settings") { page = .main }
 
+            ScrollViewReader { proxy in
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 12) {
                     Card {
@@ -121,11 +122,20 @@ struct SettingsPage: View {
                     }
                     .disclosureGroupStyle(FlushDisclosureStyle())
                     .padding(.top, 4)
+                    .id("advanced")
                 }
                 .padding(.bottom, 4)
             }
             // Screenshots of the expanded page show everything; the real popover scrolls.
             .frame(height: snapshotMode && showAdvanced ? 1060 : 470)
+            // Bring the newly opened Advanced options into view.
+            .onChange(of: showAdvanced) { expanded in
+                guard expanded else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo("advanced", anchor: .top) }
+                }
+            }
+            }
 
             MenuFooter {
                 VStack(alignment: .leading, spacing: 0) {

@@ -66,7 +66,7 @@ struct GesturesPage: View {
 // MARK: - Map
 
 /// A small trackpad with a button for every edge and corner, showing what each does.
-/// Arrow keys move around it clockwise; VoiceOver reads it in the same order.
+/// Arrow keys move in the direction pressed; VoiceOver reads the spots clockwise.
 struct TrackpadMap: View {
     @Binding var selection: MapSpot
     @ObservedObject var prefs = Prefs.shared
@@ -108,8 +108,9 @@ struct TrackpadMap: View {
         }
         .focusable()
         .focused($mapFocused)
+        .modifier(NoSystemFocusRing())
         .onMoveCommand { direction in
-            if let next = Self.neighbor(of: selection, direction) { select(next) }
+            if let next = Self.neighbor(of: selection, direction) { select(next, fromKeyboard: true) }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Trackpad map. Arrow keys move between edges and corners.")
@@ -147,9 +148,11 @@ struct TrackpadMap: View {
         return ring.first { cell($0) == (x, y) }
     }
 
-    private func select(_ spot: MapSpot) {
+    private func select(_ spot: MapSpot, fromKeyboard: Bool = false) {
         selection = spot
-        mapFocused = true
+        // Take focus so arrow keys work right after a click. Where the system focus ring can't be
+        // hidden (macOS 13), only take it from the keyboard, like native controls.
+        if #available(macOS 14, *) { mapFocused = true } else if fromKeyboard { mapFocused = true }
         let text = "\(spot.title), \(title(for: spot)). Options below."
         if let window = NSApp.keyWindow {
             NSAccessibility.post(element: window, notification: .announcementRequested,
@@ -174,7 +177,7 @@ struct TrackpadMap: View {
     private func edgeButton(_ side: EdgeSide) -> some View {
         let function = prefs.edge(side)
         let spot = MapSpot.edge(side)
-        return SpotButton(selected: selection == spot, off: function == .off, shape: .capsule) {
+        return SpotButton(selected: selection == spot, keyboardFocused: mapFocused, off: function == .off, shape: .capsule) {
             select(spot)
         } label: {
             if function != .off {
@@ -204,7 +207,7 @@ struct TrackpadMap: View {
     private func cornerButton(_ corner: Corner) -> some View {
         let function = prefs.corner(corner)
         let spot = MapSpot.corner(corner)
-        return SpotButton(selected: selection == spot, off: function == .off, shape: .circle) {
+        return SpotButton(selected: selection == spot, keyboardFocused: mapFocused, off: function == .off, shape: .circle) {
             select(spot)
         } label: {
             if function == .openApp, let id = prefs.cornerApps[corner] {
@@ -225,6 +228,8 @@ struct TrackpadMap: View {
 private struct SpotButton<Label: View>: View {
     enum Shape { case capsule, circle }
     let selected: Bool
+    /// The map has keyboard focus: the selected spot shows the system focus halo.
+    let keyboardFocused: Bool
     let off: Bool
     let shape: Shape
     let action: () -> Void
@@ -254,10 +259,14 @@ private struct SpotButton<Label: View>: View {
             Capsule().fill(fill)
                 .overlay(Capsule().strokeBorder(Color.primary.opacity(off && !selected ? 0.25 : 0), style: dash))
                 .overlay(Capsule().strokeBorder(Color.brimAccent, lineWidth: selected ? 2 : 0))
+                .overlay(Capsule().inset(by: -3).stroke(Color(nsColor: .keyboardFocusIndicatorColor),
+                                                        lineWidth: selected && keyboardFocused ? 3 : 0))
         case .circle:
             Circle().fill(fill)
                 .overlay(Circle().strokeBorder(Color.primary.opacity(off && !selected ? 0.3 : 0), style: dash))
                 .overlay(Circle().strokeBorder(Color.brimAccent, lineWidth: selected ? 2 : 0))
+                .overlay(Circle().inset(by: -3).stroke(Color(nsColor: .keyboardFocusIndicatorColor),
+                                                       lineWidth: selected && keyboardFocused ? 3 : 0))
         }
     }
 }
@@ -451,5 +460,16 @@ struct AppIcon: View {
               ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!)
             .resizable()
             .accessibilityHidden(true)
+    }
+}
+
+/// Hides the system's rectangle around the whole map; the selected spot shows focus instead.
+private struct NoSystemFocusRing: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 14, *) {
+            content.focusEffectDisabled()
+        } else {
+            content
+        }
     }
 }
