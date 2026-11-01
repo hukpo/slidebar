@@ -76,6 +76,8 @@ final class Prefs: ObservableObject {
     // State
     @Published var paused: Bool { didSet { defaults.set(paused, forKey: Keys.paused) } }
     @Published var hasCompletedSetup: Bool { didSet { defaults.set(hasCompletedSetup, forKey: Keys.setupDone) } }
+    /// The system Accessibility prompt only ever appears once; after that we open System Settings instead.
+    @Published var didPromptAccess: Bool { didSet { defaults.set(didPromptAccess, forKey: Keys.didPromptAccess) } }
     @Published private(set) var openAtLogin: Bool = false
 
     private enum Keys {
@@ -97,6 +99,7 @@ final class Prefs: ObservableObject {
         static let edgeGlow = "edgeGlow"
         static let excludedApps = "excludedApps"
         static let setupDone = "setupDone"
+        static let didPromptAccess = "didPromptAccess"
     }
 
     private init() {
@@ -138,6 +141,7 @@ final class Prefs: ObservableObject {
         edgeGlow = defaults.bool(forKey: Keys.edgeGlow)
         excludedApps = defaults.stringArray(forKey: Keys.excludedApps) ?? []
         hasCompletedSetup = defaults.bool(forKey: Keys.setupDone)
+        didPromptAccess = defaults.bool(forKey: Keys.didPromptAccess)
         refreshOpenAtLogin()
     }
 

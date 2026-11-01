@@ -1,11 +1,10 @@
 import SwiftUI
 
-/// First-run guide: grant Accessibility, then try a first slide.
+/// First-run guide: try a slide, optionally allow Accessibility, then finish in the menu bar.
 struct SetupView: View {
     @ObservedObject var live = LiveState.shared
     @ObservedObject var prefs = Prefs.shared
     @State private var slidesAtOpen = LiveState.shared.slideCount
-    let onDone: () -> Void
 
     private var triedSlide: Bool { live.slideCount > slidesAtOpen }
 
@@ -19,14 +18,15 @@ struct SetupView: View {
                         VStack(alignment: .leading, spacing: 1) {
                             Text("Welcome to Brim")
                                 .font(.system(size: 20, weight: .semibold))
-                            Text("Your trackpad's edges are now sliders.")
+                                .accessibilityAddTraits(.isHeader)
+                            Text("The edges of your trackpad are now volume and brightness sliders.")
                                 .font(.system(size: 12))
-                                .foregroundStyle(.white.opacity(0.65))
+                                .foregroundStyle(.white.opacity(0.72))
                         }
                         Spacer()
                     }
                     TrackpadDemo(swap: prefs.swapSides)
-                        .frame(height: 190)
+                        .frame(height: 180)
                 }
                 .foregroundStyle(.white)
                 .padding(.horizontal, 24)
@@ -37,39 +37,52 @@ struct SetupView: View {
             .fixedSize(horizontal: false, vertical: true)
 
             VStack(spacing: 10) {
-                StepRow(number: 1, done: live.trusted,
-                        title: "Allow Accessibility",
-                        detail: "Lets Brim show the system on-screen display and control media.") {
-                    Button("Open Settings…") {
-                        Permissions.requestAccess()
-                        Permissions.openAccessibilitySettings()
-                    }
-                    .controlSize(.small)
-                }
-                StepRow(number: 2, done: triedSlide,
-                        title: "Try your first slide",
-                        detail: "Rest one finger on the \(prefs.swapSides ? "left" : "right") edge of the trackpad and slide up.") {
+                StepRow(number: 1, done: triedSlide,
+                        title: "Try it now",
+                        detail: "Rest one finger on the \(prefs.swapSides ? "left" : "right") edge of your trackpad and slide up. The volume goes up.") {
                     EmptyView()
                 }
 
+                StepRow(number: 2, done: live.trusted,
+                        title: "Allow Accessibility (optional)",
+                        detail: accessDetail) {
+                    if !live.trusted {
+                        Button(prefs.didPromptAccess ? "Open System Settings" : "Allow…") { Permissions.ask() }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                            .keyboardShortcut(.defaultAction)
+                    }
+                }
+
                 HStack {
-                    Text(triedSlide ? "You've got it." : "Open this guide again any time from the ⋯ menu.")
+                    Text("You can open this guide again from the More menu.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Button(triedSlide && live.trusted ? "Done" : "Skip for Now") {
-                        prefs.hasCompletedSetup = true
-                        onDone()
+                    if live.trusted {
+                        Button("Done") { AppActions.shared.finishSetup() }
+                            .buttonStyle(.borderedProminent)
+                            .keyboardShortcut(.defaultAction)
+                    } else {
+                        Button("Finish Without It") { AppActions.shared.finishSetup() }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.brimAccent)
-                    .keyboardShortcut(.defaultAction)
                 }
                 .padding(.top, 6)
             }
             .padding(22)
         }
         .frame(width: 440)
+        .animation(.easeOut(duration: 0.2), value: live.trusted)
+    }
+
+    private var accessDetail: String {
+        if live.trusted {
+            return "All set. You'll see the usual volume and brightness display, and media gestures work."
+        }
+        if prefs.didPromptAccess {
+            return "In System Settings, turn on Brim in the Accessibility list. macOS may ask for your password. Then come back here."
+        }
+        return "Brim already works. Allowing this once lets it show the usual volume and brightness display and use media gestures. Brim is open source, so anyone can check what it does."
     }
 }
 
@@ -91,13 +104,16 @@ private struct StepRow<Accessory: View>: View {
                 }
             }
             .frame(width: 24, height: 24)
+            .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title).font(.system(size: 13, weight: .semibold))
                 Text(detail).font(.system(size: 12)).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityValue(done ? "Done" : "Not done")
             Spacer(minLength: 8)
-            if !done { accessory() }
+            accessory()
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(done ? Color.green.opacity(0.08) : Color.primary.opacity(0.045)))
@@ -106,10 +122,11 @@ private struct StepRow<Accessory: View>: View {
     }
 }
 
-/// An animated trackpad showing a finger sliding up the volume edge.
+/// A trackpad showing a finger sliding up the volume edge. Still under Reduce Motion.
 private struct TrackpadDemo: View {
     let swap: Bool
     @State private var up = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { geo in
@@ -126,18 +143,21 @@ private struct TrackpadDemo: View {
                 Capsule().fill(Color.primary.opacity(0.18))
                     .frame(width: 70, height: 4)
                     .position(x: w / 2, y: h - 12)
-                Text("Media Strip").font(.system(size: 9)).foregroundStyle(.secondary)
-                    .position(x: w / 2, y: h - 24)
+                Text("Media Strip").font(.system(size: 10)).foregroundStyle(.secondary)
+                    .position(x: w / 2, y: h - 25)
 
                 Circle()
                     .fill(Color.white)
-                    .shadow(color: .brimCyan.opacity(0.5), radius: 5)
+                    .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
                     .overlay(Circle().stroke(Color.primary.opacity(0.15)))
                     .frame(width: 22, height: 22)
                     .position(x: swap ? 18 : w - 18, y: up ? h * 0.25 : h * 0.78)
             }
         }
+        .accessibilityElement()
+        .accessibilityLabel("Illustration: a finger slides up the \(swap ? "left" : "right") edge of the trackpad to raise the volume.")
         .onAppear {
+            guard !reduceMotion else { up = true; return }
             withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) { up = true }
         }
     }

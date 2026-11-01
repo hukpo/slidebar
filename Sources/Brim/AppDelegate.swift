@@ -7,27 +7,27 @@ final class AppActions {
     static let shared = AppActions()
     weak var delegate: AppDelegate?
 
-    var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
-    }
-
-    func showLicense() { delegate?.showLicense() }
-    func checkForUpdates() { Task { await Updater.shared.check(userInitiated: true) } }
+    var version: String { AppConfig.version }
 
     /// The icon tile without its margin, for the app's own UI.
     lazy var badgeImage: NSImage = Brand.badge(size: 168)
     /// The full icon (with margin), for the About panel.
     lazy var iconImage: NSImage = Brand.appIcon(size: 512)
 
+    func checkForUpdates() { Task { await Updater.shared.check(userInitiated: true) } }
     func showSetupGuide() { delegate?.showSetupGuide() }
     func showAbout() { delegate?.showAbout() }
+    func finishSetup() { delegate?.finishSetup() }
+
+    func openSource() {
+        if let url = AppConfig.sourceURL { NSWorkspace.shared.open(url) }
+    }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
     private var setupWindow: NSWindow?
-    private var licenseWindow: NSWindow?
     private var levelTimer: Timer?
     private var trustTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
@@ -65,7 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         EdgeEngine.shared.start()
         DeviceWatcher.shared.start()
 
-        // Remember the last app the user was in, for "Turn Off in …".
+        // Remember the last app the user was in, for "Off in …".
         live.lastApp = NSWorkspace.shared.frontmostApplication.flatMap { $0.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : $0 }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { note in
             guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
@@ -82,18 +82,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         trustTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
             LiveState.shared.refreshTrust()
         }
-
-        // Updates and licensing.
-        Updater.shared.startAutomaticChecks()
-        Licensing.shared.$state
+        // When access is granted in System Settings, bring the setup guide back so the user sees the tick.
+        live.$trusted
             .removeDuplicates()
-            .sink { _ in LiveState.shared.objectWillChange.send() }
+            .dropFirst()
+            .filter { $0 }
+            .sink { [weak self] _ in
+                guard let window = self?.setupWindow, window.isVisible else { return }
+                NSApp.activate(ignoringOtherApps: true)
+                window.makeKeyAndOrderFront(nil)
+            }
             .store(in: &cancellables)
 
-        if !prefs.hasCompletedSetup || !live.trusted {
+        Updater.shared.startAutomaticChecks()
+
+        // Only first-timers see the guide on launch. Brim works without Accessibility, so a
+        // missing permission is shown calmly in the menu, never forced on every launch.
+        if !prefs.hasCompletedSetup {
             showSetupGuide()
-        } else if Licensing.shared.state == .expired {
-            showLicense()
         }
     }
 
@@ -113,17 +119,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     @objc private func togglePopover(_ sender: Any?) {
         if popover.isShown {
             popover.performClose(sender)
-        } else if let button = statusItem.button {
-            LiveState.shared.refreshLevels()
-            LiveState.shared.refreshTrust()
-            Licensing.shared.evaluate()
-            NSApp.activate(ignoringOtherApps: true)
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            // Keep the popover above Brim's own windows (setup guide, license), which activation brings forward.
-            if let window = popover.contentViewController?.view.window {
-                window.level = .popUpMenu
-                window.makeKey()
-            }
+        } else {
+            showPopover()
+        }
+    }
+
+    private func showPopover() {
+        guard let button = statusItem.button else { return }
+        LiveState.shared.refreshLevels()
+        LiveState.shared.refreshTrust()
+        NSApp.activate(ignoringOtherApps: true)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        // Keep the popover above Brim's own setup window, which activation brings forward.
+        if let window = popover.contentViewController?.view.window {
+            window.level = .popUpMenu
+            window.makeKey()
         }
     }
 
@@ -136,6 +146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     func popoverDidClose(_ notification: Notification) {
         levelTimer?.invalidate()
         levelTimer = nil
+        LiveState.shared.showWelcome = false
     }
 
     // MARK: Windows
@@ -143,9 +154,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     func showSetupGuide() {
         popover.performClose(nil)
         if setupWindow == nil {
-            let view = SetupView { [weak self] in self?.setupWindow?.close() }
+            let view = SetupView()
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
-            window.title = "Brim Setup"
+            window.title = "Welcome to Brim"
             window.styleMask = [.titled, .closable, .fullSizeContentView]
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
@@ -158,30 +169,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         setupWindow?.makeKeyAndOrderFront(nil)
     }
 
-    func showLicense() {
-        popover.performClose(nil)
-        Licensing.shared.evaluate()
-        if licenseWindow == nil {
-            let view = LicenseView { [weak self] in self?.licenseWindow?.close() }
-            let window = NSWindow(contentViewController: NSHostingController(rootView: view))
-            window.title = "Brim License"
-            window.styleMask = [.titled, .closable, .fullSizeContentView]
-            window.titlebarAppearsTransparent = true
-            window.titleVisibility = .hidden
-            window.isMovableByWindowBackground = true
-            window.isReleasedWhenClosed = false
-            window.center()
-            licenseWindow = window
-        }
-        NSApp.activate(ignoringOtherApps: true)
-        licenseWindow?.makeKeyAndOrderFront(nil)
+    /// Ends onboarding by opening the menu under Brim's icon, so the user sees where Brim lives.
+    func finishSetup() {
+        Prefs.shared.hasCompletedSetup = true
+        setupWindow?.close()
+        LiveState.shared.showWelcome = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in self?.showPopover() }
     }
 
     func showAbout() {
         popover.performClose(nil)
         NSApp.activate(ignoringOtherApps: true)
         let credits = NSAttributedString(
-            string: "Trackpad edges as volume and brightness sliders.\nSlide, tap and swipe your way around.",
+            string: "Trackpad edges as volume and brightness sliders.\nFree and open source.",
             attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor]
         )
         NSApp.orderFrontStandardAboutPanel(options: [

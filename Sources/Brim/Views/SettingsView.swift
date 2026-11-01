@@ -1,112 +1,138 @@
 import SwiftUI
 
-/// The "set once" options, shown inside the popover.
+/// The set-once options, inside the popover. Grouped by what they affect, and scrollable so it
+/// never runs off a small screen.
 struct SettingsPage: View {
     @Binding var page: MenuPage
     @ObservedObject var prefs = Prefs.shared
-    @ObservedObject var licensing = Licensing.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 4) {
-                PlainIconButton(systemName: "chevron.left", help: "Back") { page = .main }
-                Text("Settings").font(.system(size: 15, weight: .semibold))
-                Spacer()
-            }
-            .frame(height: 24)
+        VStack(alignment: .leading, spacing: 10) {
+            PageHeader(title: "Settings") { page = .main }
 
-            SectionHeader(title: "Edge Gestures")
-            Card {
-                ToggleRow(icon: "arrow.left.arrow.right", title: "Swap Sides",
-                          subtitle: prefs.swapSides ? "Left: Volume · Right: Brightness" : "Left: Brightness · Right: Volume",
-                          isOn: $prefs.swapSides)
-                RowDivider()
-                ToggleRow(icon: "rectangle.bottomthird.inset.filled", title: "Bottom Quarter Only",
-                          subtitle: "Only the lower 25% responds", isOn: $prefs.bottomQuarterOnly)
-                RowDivider()
-                ToggleRow(icon: "option", title: "Require Fn or ⌥",
-                          subtitle: "Only slide while holding a modifier", isOn: $prefs.requireModifier)
-                RowDivider()
-                ToggleRow(icon: "hand.raised", title: "Palm Rejection",
-                          subtitle: "Ignore a palm resting on an edge", isOn: $prefs.palmRejection)
-            }
-
-            SectionHeader(title: "While Sliding")
-            Card {
-                ToggleRow(icon: "cursorarrow", title: "Freeze Cursor",
-                          subtitle: "Pointer stays put while sliding", isOn: $prefs.freezeCursor)
-                RowDivider()
-                ToggleRow(icon: "plusminus", title: "Fine Control",
-                          subtitle: "Hold ⇧⌥ for quarter steps", isOn: $prefs.fineControl)
-                RowDivider()
-                ToggleRow(icon: "rectangle.righthalf.inset.filled", title: "Edge Glow",
-                          subtitle: "A level bar on the screen edge", isOn: $prefs.edgeGlow)
-            }
-
-            SectionHeader(title: "Apps")
-            Card {
-                Button { page = .apps } label: {
-                    HStack(spacing: 10) {
-                        FeatureIcon(systemName: "app.badge.checkmark", on: !prefs.excludedApps.isEmpty)
-                        RowLabel(title: "Turned Off In",
-                                 subtitle: prefs.excludedApps.isEmpty ? "Works in every app" : "\(prefs.excludedApps.count) app\(prefs.excludedApps.count == 1 ? "" : "s")")
-                        Spacer(minLength: 8)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.tertiary)
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 12) {
+                    SectionHeader(title: "Gestures")
+                    Card {
+                        ToggleRow(icon: "speaker.slash", title: "Quick Mute",
+                                  subtitle: "Double-tap the top-right corner", isOn: $prefs.quickMute)
+                        RowDivider()
+                        ToggleRow(icon: "forward", title: "Media Strip",
+                                  subtitle: "Swipe the bottom edge to skip songs", isOn: $prefs.mediaStrip)
+                        RowDivider()
+                        ToggleRow(icon: nil, title: "Tap to Play or Pause",
+                                  subtitle: "Tap the bottom edge. Clicks count too.", isOn: $prefs.tapToPlay)
+                            .disabled(!prefs.mediaStrip)
+                        RowDivider()
+                        ToggleRow(icon: "arrow.left.arrow.right", title: "Swap Sides",
+                                  subtitle: prefs.swapSides ? "Volume left, brightness right" : "Brightness left, volume right",
+                                  isOn: $prefs.swapSides)
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 7)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .hoverHighlight()
-            }
 
-            SectionHeader(title: "General")
-            Card {
-                HStack(spacing: 10) {
-                    FeatureIcon(systemName: "circle.lefthalf.filled", on: false)
-                    RowLabel(title: "Appearance")
-                    Spacer(minLength: 8)
-                    PillPicker(options: Appearance.allCases.map { ($0, $0.title) }, selection: $prefs.appearance)
-                        .fixedSize()
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 7)
-                RowDivider()
-                ToggleRow(icon: "power", title: "Open at Login",
-                          isOn: Binding(get: { prefs.openAtLogin }, set: { prefs.setOpenAtLogin($0) }))
-                RowDivider()
-                ToggleRow(icon: "arrow.down.circle.fill", title: "Automatic Updates",
-                          subtitle: "Download and install new versions", isOn: $prefs.autoUpdate)
-            }
+                    SectionHeader(title: "Edges")
+                    Card {
+                        SliderRow(icon: "arrow.left.and.right", title: "Edge Width",
+                                  lowLabel: "Narrow", highLabel: "Wide",
+                                  value: $prefs.edgeWidth, range: Prefs.edgeWidthRange, step: Prefs.edgeWidthStep,
+                                  valueDescription: "\(Int((prefs.edgeWidth * 100).rounded())) percent of the trackpad")
+                        RowDivider()
+                        ToggleRow(icon: "rectangle.bottomthird.inset.filled", title: "Bottom Quarter Only",
+                                  subtitle: "Only the lower part responds", isOn: $prefs.bottomQuarterOnly)
+                        RowDivider()
+                        ToggleRow(icon: "hand.raised", title: "Palm Rejection",
+                                  subtitle: "Ignore a hand resting on an edge", isOn: $prefs.palmRejection)
+                        RowDivider()
+                        ToggleRow(icon: "option", title: "Only While Holding Fn or Option",
+                                  subtitle: "Edges respond only while a key is held", isOn: $prefs.requireModifier)
+                    }
 
-            HStack(spacing: 2) {
+                    SectionHeader(title: "While Sliding")
+                    Card {
+                        SliderRow(icon: "speedometer", title: "Speed",
+                                  lowLabel: "Slower", highLabel: "Faster",
+                                  value: $prefs.sensitivity, range: Prefs.sensitivityRange, step: Prefs.sensitivityStep,
+                                  valueDescription: String(format: "%g times", prefs.sensitivity))
+                        RowDivider()
+                        ToggleRow(icon: "cursorarrow", title: "Keep Pointer Still",
+                                  subtitle: "The pointer stays put while you slide", isOn: $prefs.freezeCursor)
+                        RowDivider()
+                        ToggleRow(icon: "plusminus", title: "Smaller Steps with Shift-Option",
+                                  subtitle: "Hold Shift and Option for finer changes", isOn: $prefs.fineControl)
+                        RowDivider()
+                        ToggleRow(icon: "rectangle.righthalf.inset.filled", title: "Edge Glow",
+                                  subtitle: "A level bar on the edge of your screen", isOn: $prefs.edgeGlow)
+                    }
+
+                    SectionHeader(title: "Apps")
+                    Card {
+                        NavigationRow(icon: "app.dashed", title: "Apps Where Brim Is Off",
+                                      subtitle: prefs.excludedApps.isEmpty
+                                        ? "Brim works in every app"
+                                        : "\(prefs.excludedApps.count) app\(prefs.excludedApps.count == 1 ? "" : "s")") {
+                            page = .apps
+                        }
+                    }
+
+                    SectionHeader(title: "General")
+                    Card {
+                        HStack(spacing: 10) {
+                            FeatureIcon(systemName: "circle.lefthalf.filled")
+                            RowLabel(title: "Appearance")
+                            Spacer(minLength: 8)
+                            Picker("Appearance", selection: $prefs.appearance) {
+                                ForEach(Appearance.allCases) { Text($0.title).tag($0) }
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .controlSize(.small)
+                            .fixedSize()
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 7)
+                        RowDivider()
+                        ToggleRow(icon: "arrow.up.forward.app", title: "Open at Login",
+                                  isOn: Binding(get: { prefs.openAtLogin }, set: { prefs.setOpenAtLogin($0) }))
+                        if Updater.shared.isConfigured {
+                            RowDivider()
+                            ToggleRow(icon: "arrow.triangle.2.circlepath", title: "Install Updates Automatically",
+                                      subtitle: "New versions install themselves", isOn: $prefs.autoUpdate)
+                        }
+                    }
+                }
+                .padding(.bottom, 4)
+            }
+            .frame(height: 470)
+
+            MenuFooter {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Brim \(AppActions.shared.version)")
                         .font(.system(size: 11, weight: .medium))
-                    Text(licenseLine)
-                        .font(.system(size: 10))
+                    Text("Free and open source")
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
                 .padding(.leading, 6)
-                Spacer()
-                MoreMenu()
-                PlainIconButton(systemName: "power", help: "Quit Brim") { NSApp.terminate(nil) }
             }
         }
         .padding(14)
         .onAppear { prefs.refreshOpenAtLogin() }
     }
+}
 
-    private var licenseLine: String {
-        switch licensing.state {
-        case .free: return "Free edition"
-        case .trial(let days): return "Trial · \(days) day\(days == 1 ? "" : "s") left"
-        case .licensed(let owner): return "Licensed to \(owner)"
-        case .expired: return "Trial ended"
+/// Back button and title. Escape also goes back.
+struct PageHeader: View {
+    let title: String
+    let back: () -> Void
+
+    var body: some View {
+        HStack(spacing: 4) {
+            PlainIconButton(systemName: "chevron.left", help: "Back") { back() }
+                .keyboardShortcut(.cancelAction)
+            Text(title).font(.system(size: 15, weight: .semibold))
+                .accessibilityAddTraits(.isHeader)
+            Spacer()
         }
+        .frame(height: 24)
     }
 }
 
@@ -120,14 +146,9 @@ struct AppsPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 4) {
-                PlainIconButton(systemName: "chevron.left", help: "Back") { page = .settings }
-                Text("Turned Off In").font(.system(size: 15, weight: .semibold))
-                Spacer()
-            }
-            .frame(height: 24)
+            PageHeader(title: "Apps Where Brim Is Off") { page = .settings }
 
-            Text("Edge gestures do nothing while one of these apps is in front. Handy for games, design tools and music apps.")
+            Text("Edges do nothing while one of these apps is in front. Handy for games, drawing apps and music software.")
                 .font(.system(size: 11.5))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -135,26 +156,33 @@ struct AppsPage: View {
 
             Card {
                 if prefs.excludedApps.isEmpty {
-                    Text("No apps yet")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
+                    VStack(spacing: 10) {
+                        Text("No apps yet")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.secondary)
+                        if let app = live.lastApp, let id = app.bundleIdentifier, let name = app.localizedName {
+                            Button("Add \(name)") { prefs.excludedApps.append(id) }
+                                .controlSize(.small)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
                 } else {
                     ForEach(Array(prefs.excludedApps.enumerated()), id: \.element) { index, id in
-                        if index > 0 { RowDivider() }
+                        if index > 0 { RowDivider(inset: 42) }
                         AppRow(bundleID: id) { prefs.excludedApps.removeAll { $0 == id } }
                     }
                 }
             }
 
             HStack(spacing: 8) {
-                if let app = live.lastApp, let id = app.bundleIdentifier, !prefs.excludedApps.contains(id) {
-                    Button("Add \(app.localizedName ?? "Current App")") { prefs.excludedApps.append(id) }
+                if !prefs.excludedApps.isEmpty, let app = live.lastApp, let id = app.bundleIdentifier,
+                   let name = app.localizedName, !prefs.excludedApps.contains(id) {
+                    Button("Add \(name)") { prefs.excludedApps.append(id) }
                         .controlSize(.small)
                 }
                 Spacer()
-                Button("Choose App…") { chooseApp() }
+                Button("Choose an App…") { chooseApp() }
                     .controlSize(.small)
             }
             .padding(.horizontal, 2)
@@ -164,8 +192,8 @@ struct AppsPage: View {
 
     private func chooseApp() {
         let panel = NSOpenPanel()
-        panel.title = "Turn Off Brim in an App"
-        panel.prompt = "Turn Off"
+        panel.title = "Choose Apps Where Brim Is Off"
+        panel.prompt = "Turn Off Brim"
         panel.allowedContentTypes = [.application]
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
         panel.allowsMultipleSelection = true
@@ -190,9 +218,13 @@ private struct AppRow: View {
             Image(nsImage: url.map { NSWorkspace.shared.icon(forFile: $0.path) } ?? NSImage(systemSymbolName: "app", accessibilityDescription: nil)!)
                 .resizable()
                 .frame(width: 24, height: 24)
+                .accessibilityHidden(true)
             Text(name).font(.system(size: 13, weight: .medium))
             Spacer()
-            PlainIconButton(systemName: "minus.circle", help: "Turn Brim back on in \(name)", action: onRemove)
+            Button("Remove", action: onRemove)
+                .controlSize(.small)
+                .help("Turn Brim back on in \(name)")
+                .accessibilityLabel("Turn Brim back on in \(name)")
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)

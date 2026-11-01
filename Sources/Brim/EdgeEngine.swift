@@ -8,15 +8,14 @@ final class LiveState: ObservableObject {
     static let shared = LiveState()
 
     enum Status: Equatable {
-        case ready, needsAccess, noTrackpad, paused, trialEnded
+        case ready, needsAccess, noTrackpad, paused
 
         var title: String {
             switch self {
             case .ready: return "Ready"
-            case .needsAccess: return "Needs Access"
+            case .needsAccess: return "Limited"
             case .noTrackpad: return "No Trackpad"
             case .paused: return "Paused"
-            case .trialEnded: return "Trial Ended"
             }
         }
     }
@@ -32,9 +31,10 @@ final class LiveState: ObservableObject {
     @Published var activeControl: EdgeControl?
     /// The last app the user was in (not Brim), for "Turn Off in …".
     @Published var lastApp: NSRunningApplication?
+    /// True right after setup, when the menu opens to show where Brim lives.
+    @Published var showWelcome = false
 
     var status: Status {
-        if !Licensing.shared.allowsGestures { return .trialEnded }
         if Prefs.shared.paused { return .paused }
         if deviceCount == 0 { return .noTrackpad }
         if !trusted { return .needsAccess }
@@ -136,7 +136,7 @@ final class EdgeEngine {
 
     private func handle(_ touches: [TouchPoint], time: Double) {
         let flags = NSEvent.modifierFlags
-        var allowed = !prefs.paused && Licensing.shared.allowsGestures && !isFrontmostAppExcluded
+        var allowed = !prefs.paused && !isFrontmostAppExcluded
         if prefs.requireModifier {
             allowed = allowed && (flags.contains(.function) || flags.contains(.option))
         }

@@ -30,11 +30,9 @@
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
-    <key>BrimLicensePublicKey</key>
-    <string></string>
     <key>BrimUpdateFeedURL</key>
     <string></string>
-    <key>BrimCheckoutURL</key>
+    <key>BrimSourceURL</key>
     <string></string>
     <key>BrimWebsiteURL</key>
     <string></string>

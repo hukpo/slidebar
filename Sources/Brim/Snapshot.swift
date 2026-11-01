@@ -10,14 +10,16 @@ enum Snapshot {
         let dark = args.contains("dark")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         NSApp.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        // Native controls only draw their active (accent) state in the active app.
+        NSApp.setActivationPolicy(.accessory)
+        NSApp.activate(ignoringOtherApps: true)
         let suffix = dark ? "-dark" : ""
         LiveState.shared.refreshLevels()
         LiveState.shared.deviceCount = max(LiveState.shared.deviceCount, 1)
 
         render(MenuView(), to: dir.appendingPathComponent("menu\(suffix).png"))
         render(SettingsPage(page: .constant(.settings)).frame(width: 340), to: dir.appendingPathComponent("settings\(suffix).png"))
-        render(SetupView(onDone: {}), to: dir.appendingPathComponent("setup\(suffix).png"))
-        render(LicenseView(onClose: {}), to: dir.appendingPathComponent("license\(suffix).png"))
+        render(SetupView(), to: dir.appendingPathComponent("setup\(suffix).png"))
         render(AppsPage(page: .constant(.apps)).frame(width: 340), to: dir.appendingPathComponent("apps\(suffix).png"))
         render(EdgeGlow.preview(level: 0.62).frame(width: 26, height: 260).padding(20).background(Color.gray.opacity(0.3)),
                to: dir.appendingPathComponent("glow\(suffix).png"))
@@ -25,7 +27,7 @@ enum Snapshot {
     }
 
     private static func render<V: View>(_ view: V, to url: URL) {
-        let hosting = NSHostingView(rootView: view.background(VisualEffect()))
+        let hosting = NSHostingView(rootView: view.background(VisualEffect()).environment(\.controlActiveState, .key).environment(\.snapshotMode, true))
         hosting.frame.size = hosting.fittingSize
         let window = KeyWindow(contentRect: hosting.frame, styleMask: [.borderless], backing: .buffered, defer: false)
         window.contentView = hosting

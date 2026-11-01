@@ -18,7 +18,7 @@ extension LinearGradient {
     static let brimNight = LinearGradient(colors: [.brimNightTop, .brimNightBottom], startPoint: .top, endPoint: .bottom)
 }
 
-/// The dark, glowing surface used for brand moments (meters card, window headers).
+/// The dark surface used for brand moments (meters card, setup header).
 struct NightBackground: View {
     var cornerRadius: CGFloat = 16
 
@@ -33,9 +33,7 @@ struct NightBackground: View {
                 }
                 .clipShape(shape)
             )
-            .overlay(
-                shape.strokeBorder(Color.white.opacity(0.08))
-            )
+            .overlay(shape.strokeBorder(Color.white.opacity(0.08)))
     }
 }
 
@@ -60,11 +58,12 @@ struct Card<Content: View>: View {
 }
 
 struct RowDivider: View {
+    var inset: CGFloat = 44
     var body: some View {
         Rectangle()
             .fill(Color.primary.opacity(0.07))
             .frame(height: 1)
-            .padding(.leading, 44)
+            .padding(.leading, inset)
             .padding(.trailing, 8)
     }
 }
@@ -77,7 +76,9 @@ struct SectionHeader: View {
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, 6)
+            .padding(.top, 4)
             .padding(.bottom, -4)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -103,21 +104,20 @@ extension View {
 
 // MARK: - Row parts
 
-/// Quiet monochrome icon on the left of each row. Takes the accent color when the feature is on.
+/// Quiet monochrome icon on the left of each row. State lives in the control, not the icon.
 struct FeatureIcon: View {
     let systemName: String
-    var on = true
 
     var body: some View {
         RoundedRectangle(cornerRadius: 7, style: .continuous)
-            .fill(on ? Color.brimAccent.opacity(0.14) : Color.primary.opacity(0.06))
+            .fill(Color.primary.opacity(0.06))
             .overlay(
                 Image(systemName: systemName)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(on ? Color.brimAccent : Color.secondary)
+                    .foregroundStyle(.secondary)
             )
             .frame(width: 26, height: 26)
-            .animation(.easeOut(duration: 0.15), value: on)
+            .accessibilityHidden(true)
     }
 }
 
@@ -139,6 +139,8 @@ struct RowLabel: View {
     }
 }
 
+/// A row with a native switch. The whole row is the switch's label, so VoiceOver and
+/// Full Keyboard Access treat it as one labeled control.
 struct ToggleRow: View {
     let icon: String?
     let title: String
@@ -146,167 +148,152 @@ struct ToggleRow: View {
     @Binding var isOn: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
-            if let icon {
-                FeatureIcon(systemName: icon, on: isOn)
-            } else {
-                Color.clear.frame(width: 26, height: 1)
+        Toggle(isOn: $isOn) {
+            HStack(spacing: 10) {
+                if let icon {
+                    FeatureIcon(systemName: icon)
+                } else {
+                    Color.clear.frame(width: 26, height: 1)
+                }
+                RowLabel(title: title, subtitle: subtitle)
+                Spacer(minLength: 8)
             }
-            RowLabel(title: title, subtitle: subtitle)
-            Spacer(minLength: 8)
-            BrimSwitch(isOn: $isOn)
         }
+        .modifier(SwitchStyle())
+        .controlSize(.small)
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
-        .contentShape(Rectangle())
-        .onTapGesture { isOn.toggle() }
-        .hoverHighlight()
-        .accessibilityElement(children: .combine)
-        .accessibilityValue(isOn ? "On" : "Off")
-        .accessibilityAddTraits(.isButton)
     }
 }
 
-// MARK: - Controls
+/// True while rendering marketing screenshots offscreen.
+private struct SnapshotModeKey: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+    var snapshotMode: Bool {
+        get { self[SnapshotModeKey.self] }
+        set { self[SnapshotModeKey.self] = newValue }
+    }
+}
 
-/// A switch in Brim's accent color, drawn in SwiftUI so it looks the same in any window state.
-struct BrimSwitch: View {
-    @Binding var isOn: Bool
-    @Environment(\.isEnabled) private var isEnabled
-
-    var body: some View {
-        ZStack(alignment: isOn ? .trailing : .leading) {
-            Capsule()
-                .fill(isOn ? Color.brimAccent : Color.primary.opacity(0.14))
-            Circle()
-                .fill(Color.white)
-                .shadow(color: .black.opacity(0.25), radius: 1.5, y: 0.5)
-                .padding(2)
+/// The native switch. Offscreen renders can't draw its active (accent) look, so screenshots
+/// use a drawn stand-in that matches it.
+private struct SwitchStyle: ViewModifier {
+    @Environment(\.snapshotMode) private var snapshotMode
+    func body(content: Content) -> some View {
+        if snapshotMode {
+            content.toggleStyle(SnapshotSwitchStyle())
+        } else {
+            content.toggleStyle(.switch)
         }
-        .frame(width: 34, height: 20)
-        .opacity(isEnabled ? 1 : 0.5)
-        .animation(.spring(response: 0.25, dampingFraction: 0.75), value: isOn)
-        .contentShape(Capsule())
-        .onTapGesture { if isEnabled { isOn.toggle() } }
     }
 }
 
-/// A pill-shaped segmented control with a sliding selection.
-struct PillPicker<Value: Hashable>: View {
+private struct SnapshotSwitchStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 0) {
+            configuration.label
+            ZStack(alignment: configuration.isOn ? .trailing : .leading) {
+                Capsule().fill(configuration.isOn ? Color.brimAccent : Color.primary.opacity(0.12))
+                Circle().fill(.white).shadow(color: .black.opacity(0.25), radius: 1, y: 0.5).padding(1.5)
+            }
+            .frame(width: 32, height: 18)
+        }
+    }
+}
+
+/// A row with a native segmented control under its label.
+struct ChoiceRow<Value: Hashable>: View {
+    let icon: String
+    let title: String
+    var subtitle: String?
     let options: [(value: Value, title: String)]
     @Binding var selection: Value
     var onChange: ((Value) -> Void)?
-    @Namespace private var ns
-    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(options.indices, id: \.self) { i in
-                let option = options[i]
-                let selected = option.value == selection
-                Text(option.title)
-                    .font(.system(size: 11, weight: selected ? .semibold : .medium))
-                    .foregroundStyle(selected ? Color.primary : Color.secondary)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
-                    .frame(maxWidth: .infinity)
-                    .background {
-                        if selected {
-                            Capsule()
-                                .fill(scheme == .dark ? Color.white.opacity(0.2) : Color.white)
-                                .shadow(color: .black.opacity(0.16), radius: 1.5, y: 0.5)
-                                .matchedGeometryEffect(id: "selection", in: ns)
-                        }
-                    }
-                    .contentShape(Capsule())
-                    .onTapGesture {
-                        guard option.value != selection else { return }
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) { selection = option.value }
-                        onChange?(option.value)
-                    }
-                    .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                FeatureIcon(systemName: icon)
+                RowLabel(title: title, subtitle: subtitle)
+                Spacer(minLength: 0)
             }
-        }
-        .padding(2)
-        .background(Capsule().fill(Color.primary.opacity(0.08)))
-    }
-}
-
-/// A stepped slider with an accent fill, step dots and a soft knob.
-struct BrimSlider: View {
-    @Binding var value: Double
-    let range: ClosedRange<Double>
-    let step: Double
-
-    private let knob: CGFloat = 15
-    private var steps: Int { max(1, Int(((range.upperBound - range.lowerBound) / step).rounded())) }
-    private var fraction: CGFloat {
-        min(max(CGFloat((value - range.lowerBound) / (range.upperBound - range.lowerBound)), 0), 1)
-    }
-
-    var body: some View {
-        GeometryReader { geo in
-            let usable = geo.size.width - knob
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.primary.opacity(0.10))
-                    .frame(height: 4)
-                Capsule()
-                    .fill(Color.brimAccent)
-                    .frame(width: knob / 2 + fraction * usable, height: 4)
-                Circle()
-                    .fill(Color.white)
-                    .overlay(Circle().strokeBorder(Color.black.opacity(0.1), lineWidth: 0.5))
-                    .shadow(color: .black.opacity(0.22), radius: 1.5, y: 0.5)
-                    .frame(width: knob, height: knob)
-                    .offset(x: fraction * usable)
-            }
-            .frame(height: knob)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0).onChanged { g in
-                    let f = min(max((g.location.x - knob / 2) / usable, 0), 1)
-                    let raw = range.lowerBound + Double(f) * (range.upperBound - range.lowerBound)
-                    let snapped = min(max((raw / step).rounded() * step, range.lowerBound), range.upperBound)
-                    if abs(snapped - value) > step / 10 {
-                        withAnimation(.easeOut(duration: 0.12)) { value = snapped }
-                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-                    }
+            Picker(title, selection: $selection) {
+                ForEach(options.indices, id: \.self) { i in
+                    Text(options[i].title).tag(options[i].value)
                 }
-            )
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.small)
+            .padding(.leading, 36)
+            .onChange(of: selection) { onChange?($0) }
         }
-        .frame(height: 16)
-        .accessibilityRepresentation {
-            Slider(value: $value, in: range, step: step)
-        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
     }
 }
 
+/// A row with a native slider and plain-language ends ("Narrow … Wide").
 struct SliderRow: View {
     let icon: String
     let title: String
-    let valueText: String
+    let lowLabel: String
+    let highLabel: String
     @Binding var value: Double
     let range: ClosedRange<Double>
     let step: Double
+    let valueDescription: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            FeatureIcon(systemName: icon, on: false)
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(title).font(.system(size: 13, weight: .medium))
-                    Spacer()
-                    Text(valueText)
-                        .font(.system(size: 12, weight: .medium).monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-                BrimSlider(value: $value, range: range, step: step)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                FeatureIcon(systemName: icon)
+                Text(title).font(.system(size: 13, weight: .medium))
+                Spacer(minLength: 0)
             }
-            .padding(.top, 4)
+            HStack(spacing: 8) {
+                Text(lowLabel)
+                Slider(value: $value, in: range, step: step) { Text(title) }
+                    .labelsHidden()
+                    .controlSize(.small)
+                    .accessibilityValue(valueDescription)
+                    .onChange(of: value) { _ in
+                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                    }
+                Text(highLabel)
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+            .padding(.leading, 36)
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 8)
+        .padding(.vertical, 7)
+    }
+}
+
+/// A row that opens another page.
+struct NavigationRow: View {
+    let icon: String
+    let title: String
+    var subtitle: String?
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                FeatureIcon(systemName: icon)
+                RowLabel(title: title, subtitle: subtitle)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .hoverHighlight()
     }
 }
 
@@ -333,41 +320,28 @@ struct PlainIconButton: View {
         .foregroundStyle(.secondary)
         .hoverHighlight(cornerRadius: 7)
         .help(help)
+        .accessibilityLabel(title ?? help)
     }
 }
 
-/// The "…" menu shared by both pages.
+/// The "…" menu shared by every page.
 struct MoreMenu: View {
-    @ObservedObject var prefs = Prefs.shared
-    @ObservedObject var licensing = Licensing.shared
     @ObservedObject var updater = Updater.shared
-    @ObservedObject var live = LiveState.shared
 
     var body: some View {
         Menu {
-            Button(prefs.paused ? "Resume Brim" : "Pause Brim") { prefs.paused.toggle() }
-            if let app = live.lastApp, let id = app.bundleIdentifier, let name = app.localizedName {
-                if prefs.excludedApps.contains(id) {
-                    Button("Turn On in \(name)") { prefs.excludedApps.removeAll { $0 == id } }
-                } else {
-                    Button("Turn Off in \(name)") { prefs.excludedApps.append(id) }
-                }
-            }
-            Divider()
             Button("Setup Guide…") { AppActions.shared.showSetupGuide() }
             Button("Accessibility Settings…") { Permissions.openAccessibilitySettings() }
-            Button("Rescan Trackpads") { EdgeEngine.shared.restart() }
+            Button("Find Trackpads Again") { EdgeEngine.shared.restart() }
             Divider()
             if let update = updater.available {
                 Button("Install Brim \(update.version)…") { Task { await updater.install(update) } }
-            } else {
+            } else if updater.isConfigured {
                 Button("Check for Updates…") { AppActions.shared.checkForUpdates() }
             }
-            Button(licensing.isLicensed ? "License…" : "Enter License…") { AppActions.shared.showLicense() }
-            if licensing.canBuy {
-                Button("Buy Brim…") { licensing.openCheckout() }
+            if AppConfig.sourceURL != nil {
+                Button("View Source Code…") { AppActions.shared.openSource() }
             }
-            Divider()
             Button("About Brim") { AppActions.shared.showAbout() }
         } label: {
             Image(systemName: "ellipsis.circle")
@@ -379,6 +353,22 @@ struct MoreMenu: View {
         .frame(width: 28, height: 26)
         .hoverHighlight(cornerRadius: 7)
         .help("More")
+        .accessibilityLabel("More")
+    }
+}
+
+/// Footer shared by every page: a leading view, then More and Quit, kept apart.
+struct MenuFooter<Leading: View>: View {
+    @ViewBuilder var leading: Leading
+
+    var body: some View {
+        HStack(spacing: 6) {
+            leading
+            Spacer()
+            MoreMenu()
+            PlainIconButton(systemName: "power", help: "Quit Brim") { NSApp.terminate(nil) }
+                .keyboardShortcut("q", modifiers: .command)
+        }
     }
 }
 
@@ -387,41 +377,48 @@ struct MoreMenu: View {
 struct StatusPill: View {
     @ObservedObject var live = LiveState.shared
     @ObservedObject var prefs = Prefs.shared
-    @ObservedObject var licensing = Licensing.shared
 
     var body: some View {
         let status = live.status
-        let color: Color = {
-            switch status {
-            case .ready: return .green
-            case .needsAccess, .trialEnded: return .orange
-            case .noTrackpad: return .red
-            case .paused: return .gray
-            }
-        }()
-        Button {
-            switch status {
-            case .needsAccess: AppActions.shared.showSetupGuide()
-            case .paused: prefs.paused = false
-            case .noTrackpad: EdgeEngine.shared.restart()
-            case .trialEnded: AppActions.shared.showLicense()
-            case .ready: break
-            }
-        } label: {
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(color)
-                    .frame(width: 6, height: 6)
-                Text(status.title)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(status == .ready ? Color.secondary : color)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(Capsule().fill(status == .ready ? Color.primary.opacity(0.06) : color.opacity(0.12)))
+        let label = HStack(spacing: 5) {
+            Circle()
+                .fill(dotColor(status))
+                .frame(width: 6, height: 6)
+            Text(status.title)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(status == .noTrackpad ? Color.red : Color.secondary)
         }
-        .buttonStyle(.plain)
-        .help(status == .ready ? "Brim is listening to your trackpad" : "Click to fix")
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(Color.primary.opacity(0.06)))
+
+        switch status {
+        case .ready:
+            label
+                .help("Brim is listening to your trackpad")
+                .accessibilityElement(children: .combine)
+        case .needsAccess:
+            Button { AppActions.shared.showSetupGuide() } label: { label }
+                .buttonStyle(.plain)
+                .help("Volume and brightness work. Allow Accessibility for the on-screen display and media gestures.")
+        case .paused:
+            Button { prefs.paused = false } label: { label }
+                .buttonStyle(.plain)
+                .help("Turn edge sliders back on")
+        case .noTrackpad:
+            Button { EdgeEngine.shared.restart() } label: { label }
+                .buttonStyle(.plain)
+                .help("No trackpad found. Click to look again.")
+        }
+    }
+
+    private func dotColor(_ status: LiveState.Status) -> Color {
+        switch status {
+        case .ready: return .green
+        case .needsAccess: return .yellow
+        case .noTrackpad: return .red
+        case .paused: return .gray
+        }
     }
 }
 
@@ -434,16 +431,17 @@ struct AppIconView: View {
             .frame(width: size, height: size)
             .clipShape(RoundedRectangle(cornerRadius: size * 0.225, style: .continuous))
             .shadow(color: .black.opacity(0.22), radius: size / 12, y: size / 28)
+            .accessibilityHidden(true)
     }
 }
 
-/// A tinted notice with optional buttons.
+/// A tinted notice with an optional button and an optional close button.
 struct Banner: View {
     let icon: String
-    let tint: Color
+    var tint: Color = .brimAccent
     let text: String
     var primary: (String, () -> Void)?
-    var secondary: (String, () -> Void)?
+    var onDismiss: (() -> Void)?
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -451,30 +449,34 @@ struct Banner: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 18)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 7) {
                 Text(text)
                     .font(.system(size: 11.5))
                     .fixedSize(horizontal: false, vertical: true)
-                if primary != nil || secondary != nil {
-                    HStack(spacing: 6) {
-                        if let primary {
-                            Button(primary.0, action: primary.1)
-                                .buttonStyle(.borderedProminent)
-                                .tint(tint)
-                                .controlSize(.small)
-                        }
-                        if let secondary {
-                            Button(secondary.0, action: secondary.1)
-                                .controlSize(.small)
-                        }
-                    }
+                if let primary {
+                    Button(primary.0, action: primary.1)
+                        .controlSize(.small)
                 }
             }
             Spacer(minLength: 0)
+            if let onDismiss {
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 18, height: 18)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Dismiss")
+                .accessibilityLabel("Dismiss")
+            }
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(tint.opacity(0.11)))
+        .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(tint.opacity(0.1)))
         .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).strokeBorder(tint.opacity(0.12)))
+        .accessibilityElement(children: .contain)
     }
 }

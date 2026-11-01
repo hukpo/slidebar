@@ -51,6 +51,14 @@ final class Updater: ObservableObject {
         }
     }
 
+    /// Hides an "up to date" or error notice, or postpones an available update.
+    func dismiss() {
+        switch phase {
+        case .downloading, .installing: return
+        default: phase = .idle
+        }
+    }
+
     func check(userInitiated: Bool) async {
         guard let feed = AppConfig.updateFeedURL else {
             if userInitiated { phase = .failed("Updates aren't set up for this build.") }
