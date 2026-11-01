@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brim · Your trackpad's edges, as sliders</title>
+<meta name="description" content="Brim turns the edges of your Mac trackpad into volume and brightness sliders. Quick mute, media swipes, haptics. Lives in your menu bar.">
+<meta name="theme-color" content="#0d0d29">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root {
+    --ink: #f4f4fb;
+    --ink-2: #a9a9c8;
+    --ink-3: #7c7c9e;
+    --bg: #0b0b22;
+    --bg-2: #12123a;
+    --card: rgba(255,255,255,0.05);
+    --line: rgba(255,255,255,0.09);
+    --amber: #ff7333;
+    --amber-top: #ffd65c;
+    --cyan: #73ebff;
+    --violet: #6b5cff;
+    --accent: #12a0cc;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", Arial, sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { font-family: var(--font); background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; line-height: 1.5; letter-spacing: -0.01em; overflow-x: hidden; }
+  a { color: inherit; text-decoration: none; }
+  img { display: block; max-width: 100%; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+
+  /* Nav */
+  nav { position: sticky; top: 0; z-index: 20; backdrop-filter: saturate(160%) blur(18px); -webkit-backdrop-filter: saturate(160%) blur(18px); background: rgba(11,11,34,0.72); border-bottom: 1px solid var(--line); }
+  nav .wrap { height: 52px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 650; font-size: 17px; }
+  .brand img { width: 22px; height: 22px; border-radius: 6px; }
+  nav ul { display: flex; gap: 26px; list-style: none; font-size: 13px; color: var(--ink-2); align-items: center; }
+  nav ul a:hover { color: var(--ink); }
+  .pill { background: var(--ink); color: var(--bg) !important; padding: 6px 14px; border-radius: 99px; font-weight: 600; }
+  .pill:hover { opacity: 0.88; }
+
+  /* Hero */
+  .hero { position: relative; padding: 88px 0 72px; text-align: center; }
+  .hero::before { content: ""; position: absolute; inset: -200px 0 auto; height: 760px; z-index: -1;
+    background: radial-gradient(600px 380px at 22% 40%, rgba(255,115,51,0.20), transparent 70%),
+                radial-gradient(600px 380px at 78% 40%, rgba(107,92,255,0.28), transparent 70%); }
+  .hero-icon { width: 112px; height: 112px; margin: 0 auto 26px; filter: drop-shadow(0 18px 40px rgba(107,92,255,0.35)); }
+  h1 { font-size: clamp(44px, 7.4vw, 86px); line-height: 1.02; letter-spacing: -0.035em; font-weight: 700; }
+  h1 .grad { background: linear-gradient(90deg, var(--amber-top), var(--amber) 30%, var(--violet) 70%, var(--cyan)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  h1 .warm { background: linear-gradient(180deg, var(--amber-top), var(--amber)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  h1 .cool { background: linear-gradient(180deg, var(--cyan), var(--violet)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lede { max-width: 620px; margin: 22px auto 0; font-size: clamp(18px, 2.2vw, 22px); color: var(--ink-2); }
+  .cta { display: flex; justify-content: center; align-items: center; gap: 22px; margin-top: 34px; flex-wrap: wrap; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(180deg, #1bb5e0, #0e86b0); color: #fff; font-weight: 600; font-size: 16px; padding: 13px 24px; border-radius: 99px; box-shadow: 0 10px 30px rgba(18,160,204,0.35), inset 0 1px 0 rgba(255,255,255,0.25); transition: transform .15s; }
+  .btn:hover { transform: translateY(-1px); }
+  .link { color: var(--cyan); font-size: 16px; }
+  .link:hover { text-decoration: underline; }
+  .fine { margin-top: 14px; font-size: 13px; color: var(--ink-3); }
+
+  /* Demo */
+  .demo { margin: 64px auto 0; max-width: 760px; }
+  .laptop { position: relative; padding: 28px 28px 34px; border-radius: 30px; background: linear-gradient(180deg, #23234f, #15153a); border: 1px solid var(--line); box-shadow: 0 40px 90px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08); }
+  .pad { position: relative; aspect-ratio: 16 / 10; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04)); border: 1.5px solid rgba(255,255,255,0.16); touch-action: none; cursor: grab; user-select: none; overflow: hidden; }
+  .pad:active { cursor: grabbing; }
+  .edge { position: absolute; top: 9%; bottom: 13%; width: 10px; border-radius: 10px; background: rgba(255,255,255,0.09); }
+  .edge.left { left: 3.2%; }
+  .edge.right { right: 3.2%; }
+  .edge .fill { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 10px; transition: height .12s ease-out, box-shadow .2s; }
+  .edge.left .fill { background: linear-gradient(0deg, var(--amber), var(--amber-top)); }
+  .edge.right .fill { background: linear-gradient(0deg, var(--violet), var(--cyan)); }
+  .edge.hot .fill { box-shadow: 0 0 22px currentColor; }
+  .edge.left.hot .fill { color: var(--amber); }
+  .edge.right.hot .fill { color: var(--cyan); }
+  .zone-label { position: absolute; top: 50%; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); pointer-events: none; }
+  .zone-label.left { left: 7%; transform: translateY(-50%) rotate(-90deg); transform-origin: left center; margin-top: 40px; }
+  .zone-label.right { right: 7%; transform: translateY(-50%) rotate(90deg); transform-origin: right center; margin-top: 30px; }
+  .strip { position: absolute; left: 50%; bottom: 4.5%; width: 22%; height: 5px; transform: translateX(-50%); border-radius: 5px; background: rgba(255,255,255,0.22); }
+  .strip-label { position: absolute; left: 50%; bottom: 8.5%; transform: translateX(-50%); font-size: 11px; color: var(--ink-3); letter-spacing: 0.1em; text-transform: uppercase; pointer-events: none; }
+  .corner { position: absolute; right: 2.4%; top: 4%; width: 26px; height: 26px; border-radius: 50%; border: 1.5px dashed rgba(255,255,255,0.25); pointer-events: none; }
+  .hint { position: absolute; left: 50%; top: 42%; transform: translate(-50%,-50%); text-align: center; color: var(--ink-3); font-size: 14px; pointer-events: none; transition: opacity .4s; }
+  .hint b { color: var(--ink-2); font-weight: 600; }
+  .finger { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; background: #fff; box-shadow: 0 0 26px rgba(115,235,255,0.9); opacity: 0; transition: opacity .15s; pointer-events: none; }
+  .finger.on { opacity: 0.92; }
+
+  /* macOS-style on-screen display */
+  .osd { position: absolute; left: 50%; top: -22px; transform: translate(-50%, -100%) scale(.96); opacity: 0; transition: opacity .2s, transform .2s; display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 16px; background: rgba(40,40,70,0.82); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--line); min-width: 250px; pointer-events: none; box-shadow: 0 16px 40px rgba(0,0,0,0.4); }
+  .osd.show { opacity: 1; transform: translate(-50%, -100%) scale(1); }
+  .osd .sym { font-size: 18px; width: 22px; text-align: center; }
+  .osd .track { flex: 1; height: 6px; border-radius: 6px; background: rgba(255,255,255,0.15); overflow: hidden; }
+  .osd .lvl { height: 100%; background: #fff; border-radius: 6px; transition: width .1s; }
+  .osd .txt { font-size: 13px; font-weight: 600; min-width: 92px; }
+
+  /* Sections */
+  section { padding: 110px 0 0; }
+  .eyebrow { font-size: 14px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--cyan); margin-bottom: 12px; }
+  h2 { font-size: clamp(34px, 5vw, 56px); line-height: 1.06; letter-spacing: -0.03em; font-weight: 700; }
+  .sub { color: var(--ink-2); font-size: 19px; margin-top: 14px; max-width: 640px; }
+  .center { text-align: center; }
+  .center .sub { margin-left: auto; margin-right: auto; }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 46px; }
+  .side { border-radius: 26px; padding: 34px; border: 1px solid var(--line); background: var(--card); position: relative; overflow: hidden; min-height: 260px; }
+  .side h3 { font-size: 28px; letter-spacing: -0.02em; margin-top: 70px; }
+  .side p { color: var(--ink-2); margin-top: 6px; }
+  .side .glyph { position: absolute; top: 30px; left: 34px; font-size: 40px; }
+  .side.warm { background: radial-gradient(420px 260px at 0% 0%, rgba(255,115,51,0.22), transparent 70%), var(--card); }
+  .side.cool { background: radial-gradient(420px 260px at 100% 0%, rgba(107,92,255,0.30), transparent 70%), var(--card); }
+  .side .bar { position: absolute; top: 30px; bottom: 30px; width: 8px; border-radius: 8px; }
+  .side.warm .bar { right: 30px; background: linear-gradient(0deg, var(--amber), var(--amber-top)); box-shadow: 0 0 30px rgba(255,115,51,0.6); }
+  .side.cool .bar { right: 30px; background: linear-gradient(0deg, var(--violet), var(--cyan)); box-shadow: 0 0 30px rgba(115,235,255,0.5); }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 46px; }
+  .feat { border-radius: 20px; padding: 26px; border: 1px solid var(--line); background: var(--card); transition: border-color .2s, transform .2s; }
+  .feat:hover { border-color: rgba(115,235,255,0.35); transform: translateY(-2px); }
+  .feat .ic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: rgba(18,160,204,0.18); color: var(--cyan); font-size: 18px; margin-bottom: 16px; }
+  .feat h4 { font-size: 18px; letter-spacing: -0.01em; }
+  .feat p { color: var(--ink-2); font-size: 15px; margin-top: 4px; }
+  kbd { font-family: inherit; font-size: 13px; padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line); background: rgba(255,255,255,0.06); }
+
+  .shots { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 54px; align-items: start; }
+  .shot { text-align: center; }
+  .shot img { width: 100%; max-width: 330px; margin: 0 auto; border-radius: 18px; box-shadow: 0 30px 70px rgba(0,0,0,0.5); border: 1px solid var(--line); }
+  .shot h3 { margin-top: 26px; font-size: 22px; letter-spacing: -0.02em; }
+  .shot p { color: var(--ink-2); max-width: 360px; margin: 6px auto 0; }
+  .theme { display: inline-flex; margin-top: 30px; padding: 3px; border-radius: 99px; background: rgba(255,255,255,0.07); border: 1px solid var(--line); }
+  .theme button { font: inherit; font-size: 13px; color: var(--ink-2); background: none; border: 0; padding: 6px 16px; border-radius: 99px; cursor: pointer; }
+  .theme button.on { background: var(--ink); color: var(--bg); font-weight: 600; }
+
+  .get { margin: 110px auto 0; max-width: 720px; text-align: center; border-radius: 30px; padding: 56px 32px; border: 1px solid var(--line);
+    background: radial-gradient(400px 200px at 20% 0%, rgba(255,115,51,0.18), transparent 70%), radial-gradient(400px 200px at 80% 0%, rgba(107,92,255,0.25), transparent 70%), var(--card); }
+  .get img { width: 96px; height: 96px; margin: 0 auto 18px; }
+  .price { font-size: 64px; font-weight: 700; letter-spacing: -0.04em; margin-top: 6px; }
+  .checks { list-style: none; display: flex; justify-content: center; gap: 22px; flex-wrap: wrap; color: var(--ink-2); margin: 16px 0 30px; font-size: 15px; }
+  .checks li::before { content: "✓ "; color: var(--cyan); }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; background: rgba(255,255,255,0.07); padding: 2px 7px; border-radius: 6px; }
+
+  .log { max-width: 720px; margin: 46px auto 0; }
+  .log article { display: grid; grid-template-columns: 120px 1fr; gap: 20px; padding: 24px 0; border-top: 1px solid var(--line); }
+  .log .v { font-size: 24px; font-weight: 700; }
+  .log .d { color: var(--ink-3); font-size: 13px; }
+  .log ul { color: var(--ink-2); padding-left: 18px; }
+
+  footer { margin-top: 110px; border-top: 1px solid var(--line); padding: 34px 0 60px; color: var(--ink-3); font-size: 13px; }
+  footer .wrap { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+
+  .rv { opacity: 0; transform: translateY(24px); transition: opacity .8s cubic-bezier(.2,.7,.2,1), transform .8s cubic-bezier(.2,.7,.2,1); }
+  .rv.in { opacity: 1; transform: none; }
+
+  @media (max-width: 760px) {
+    nav ul li:not(:last-child) { display: none; }
+    .split, .shots { grid-template-columns: 1fr; }
+    .grid { grid-template-columns: 1fr; }
+    .log article { grid-template-columns: 1fr; gap: 6px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .rv { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a href="#top" class="brand"><img src="img/badge-128.png" alt="">Brim</a>
+    <ul>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#features">Features</a></li>
+      <li><a href="#settings">Settings</a></li>
+      <li><a href="#changes">What's new</a></li>
+      <li><a href="#get" class="pill">Download</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <img class="hero-icon" src="img/icon-512.png" alt="Brim app icon">
+    <h1>Slide the <span class="grad">edge</span>.</h1>
+    <p class="lede">Brim turns the edges of your Mac trackpad into smooth <b>brightness</b> and <b>volume</b> sliders. No keys, no menus — just slide.</p>
+    <div class="cta">
+      <a class="btn" href="#get">Download Brim</a>
+      <a class="link" href="#overview">See how it works ›</a>
+    </div>
+    <p class="fine">Free. For macOS 13 Ventura or later.</p>
+
+    <div class="demo rv">
+      <div class="laptop">
+        <div class="osd" id="osd"><span class="sym" id="osdSym">🔊</span><span class="txt" id="osdTxt">Volume</span><div class="track"><div class="lvl" id="osdLvl"></div></div></div>
+        <div class="pad" id="pad" aria-label="Interactive trackpad demo">
+          <div class="edge left" id="edgeL"><div class="fill" id="fillL"></div></div>
+          <div class="edge right" id="edgeR"><div class="fill" id="fillR"></div></div>
+          <span class="zone-label left">Brightness</span>
+          <span class="zone-label right">Volume</span>
+          <div class="corner" title="Double-tap to mute"></div>
+          <div class="strip"></div>
+          <span class="strip-label">Media strip</span>
+          <p class="hint" id="hint"><b>Try it.</b> Drag along an edge.<br>Swipe the bottom. Double-tap the top-right corner.</p>
+          <div class="finger" id="finger"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="overview">
+  <div class="wrap">
+    <div class="center rv">
+      <p class="eyebrow">Overview</p>
+      <h2>Two edges.<br>Two sliders.</h2>
+      <p class="sub">Brightness lives on the left, volume on the right. Brim sends the same key events as your keyboard, so you get the familiar macOS on-screen display.</p>
+    </div>
+    <div class="split">
+      <div class="side warm rv"><span class="glyph">☀︎</span><div class="bar"></div><h3>Brightness on the left.</h3><p>Rest a finger on the left edge and slide up to brighten, down to dim.</p></div>
+      <div class="side cool rv"><span class="glyph">🔊</span><div class="bar"></div><h3>Volume on the right.</h3><p>Same move on the right edge. Prefer them the other way round? Swap sides.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <div class="center rv">
+      <p class="eyebrow">Features</p>
+      <h2>More than two edges.</h2>
+      <p class="sub">Small touches that make the trackpad feel like it was always meant to do this.</p>
+    </div>
+    <div class="grid">
+      <div class="feat rv"><div class="ic">🔇</div><h4>Quick Mute</h4><p>Double-tap the top-right corner to mute or unmute.</p></div>
+      <div class="feat rv"><div class="ic">⏭</div><h4>Media Strip</h4><p>Swipe along the bottom edge to skip tracks. Tap to play or pause, if you want it.</p></div>
+      <div class="feat rv"><div class="ic">〰︎</div><h4>Haptic Feedback</h4><p>A light tick under your finger at every step. Light, Medium or Strong.</p></div>
+      <div class="feat rv"><div class="ic">±</div><h4>Fine Control</h4><p>Hold <kbd>⇧</kbd> <kbd>⌥</kbd> while sliding for quarter steps.</p></div>
+      <div class="feat rv"><div class="ic">➚</div><h4>Freeze Cursor</h4><p>The pointer stays exactly where it was while you slide.</p></div>
+      <div class="feat rv"><div class="ic">▁</div><h4>Bottom Quarter</h4><p>Only the lower part of the edges responds, if you rest your hand high.</p></div>
+      <div class="feat rv"><div class="ic">⇄</div><h4>Swap Sides</h4><p>Volume on the left, brightness on the right.</p></div>
+      <div class="feat rv"><div class="ic">⌥</div><h4>Modifier Lock</h4><p>Require <kbd>fn</kbd> or <kbd>⌥</kbd> so edges only slide when you mean it.</p></div>
+      <div class="feat rv"><div class="ic">▭</div><h4>Menu bar only</h4><p>No Dock icon. Sleeps until a finger lands on an edge.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="settings">
+  <div class="wrap">
+    <div class="center rv">
+      <p class="eyebrow">Settings</p>
+      <h2>Lives in your menu bar.</h2>
+      <p class="sub">Everyday controls up front. Set-once options one click away.</p>
+      <div class="theme" role="group" aria-label="Screenshot appearance">
+        <button id="themeLight">Light</button><button id="themeDark" class="on">Dark</button>
+      </div>
+    </div>
+    <div class="shots">
+      <div class="shot rv">
+        <img id="shotMenu" src="img/menu-dark.png" alt="Brim menu: live brightness and volume, haptics, quick mute, media strip, sensitivity and edge width">
+        <h3>At a glance</h3>
+        <p>Live brightness and volume on the side that controls them — drag the meters, too. Haptics, Quick Mute, the Media Strip, sensitivity and edge width.</p>
+      </div>
+      <div class="shot rv">
+        <img id="shotSettings" src="img/settings-dark.png" alt="Brim settings: swap sides, bottom quarter, modifier, freeze cursor, fine control, appearance, open at login">
+        <h3>Set once</h3>
+        <p>Swap sides, keep slides to the bottom quarter, require a modifier, freeze the cursor, pick Light, Dark or Auto, and open at login.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="get rv" id="get">
+    <img src="img/icon-512.png" alt="">
+    <h2>Brim</h2>
+    <p class="price">Free</p>
+    <ul class="checks"><li>Every feature</li><li>Open source</li><li>No account</li><li>No tracking</li></ul>
+    <a class="btn" href="Brim.dmg" download>Download for Mac</a>
+    <p class="fine">macOS 13 Ventura or later · Apple silicon &amp; Intel · Needs Accessibility access, granted on first launch.<br>Or build it yourself: <code>scripts/build.sh --dmg</code></p>
+  </div>
+</div>
+
+<section id="changes">
+  <div class="wrap">
+    <div class="center rv"><p class="eyebrow">What's new</p><h2>Changelog</h2></div>
+    <div class="log">
+      <article class="rv">
+        <div><div class="v">1.0</div><div class="d">November 1, 2026</div></div>
+        <ul>
+          <li>Brightness and volume sliders on the trackpad edges, with the system on-screen display.</li>
+          <li>Quick Mute, Media Strip (swipe to skip, optional tap to play), haptic ticks in three strengths.</li>
+          <li>Fine Control, Freeze Cursor, Bottom Quarter Only, Swap Sides and Require Modifier.</li>
+          <li>Live meters in the menu — drag them to set a level directly.</li>
+          <li>Setup guide, Light / Dark / Auto appearance and Open at Login.</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>Brim is a menu bar app for macOS. Trackpad gestures need Accessibility access to send volume, brightness and media keys.</span>
+    <span>Mac and macOS are trademarks of Apple Inc.</span>
+  </div>
+</footer>
+
+<script>
+(() => {
+  // Reveal on scroll.
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12 });
+  document.querySelectorAll('.rv').forEach(el => io.observe(el));
+
+  // Screenshot theme switch.
+  const setTheme = dark => {
+    document.getElementById('shotMenu').src = `img/menu${dark ? '-dark' : ''}.png`;
+    document.getElementById('shotSettings').src = `img/settings${dark ? '-dark' : ''}.png`;
+    document.getElementById('themeDark').classList.toggle('on', dark);
+    document.getElementById('themeLight').classList.toggle('on', !dark);
+  };
+  document.getElementById('themeLight').onclick = () => setTheme(false);
+  document.getElementById('themeDark').onclick = () => setTheme(true);
+
+  // Interactive trackpad: the same rules as the app, in miniature.
+  const pad = document.getElementById('pad'), finger = document.getElementById('finger'), hint = document.getElementById('hint');
+  const osd = document.getElementById('osd'), osdSym = document.getElementById('osdSym'), osdTxt = document.getElementById('osdTxt'), osdLvl = document.getElementById('osdLvl');
+  const fills = { brightness: document.getElementById('fillL'), volume: document.getElementById('fillR') };
+  const edges = { brightness: document.getElementById('edgeL'), volume: document.getElementById('edgeR') };
+  const level = { brightness: 10, volume: 8 };  // out of 16 steps, like the keyboard
+  let muted = false, g = null, lastCornerTap = 0, osdTimer;
+  const EDGE = 0.09, STEP = 0.045, STRIP = 0.14, CORNER = 0.16;
+
+  const render = () => {
+    fills.brightness.style.height = (level.brightness / 16 * 100) + '%';
+    fills.volume.style.height = (level.volume / 16 * 100) + '%';
+    fills.volume.style.opacity = muted ? 0.35 : 1;
+  };
+  const show = (sym, txt, pct) => {
+    osdSym.textContent = sym; osdTxt.textContent = txt;
+    osdLvl.style.width = (pct == null ? 0 : pct) + '%';
+    osdLvl.parentElement.style.visibility = pct == null ? 'hidden' : 'visible';
+    osd.classList.add('show'); clearTimeout(osdTimer);
+    osdTimer = setTimeout(() => osd.classList.remove('show'), 1100);
+  };
+  const tick = () => navigator.vibrate && navigator.vibrate(4);
+  const pos = e => { const r = pad.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width, y: 1 - (e.clientY - r.top) / r.height, px: e.clientX - r.left, py: e.clientY - r.top }; };
+
+  pad.addEventListener('pointerdown', e => {
+    pad.setPointerCapture(e.pointerId);
+    const p = pos(e); hint.style.opacity = 0;
+    finger.style.left = p.px + 'px'; finger.style.top = p.py + 'px'; finger.classList.add('on');
+    let zone = null;
+    if (p.x > 1 - CORNER && p.y > 1 - CORNER) zone = 'corner';
+    else if (p.x < EDGE) zone = 'brightness';
+    else if (p.x > 1 - EDGE) zone = 'volume';
+    else if (p.y < STRIP) zone = 'strip';
+    g = { zone, x0: p.x, y0: p.y, last: p.y, acc: 0, fired: false, t0: performance.now() };
+    if (edges[zone]) edges[zone].classList.add('hot');
+  });
+  pad.addEventListener('pointermove', e => {
+    if (!g) return;
+    const p = pos(e);
+    finger.style.left = p.px + 'px'; finger.style.top = p.py + 'px';
+    if (g.zone === 'brightness' || g.zone === 'volume') {
+      g.acc += p.y - g.last; g.last = p.y;
+      while (Math.abs(g.acc) >= STEP) {
+        const up = g.acc > 0; g.acc -= up ? STEP : -STEP;
+        level[g.zone] = Math.max(0, Math.min(16, level[g.zone] + (up ? 1 : -1)));
+        if (g.zone === 'volume' && muted) muted = false;
+        tick(); render();
+        const pct = level[g.zone] / 16 * 100;
+        g.zone === 'volume' ? show(level.volume ? '🔊' : '🔈', 'Volume', pct) : show('☀︎', 'Brightness', pct);
+      }
+    } else if (g.zone === 'strip' && !g.fired && Math.abs(p.x - g.x0) > 0.14) {
+      g.fired = true; tick();
+      show(p.x > g.x0 ? '⏭' : '⏮', p.x > g.x0 ? 'Next track' : 'Previous track', null);
+    }
+  });
+  const end = () => {
+    if (!g) return;
+    const quick = performance.now() - g.t0 < 300;
+    if (g.zone === 'corner' && quick) {
+      const now = performance.now();
+      if (now - lastCornerTap < 450) { muted = !muted; lastCornerTap = 0; tick(); render(); show(muted ? '🔇' : '🔊', muted ? 'Muted' : 'Volume', muted ? 0 : level.volume / 16 * 100); }
+      else lastCornerTap = now;
+    }
+    Object.values(edges).forEach(el => el.classList.remove('hot'));
+    finger.classList.remove('on'); g = null;
+  };
+  pad.addEventListener('pointerup', end);
+  pad.addEventListener('pointercancel', end);
+  render();
+})();
+</script>
+</body>
+</html>
