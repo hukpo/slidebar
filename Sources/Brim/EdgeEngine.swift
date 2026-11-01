@@ -37,7 +37,7 @@ final class LiveState: ObservableObject {
     var status: Status {
         if Prefs.shared.paused { return .paused }
         if deviceCount == 0 { return .noTrackpad }
-        if !trusted { return .needsAccess }
+        if !trusted && !Prefs.shared.accessNoticeDismissed { return .needsAccess }
         return .ready
     }
 

@@ -38,8 +38,10 @@ struct SetupView: View {
 
             VStack(spacing: 10) {
                 StepRow(number: 1, done: triedSlide,
-                        title: "Try it now",
-                        detail: "Rest one finger on the \(prefs.swapSides ? "left" : "right") edge of your trackpad and slide up. The volume goes up.") {
+                        title: live.deviceCount == 0 ? "Connect a trackpad" : "Try it now",
+                        detail: live.deviceCount == 0
+                            ? "Brim can't find a trackpad. Turn on or connect your Magic Trackpad, then try again."
+                            : "Rest one finger on the \(prefs.swapSides ? "left" : "right") edge of your trackpad and slide up. The volume goes up.") {
                     EmptyView()
                 }
 
@@ -55,7 +57,7 @@ struct SetupView: View {
                 }
 
                 HStack {
-                    Text("You can open this guide again from the More menu.")
+                    Text("You can open this guide again from Brim's menu bar icon.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -64,7 +66,7 @@ struct SetupView: View {
                             .buttonStyle(.borderedProminent)
                             .keyboardShortcut(.defaultAction)
                     } else {
-                        Button("Finish Without It") { AppActions.shared.finishSetup() }
+                        Button("Skip for Now") { AppActions.shared.finishSetup() }
                     }
                 }
                 .padding(.top, 6)

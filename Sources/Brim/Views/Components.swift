@@ -366,7 +366,7 @@ struct MenuFooter<Leading: View>: View {
             leading
             Spacer()
             MoreMenu()
-            PlainIconButton(systemName: "power", help: "Quit Brim") { NSApp.terminate(nil) }
+            PlainIconButton(systemName: "power", title: "Quit", help: "Quit Brim (⌘Q)") { NSApp.terminate(nil) }
                 .keyboardShortcut("q", modifiers: .command)
         }
     }
@@ -386,7 +386,7 @@ struct StatusPill: View {
                 .frame(width: 6, height: 6)
             Text(status.title)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(status == .noTrackpad ? Color.red : Color.secondary)
+                .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
@@ -415,8 +415,8 @@ struct StatusPill: View {
     private func dotColor(_ status: LiveState.Status) -> Color {
         switch status {
         case .ready: return .green
-        case .needsAccess: return .yellow
-        case .noTrackpad: return .red
+        case .needsAccess: return .gray
+        case .noTrackpad: return .orange
         case .paused: return .gray
         }
     }

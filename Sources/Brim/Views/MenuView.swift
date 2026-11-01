@@ -60,6 +60,10 @@ struct MainPage: View {
                 Banner(icon: "menubar.arrow.up.rectangle",
                        text: "Brim lives here in the menu bar. Click its icon any time to see your levels or change settings.",
                        onDismiss: { live.showWelcome = false })
+            } else if live.status == .noTrackpad {
+                Banner(icon: "exclamationmark.triangle", tint: .orange,
+                       text: "Brim can't find a trackpad. Turn on or connect your Magic Trackpad.",
+                       primary: ("Look Again", { EdgeEngine.shared.restart() }))
             } else if live.status == .needsAccess {
                 AccessBanner()
             }
@@ -72,13 +76,13 @@ struct MainPage: View {
 
                 if let app = live.lastApp, let id = app.bundleIdentifier, let name = app.localizedName {
                     RowDivider()
-                    ToggleRow(icon: "app.dashed", title: "Off in \(name)",
-                              subtitle: "Pause Brim only while \(name) is in front",
+                    ToggleRow(icon: "app.dashed", title: "Use in \(name)",
+                              subtitle: "Turn off to pause Brim while \(name) is in front",
                               isOn: Binding(
-                                get: { prefs.excludedApps.contains(id) },
-                                set: { off in
-                                    if off { if !prefs.excludedApps.contains(id) { prefs.excludedApps.append(id) } }
-                                    else { prefs.excludedApps.removeAll { $0 == id } }
+                                get: { !prefs.excludedApps.contains(id) },
+                                set: { on in
+                                    if on { prefs.excludedApps.removeAll { $0 == id } }
+                                    else if !prefs.excludedApps.contains(id) { prefs.excludedApps.append(id) }
                                 }))
                         .disabled(prefs.paused)
                 }
@@ -193,9 +197,8 @@ struct EdgeMeters: View {
             .opacity(live.activeControl == nil || active ? 1 : 0.5)
             .animation(.easeOut(duration: 0.15), value: live.activeControl)
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(isVolume ? "Volume" : "Brightness")
-        .accessibilityValue(isVolume && live.muted ? "Muted" : value(c).map { "\(Int(($0 * 100).rounded())) percent" } ?? "Unavailable")
+        // The level bar beside it already speaks and adjusts this value for VoiceOver.
+        .accessibilityHidden(true)
     }
 }
 
@@ -232,7 +235,7 @@ struct LevelBar: View {
         .help("Drag to adjust")
         .accessibilityElement()
         .accessibilityLabel(control == .brightness ? "Brightness" : "Volume")
-        .accessibilityValue("\(Int((level * 100).rounded())) percent")
+        .accessibilityValue(dimmed ? "Muted" : "\(Int((level * 100).rounded())) percent")
         .accessibilityAdjustableAction { direction in
             switch direction {
             case .increment: set(Float(level) + 1 / 16)
@@ -295,6 +298,7 @@ struct AccessBanner: View {
     var body: some View {
         Banner(icon: "lock.open",
                text: "Volume and brightness already work. Allow Accessibility to also see the usual on-screen display and use the media gestures.",
-               primary: ("Allow…", { Permissions.ask() }))
+               primary: ("Allow…", { Permissions.ask() }),
+               onDismiss: { Prefs.shared.accessNoticeDismissed = true })
     }
 }

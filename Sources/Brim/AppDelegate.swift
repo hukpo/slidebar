@@ -24,7 +24,7 @@ final class AppActions {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowDelegate {
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
     private var setupWindow: NSWindow?
@@ -162,6 +162,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             window.titleVisibility = .hidden
             window.isMovableByWindowBackground = true
             window.isReleasedWhenClosed = false
+            window.delegate = self
             window.center()
             setupWindow = window
         }
@@ -169,10 +170,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         setupWindow?.makeKeyAndOrderFront(nil)
     }
 
+    /// Closing the setup window with its close button counts as finishing it.
+    func windowWillClose(_ notification: Notification) {
+        guard (notification.object as? NSWindow) === setupWindow, !Prefs.shared.hasCompletedSetup else { return }
+        DispatchQueue.main.async { [weak self] in self?.finishSetup() }
+    }
+
     /// Ends onboarding by opening the menu under Brim's icon, so the user sees where Brim lives.
     func finishSetup() {
         Prefs.shared.hasCompletedSetup = true
-        setupWindow?.close()
+        if setupWindow?.isVisible == true { setupWindow?.close() }
         LiveState.shared.showWelcome = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in self?.showPopover() }
     }

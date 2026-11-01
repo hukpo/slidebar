@@ -78,6 +78,8 @@ final class Prefs: ObservableObject {
     @Published var hasCompletedSetup: Bool { didSet { defaults.set(hasCompletedSetup, forKey: Keys.setupDone) } }
     /// The system Accessibility prompt only ever appears once; after that we open System Settings instead.
     @Published var didPromptAccess: Bool { didSet { defaults.set(didPromptAccess, forKey: Keys.didPromptAccess) } }
+    /// The user chose to use Brim without Accessibility; stop mentioning it in the menu.
+    @Published var accessNoticeDismissed: Bool { didSet { defaults.set(accessNoticeDismissed, forKey: Keys.accessNoticeDismissed) } }
     @Published private(set) var openAtLogin: Bool = false
 
     private enum Keys {
@@ -100,6 +102,7 @@ final class Prefs: ObservableObject {
         static let excludedApps = "excludedApps"
         static let setupDone = "setupDone"
         static let didPromptAccess = "didPromptAccess"
+        static let accessNoticeDismissed = "accessNoticeDismissed"
     }
 
     private init() {
@@ -142,6 +145,7 @@ final class Prefs: ObservableObject {
         excludedApps = defaults.stringArray(forKey: Keys.excludedApps) ?? []
         hasCompletedSetup = defaults.bool(forKey: Keys.setupDone)
         didPromptAccess = defaults.bool(forKey: Keys.didPromptAccess)
+        accessNoticeDismissed = defaults.bool(forKey: Keys.accessNoticeDismissed)
         refreshOpenAtLogin()
     }
 

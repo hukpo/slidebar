@@ -5,6 +5,7 @@ import SwiftUI
 struct SettingsPage: View {
     @Binding var page: MenuPage
     @ObservedObject var prefs = Prefs.shared
+    @ObservedObject var live = LiveState.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -18,7 +19,7 @@ struct SettingsPage: View {
                                   subtitle: "Double-tap the top-right corner", isOn: $prefs.quickMute)
                         RowDivider()
                         ToggleRow(icon: "forward", title: "Media Strip",
-                                  subtitle: "Swipe the bottom edge to skip songs", isOn: $prefs.mediaStrip)
+                                  subtitle: live.trusted ? "Swipe the bottom edge to skip songs" : "Needs Accessibility to work", isOn: $prefs.mediaStrip)
                         RowDivider()
                         ToggleRow(icon: nil, title: "Tap to Play or Pause",
                                   subtitle: "Tap the bottom edge. Clicks count too.", isOn: $prefs.tapToPlay)
@@ -48,7 +49,7 @@ struct SettingsPage: View {
 
                     SectionHeader(title: "While Sliding")
                     Card {
-                        SliderRow(icon: "speedometer", title: "Speed",
+                        SliderRow(icon: "speedometer", title: "Slide Speed",
                                   lowLabel: "Slower", highLabel: "Faster",
                                   value: $prefs.sensitivity, range: Prefs.sensitivityRange, step: Prefs.sensitivityStep,
                                   valueDescription: String(format: "%g times", prefs.sensitivity))

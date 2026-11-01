@@ -104,6 +104,6 @@ private struct GlowBar: View {
             .padding(.vertical, 8)
         }
         .opacity(model.visible ? 1 : 0)
-        .offset(x: model.visible ? 0 : (model.onLeft ? -14 : 14))
+        .offset(x: model.visible || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : (model.onLeft ? -14 : 14))
     }
 }

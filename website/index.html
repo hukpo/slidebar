@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="no-js">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#0b0b22">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script>document.documentElement.classList.replace("no-js", "js");</script>
 <script src="config.js"></script>
 <style>
   :root {
@@ -169,7 +170,8 @@
     .zone-label { font-size: 11px; }
     .hint { font-size: 13px; width: 58%; }
   }
-  body.on-phone .hero .cta, body.on-phone .hero .meta { display: none; }
+  .no-js .hint, .no-js .demo-keys { display: none; }
+  body.on-phone .cta, body.on-phone .meta, body.on-phone .demo-keys { display: none; }
   body.on-phone .phone-note { display: block; }
 </style>
 </head>
@@ -237,7 +239,7 @@
       </div>
       <div class="groups">
         <div class="group">
-          <h3><span class="swatch warm" aria-hidden="true"></span>Feels right</h3>
+          <h3><span class="swatch warm" aria-hidden="true"></span>Feel</h3>
           <dl>
             <dt>Haptic Feedback</dt><dd>A light tick under your finger at every step, and a firmer one at the ends.</dd>
             <dt>Smaller Steps</dt><dd>Hold Shift and Option while you slide for finer changes.</dd>
@@ -258,7 +260,7 @@
             <dt>Palm Rejection</dt><dd>A hand resting on the trackpad doesn't change anything.</dd>
             <dt>Keep Pointer Still</dt><dd>The pointer stays where it is while you slide.</dd>
             <dt>Off in Chosen Apps</dt><dd>Turn Brim off in games, drawing apps or music software.</dd>
-            <dt>Menu bar only</dt><dd>No Dock icon, and it idles until a finger lands on an edge.</dd>
+            <dt>Menu Bar Only</dt><dd>No Dock icon, and it idles until a finger lands on an edge.</dd>
           </dl>
         </div>
       </div>
@@ -292,8 +294,8 @@
         <ol class="steps">
           <li>
             <h3>Move Brim to Applications</h3>
-            <p>Open the download and drag Brim into your Applications folder. Then open it.</p>
-            <p class="aside">If macOS says Brim can't be opened, Control-click Brim in Applications and choose Open.</p>
+            <p>Open the download and drag Brim into your Applications folder. Then open it. Its icon appears in the menu bar at the top right of your screen.</p>
+            <p class="aside">If macOS says it can't check Brim for malicious software, open System Settings, choose Privacy &amp; Security, scroll down and click Open Anyway next to Brim.</p>
           </li>
           <li>
             <h3>Slide once</h3>
@@ -301,10 +303,10 @@
           </li>
           <li>
             <h3>Allow Accessibility, if you like</h3>
-            <p>Brim already works. Allowing Accessibility once lets it show the usual volume and brightness display and use the media gestures. macOS asks in its own words, and the welcome window walks you through it.</p>
+            <p>Brim already works. Allowing Accessibility once lets it show the usual volume and brightness display and use the media gestures. Brim uses it only to press those keys for you. It doesn't read your screen or what you type.</p>
           </li>
         </ol>
-        <img src="img/setup-dark.png" width="440" alt="Brim's welcome window: try a slide, then optionally allow Accessibility.">
+        <img id="shotSetup" src="img/setup-dark.png" width="440" alt="Brim's welcome window: try a slide, then optionally allow Accessibility.">
       </div>
     </div>
   </section>
@@ -316,8 +318,8 @@
       <p class="sub" style="margin-left:auto;margin-right:auto">No account, no tracking, no ads. Your touches are handled on your Mac and never leave it.</p>
       <ul class="promises">
         <li>Every feature, free</li>
-        <li>Source code anyone can read</li>
-        <li>Updates when you want them</li>
+        <li class="source-promise">Source code coming soon</li>
+        <li>Updates you can turn off</li>
       </ul>
       <div class="cta">
         <a class="btn" href="Brim.dmg" download>
@@ -327,6 +329,8 @@
         <a class="btn-quiet source-link" href="#" hidden>View the source code</a>
       </div>
       <p class="meta" style="margin-top:14px">Version <span class="version">1.0</span> · macOS 13 Ventura or later · Apple silicon and Intel</p>
+      <p class="meta" style="margin-top:6px">To remove Brim, choose Quit in its menu and drag it from Applications to the Trash.</p>
+      <p class="phone-note">Brim is a Mac app. Open this page on your Mac to download it.</p>
     </div>
   </div>
 </main>
@@ -349,6 +353,7 @@
   const cfg = window.BRIM || {};
   document.querySelectorAll('.version').forEach(el => el.textContent = cfg.version || '1.0');
   if (cfg.sourceURL) {
+    document.querySelectorAll('.source-promise').forEach(li => li.textContent = 'Source code anyone can read');
     document.querySelectorAll('.source-link').forEach(a => { a.href = cfg.sourceURL; a.hidden = false; });
     document.querySelectorAll('.source-item').forEach(li => li.hidden = false);
   }
@@ -356,6 +361,7 @@
     document.querySelectorAll('.contact-link').forEach(a => a.href = 'mailto:' + cfg.contactEmail);
     document.querySelectorAll('.contact-item').forEach(li => li.hidden = false);
   }
+  document.querySelectorAll('.get-link').forEach(a => { if (matchMedia('(hover: none) and (pointer: coarse)').matches) a.textContent = 'Get it for Mac'; });
 
   // Phones and tablets can't run Brim: offer to copy the link instead of downloading a .dmg.
   if (matchMedia('(hover: none) and (pointer: coarse)').matches) {
@@ -373,6 +379,7 @@
   const setTheme = dark => {
     document.getElementById('shotMenu').src = `img/menu${dark ? '-dark' : ''}.png`;
     document.getElementById('shotSettings').src = `img/settings${dark ? '-dark' : ''}.png`;
+    document.getElementById('shotSetup').src = `img/setup${dark ? '-dark' : ''}.png`;
     document.getElementById('themeDark').setAttribute('aria-pressed', dark);
     document.getElementById('themeLight').setAttribute('aria-pressed', !dark);
   };

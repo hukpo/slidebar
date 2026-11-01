@@ -1,5 +1,5 @@
 :root { --ink:#f4f4fb; --ink-2:#b4b4d0; --ink-3:#8f8fb0; --bg:#0b0b22; --line:rgba(255,255,255,0.09); --cyan:#73ebff;
-  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Helvetica Neue",Arial,sans-serif; }
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif; }
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:var(--font); background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased; line-height:1.6; }
 body::before { content:""; position:fixed; inset:-200px 0 auto; height:600px; z-index:-1;
