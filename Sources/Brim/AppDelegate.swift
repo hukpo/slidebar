@@ -110,7 +110,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             Licensing.shared.evaluate()
             NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            popover.contentViewController?.view.window?.makeKey()
+            // Keep the popover above Brim's own windows (setup guide, license), which activation brings forward.
+            if let window = popover.contentViewController?.view.window {
+                window.level = .popUpMenu
+                window.makeKey()
+            }
         }
     }
 

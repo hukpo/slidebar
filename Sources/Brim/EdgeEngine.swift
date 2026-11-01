@@ -126,6 +126,9 @@ final class EdgeEngine {
 
     // MARK: Frames
 
+    /// Feeds synthetic frames through the same path as real trackpad frames (used by --simulate).
+    func feed(_ touches: [TouchPoint], time: Double) { handle(touches, time: time) }
+
     private func handle(_ touches: [TouchPoint], time: Double) {
         let flags = NSEvent.modifierFlags
         var allowed = !prefs.paused && Licensing.shared.allowsGestures
