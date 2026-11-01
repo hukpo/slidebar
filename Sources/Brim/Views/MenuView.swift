@@ -130,14 +130,6 @@ struct NoticeArea: View {
                    text: "Keeping your Mac awake. Its display won't turn off on its own.",
                    primary: ("Let It Sleep", { _ = KeepAwake.toggle() }))
         }
-        if live.micMuted && prefs.corners.values.contains(.muteMicrophone) {
-            Banner(icon: "mic.slash.fill", tint: .orange,
-                   text: "Your microphone is muted.",
-                   primary: ("Unmute", {
-                       Microphone.setMuted(false)
-                       live.micMuted = Microphone.isMuted()
-                   }))
-        }
         UpdateBanner()
     }
 }

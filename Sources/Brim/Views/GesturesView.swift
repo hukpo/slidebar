@@ -213,12 +213,16 @@ struct TrackpadMap: View {
     private func cornerButton(_ corner: Corner) -> some View {
         let function = prefs.corner(corner)
         let spot = MapSpot.corner(corner)
+        // Mute corners show when they're on: orange, filled, so a muted mic is never a surprise.
+        let isMuted = (function == .muteMicrophone && live.micMuted) || (function == .mute && live.muted)
         return SpotButton(selected: selection == spot, keyboardFocused: mapFocused && keyboardNav, off: function == .off,
-                          shape: .circle, anchor: anchors.anchor(spot)) {
+                          shape: .circle, tint: isMuted ? .orange : nil, anchor: anchors.anchor(spot)) {
             open(spot)
         } label: {
             if function == .openApp, let id = prefs.cornerApps[corner] {
                 AppIcon(bundleID: id).frame(width: 18, height: 18)
+            } else if isMuted {
+                Image(systemName: function.icon + ".fill").foregroundStyle(.orange)
             } else if function != .off {
                 Image(systemName: function.icon)
             } else {
@@ -226,8 +230,9 @@ struct TrackpadMap: View {
             }
         }
         .frame(width: bar, height: bar)
-        .help("\(corner.title): \(title(for: spot)). Click to change.")
+        .help("\(corner.title): \(title(for: spot))\(isMuted ? (function == .mute ? ". Sound is muted" : ". Microphone is muted") : ""). Click to change.")
         .accessibilityLabel("\(corner.title): \(title(for: spot))")
+        .accessibilityValue(isMuted ? "Muted" : "")
         .accessibilityHint("Opens a menu of actions")
         .accessibilitySortPriority(priority(spot))
     }
@@ -241,6 +246,8 @@ private struct SpotButton<Label: View>: View {
     let keyboardFocused: Bool
     let off: Bool
     let shape: Shape
+    /// Colors the spot while its toggle is on (a muted mic or sound).
+    var tint: Color? = nil
     /// A live level (0…1) filling the edge from the bottom or the left.
     var levelValue: CGFloat? = nil
     var vertical = false
@@ -284,7 +291,8 @@ private struct SpotButton<Label: View>: View {
                 .overlay(Capsule().inset(by: -3).stroke(Color(nsColor: .keyboardFocusIndicatorColor),
                                                         lineWidth: selected && keyboardFocused ? 3 : 0))
         case .circle:
-            Circle().fill(fill)
+            Circle().fill(tint.map { $0.opacity(hovering ? 0.32 : 0.24) } ?? fill)
+                .overlay(Circle().strokeBorder(tint?.opacity(0.6) ?? .clear, lineWidth: 1))
                 .overlay(Circle().strokeBorder(Color.primary.opacity(off && !selected ? 0.3 : 0), style: dash))
                 .overlay(Circle().strokeBorder(Color.brimAccent, lineWidth: selected ? 2 : 0))
                 .overlay(Circle().inset(by: -3).stroke(Color(nsColor: .keyboardFocusIndicatorColor),
