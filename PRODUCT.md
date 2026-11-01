@@ -32,7 +32,8 @@ Feel and craft. Brim should feel like Apple built it: precise haptics, a quiet n
 - Reads raw trackpad touches through a private Apple framework; future macOS updates may change behavior.
 - Brightness control covers the built-in display only.
 - Updates can download and install themselves from an update feed (`appcast.json`) when one is configured.
-- **Distribution: free and open source** (confirmed). The current build still contains a 14-day trial, offline license keys and $5 pricing on the website; these conflict with the confirmed model and are pending removal. Open decision: license for the source code, and whether to accept donations.
+- **Distribution: free and open source** (confirmed). No trial, license keys or payments. Open decisions: which open-source license covers the code (no LICENSE file yet), where the repository is hosted (`SOURCE_URL` / `website/config.js` `sourceURL`), and whether to accept donations.
+- Accessibility is optional: without it, Brim still changes volume, brightness and mute directly; with it, the system on-screen display appears and media gestures work.
 
 ## Brand Commitments
 

@@ -1,7 +1,8 @@
-// Site settings. Edit these when you publish.
+// Site settings. Edit these when you publish. Empty values hide the matching links.
 window.BRIM = {
-  price: "$5",
-  // Your checkout link (Paddle, Lemon Squeezy, Gumroad, Stripe Payment Link…). Empty = "Buy" scrolls to download.
-  checkoutURL: "",
-  contactEmail: "hello@example.com",
+  version: "1.0",
+  // Where the source code lives, e.g. "https://github.com/you/brim".
+  sourceURL: "",
+  // Shown as "Contact" in the footer.
+  contactEmail: "",
 };

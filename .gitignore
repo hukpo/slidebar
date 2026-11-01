@@ -6,3 +6,4 @@ build/
 website/Brim.dmg
 Resources/AppIcon.iconset/
 website/downloads/
+website/appcast.json
