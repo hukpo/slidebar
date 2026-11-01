@@ -55,8 +55,8 @@ struct MainPage: View {
             Card {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 10) {
-                        FeatureIcon(systemName: "hand.tap.fill", color: .pink, on: prefs.haptics != .off)
-                        RowLabel(title: "Haptic Feedback", subtitle: "A light tick under your finger")
+                        FeatureIcon(systemName: "hand.tap.fill", on: prefs.haptics != .off)
+                        RowLabel(title: "Haptic Feedback", subtitle: "A light tick as you slide")
                         Spacer(minLength: 0)
                     }
                     PillPicker(options: HapticStrength.allCases.map { ($0, $0.title) },
@@ -69,13 +69,13 @@ struct MainPage: View {
 
                 RowDivider()
 
-                ToggleRow(icon: "speaker.slash.fill", color: .red, title: "Quick Mute",
+                ToggleRow(icon: "speaker.slash.fill", title: "Quick Mute",
                           subtitle: "Double-tap the top-right corner", isOn: $prefs.quickMute)
 
                 RowDivider()
 
                 HStack(spacing: 10) {
-                    FeatureIcon(systemName: "forward.fill", color: .orange, on: prefs.mediaStrip)
+                    FeatureIcon(systemName: "forward.fill", on: prefs.mediaStrip)
                     VStack(alignment: .leading, spacing: 1) {
                         Button {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showMediaOptions.toggle() }
@@ -83,11 +83,9 @@ struct MainPage: View {
                             HStack(spacing: 4) {
                                 Text("Media Strip").font(.system(size: 13, weight: .medium))
                                 Image(systemName: "chevron.down")
-                                    .font(.system(size: 8, weight: .heavy))
-                                    .foregroundStyle(.secondary)
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(.tertiary)
                                     .rotationEffect(.degrees(showMediaOptions ? 180 : 0))
-                                    .padding(3)
-                                    .background(Circle().fill(Color.primary.opacity(0.07)))
                             }
                         }
                         .buttonStyle(.plain)
@@ -112,11 +110,11 @@ struct MainPage: View {
             }
 
             Card {
-                SliderRow(icon: "gauge.with.dots.needle.50percent", color: .purple, title: "Sensitivity",
+                SliderRow(icon: "gauge.with.dots.needle.50percent", title: "Sensitivity",
                           valueText: String(format: "%g×", prefs.sensitivity),
                           value: $prefs.sensitivity, range: Prefs.sensitivityRange, step: Prefs.sensitivityStep)
                 RowDivider()
-                SliderRow(icon: "arrow.left.and.right", color: .teal, title: "Edge Width",
+                SliderRow(icon: "arrow.left.and.right", title: "Edge Width",
                           valueText: "\(Int((prefs.edgeWidth * 100).rounded()))%",
                           value: $prefs.edgeWidth, range: Prefs.edgeWidthRange, step: Prefs.edgeWidthStep)
             }
@@ -164,13 +162,12 @@ struct EdgeMeters: View {
 
             // The media strip, lit when it's on.
             Capsule()
-                .fill(Color.white.opacity(prefs.mediaStrip ? 0.38 : 0.1))
-                .frame(width: 54, height: 3)
+                .fill(Color.white.opacity(prefs.mediaStrip ? 0.25 : 0.08))
+                .frame(width: 44, height: 3)
                 .padding(.bottom, 7)
         }
-        .frame(height: 116)
+        .frame(height: 108)
         .environment(\.colorScheme, .dark)
-        .shadow(color: Color.brimViolet.opacity(0.18), radius: 10, y: 4)
     }
 
     private func value(_ c: EdgeControl) -> Float? {
@@ -194,9 +191,8 @@ struct EdgeMeters: View {
         VStack(alignment: leading ? .leading : .trailing, spacing: 3) {
             HStack(spacing: 5) {
                 if leading { Image(systemName: icon).foregroundStyle(tint) }
-                Text(isVolume ? "VOLUME" : "BRIGHTNESS")
-                    .font(.system(size: 10, weight: .bold))
-                    .kerning(1.3)
+                Text(isVolume ? "Volume" : "Brightness")
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.6))
                 if !leading { Image(systemName: icon).foregroundStyle(tint) }
             }
@@ -205,23 +201,23 @@ struct EdgeMeters: View {
             HStack(alignment: .firstTextBaseline, spacing: 1) {
                 if isVolume && live.muted {
                     Text("Muted")
-                        .font(.system(size: 30, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.55))
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
                 } else if let v = value(c) {
                     Text("\(Int((v * 100).rounded()))")
-                        .font(.system(size: 38, weight: .semibold, design: .rounded).monospacedDigit())
+                        .font(.system(size: 34, weight: .medium).monospacedDigit())
                         .foregroundStyle(.white)
                     Text("%")
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.45))
                 } else {
                     Text("—")
-                        .font(.system(size: 38, weight: .semibold, design: .rounded))
+                        .font(.system(size: 34, weight: .medium))
                         .foregroundStyle(.white.opacity(0.4))
                 }
             }
-            .scaleEffect(active ? 1.06 : 1, anchor: leading ? .leading : .trailing)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: active)
+            .opacity(live.activeControl == nil || active ? 1 : 0.5)
+            .animation(.easeOut(duration: 0.15), value: live.activeControl)
         }
     }
 }
@@ -243,7 +239,7 @@ struct LevelBar: View {
                     .fill(LinearGradient(colors: colors, startPoint: .bottom, endPoint: .top))
                     .frame(height: max(geo.size.width, geo.size.height * min(max(level, 0), 1)))
                     .opacity(dimmed ? 0.3 : 1)
-                    .shadow(color: colors[1].opacity(dimmed ? 0 : 0.85), radius: active || hovering ? 8 : 4)
+                    .shadow(color: colors[1].opacity(dimmed ? 0 : 0.5), radius: active || hovering ? 5 : 2)
             }
             .contentShape(Rectangle().inset(by: -10))
             .gesture(
@@ -258,7 +254,7 @@ struct LevelBar: View {
                 }
             )
         }
-        .frame(width: active || hovering ? 10 : 8)
+        .frame(width: active || hovering ? 8 : 6)
         .onHover { hovering = $0 }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: level)
         .animation(.easeOut(duration: 0.15), value: active || hovering)

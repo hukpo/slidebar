@@ -4,7 +4,8 @@ import SwiftUI
 // MARK: - Colors
 
 extension Color {
-    static let brimAccent = Color(nsColor: Brand.accent)
+    /// The user's own accent color from System Settings, like any native Mac app.
+    static let brimAccent = Color.accentColor
     static let brimAmber = Color(nsColor: Brand.amberBottom)
     static let brimAmberTop = Color(nsColor: Brand.amberTop)
     static let brimCyan = Color(nsColor: Brand.cyanTop)
@@ -14,8 +15,6 @@ extension Color {
 }
 
 extension LinearGradient {
-    static let brimAccent = LinearGradient(colors: [Color(red: 0.16, green: 0.74, blue: 0.92), .brimAccent],
-                                           startPoint: .top, endPoint: .bottom)
     static let brimNight = LinearGradient(colors: [.brimNightTop, .brimNightBottom], startPoint: .top, endPoint: .bottom)
 }
 
@@ -29,13 +28,13 @@ struct NightBackground: View {
             .fill(LinearGradient.brimNight)
             .overlay(
                 ZStack {
-                    RadialGradient(colors: [Color.brimAmber.opacity(0.32), .clear], center: .leading, startRadius: 0, endRadius: 190)
-                    RadialGradient(colors: [Color.brimViolet.opacity(0.42), .clear], center: .trailing, startRadius: 0, endRadius: 190)
+                    RadialGradient(colors: [Color.brimAmber.opacity(0.16), .clear], center: .leading, startRadius: 0, endRadius: 160)
+                    RadialGradient(colors: [Color.brimViolet.opacity(0.24), .clear], center: .trailing, startRadius: 0, endRadius: 160)
                 }
                 .clipShape(shape)
             )
             .overlay(
-                shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.20), .white.opacity(0.04)], startPoint: .top, endPoint: .bottom))
+                shape.strokeBorder(Color.white.opacity(0.08))
             )
     }
 }
@@ -104,24 +103,20 @@ extension View {
 
 // MARK: - Row parts
 
-/// Colored rounded-square icon on the left of each row. Dims when the feature is off.
+/// Quiet monochrome icon on the left of each row. Takes the accent color when the feature is on.
 struct FeatureIcon: View {
     let systemName: String
-    let color: Color
     var on = true
 
     var body: some View {
         RoundedRectangle(cornerRadius: 7, style: .continuous)
-            .fill(LinearGradient(colors: [color.opacity(0.75), color], startPoint: .top, endPoint: .bottom))
+            .fill(on ? Color.brimAccent.opacity(0.14) : Color.primary.opacity(0.06))
             .overlay(
                 Image(systemName: systemName)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(on ? Color.brimAccent : Color.secondary)
             )
-            .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(.white.opacity(0.14)))
             .frame(width: 26, height: 26)
-            .saturation(on ? 1 : 0.1)
-            .opacity(on ? 1 : 0.55)
             .animation(.easeOut(duration: 0.15), value: on)
     }
 }
@@ -146,7 +141,6 @@ struct RowLabel: View {
 
 struct ToggleRow: View {
     let icon: String?
-    var color: Color = .brimAccent
     let title: String
     var subtitle: String?
     @Binding var isOn: Bool
@@ -154,7 +148,7 @@ struct ToggleRow: View {
     var body: some View {
         HStack(spacing: 10) {
             if let icon {
-                FeatureIcon(systemName: icon, color: color, on: isOn)
+                FeatureIcon(systemName: icon, on: isOn)
             } else {
                 Color.clear.frame(width: 26, height: 1)
             }
@@ -183,7 +177,7 @@ struct BrimSwitch: View {
     var body: some View {
         ZStack(alignment: isOn ? .trailing : .leading) {
             Capsule()
-                .fill(isOn ? AnyShapeStyle(LinearGradient.brimAccent) : AnyShapeStyle(Color.primary.opacity(0.14)))
+                .fill(isOn ? Color.brimAccent : Color.primary.opacity(0.14))
             Circle()
                 .fill(Color.white)
                 .shadow(color: .black.opacity(0.25), radius: 1.5, y: 0.5)
@@ -244,7 +238,7 @@ struct BrimSlider: View {
     let range: ClosedRange<Double>
     let step: Double
 
-    private let knob: CGFloat = 16
+    private let knob: CGFloat = 15
     private var steps: Int { max(1, Int(((range.upperBound - range.lowerBound) / step).rounded())) }
     private var fraction: CGFloat {
         min(max(CGFloat((value - range.lowerBound) / (range.upperBound - range.lowerBound)), 0), 1)
@@ -256,23 +250,14 @@ struct BrimSlider: View {
             ZStack(alignment: .leading) {
                 Capsule()
                     .fill(Color.primary.opacity(0.10))
-                    .frame(height: 6)
+                    .frame(height: 4)
                 Capsule()
-                    .fill(LinearGradient.brimAccent)
-                    .frame(width: knob / 2 + fraction * usable + 3, height: 6)
-                HStack(spacing: 0) {
-                    ForEach(0...steps, id: \.self) { i in
-                        Circle()
-                            .fill(CGFloat(i) / CGFloat(steps) <= fraction + 0.001 ? Color.white.opacity(0.75) : Color.primary.opacity(0.25))
-                            .frame(width: 2.5, height: 2.5)
-                        if i < steps { Spacer(minLength: 0) }
-                    }
-                }
-                .padding(.horizontal, knob / 2 - 1.25)
+                    .fill(Color.brimAccent)
+                    .frame(width: knob / 2 + fraction * usable, height: 4)
                 Circle()
                     .fill(Color.white)
-                    .overlay(Circle().strokeBorder(Color.black.opacity(0.08)))
-                    .shadow(color: .black.opacity(0.28), radius: 2, y: 1)
+                    .overlay(Circle().strokeBorder(Color.black.opacity(0.1), lineWidth: 0.5))
+                    .shadow(color: .black.opacity(0.22), radius: 1.5, y: 0.5)
                     .frame(width: knob, height: knob)
                     .offset(x: fraction * usable)
             }
@@ -284,7 +269,7 @@ struct BrimSlider: View {
                     let raw = range.lowerBound + Double(f) * (range.upperBound - range.lowerBound)
                     let snapped = min(max((raw / step).rounded() * step, range.lowerBound), range.upperBound)
                     if abs(snapped - value) > step / 10 {
-                        withAnimation(.spring(response: 0.2, dampingFraction: 0.85)) { value = snapped }
+                        withAnimation(.easeOut(duration: 0.12)) { value = snapped }
                         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
                     }
                 }
@@ -299,7 +284,6 @@ struct BrimSlider: View {
 
 struct SliderRow: View {
     let icon: String
-    var color: Color = .brimAccent
     let title: String
     let valueText: String
     @Binding var value: Double
@@ -308,17 +292,14 @@ struct SliderRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            FeatureIcon(systemName: icon, color: color)
+            FeatureIcon(systemName: icon, on: false)
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text(title).font(.system(size: 13, weight: .medium))
                     Spacer()
                     Text(valueText)
-                        .font(.system(size: 11, weight: .bold).monospacedDigit())
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(LinearGradient.brimAccent))
+                        .font(.system(size: 12, weight: .medium).monospacedDigit())
+                        .foregroundStyle(.secondary)
                 }
                 BrimSlider(value: $value, range: range, step: step)
             }
@@ -423,14 +404,13 @@ struct StatusPill: View {
                 Circle()
                     .fill(color)
                     .frame(width: 6, height: 6)
-                    .shadow(color: color.opacity(0.9), radius: status == .ready ? 3 : 0)
                 Text(status.title)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(color == .gray ? Color.secondary : color)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(status == .ready ? Color.secondary : color)
             }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 4)
-            .background(Capsule().fill(color.opacity(0.13)))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(status == .ready ? Color.primary.opacity(0.06) : color.opacity(0.12)))
         }
         .buttonStyle(.plain)
         .help(status == .ready ? "Brim is listening to your trackpad" : "Click to fix")
@@ -487,6 +467,6 @@ struct Banner: View {
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(tint.opacity(0.11)))
-        .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).strokeBorder(tint.opacity(0.2)))
+        .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).strokeBorder(tint.opacity(0.12)))
     }
 }

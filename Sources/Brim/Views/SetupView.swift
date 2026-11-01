@@ -131,7 +131,7 @@ private struct TrackpadDemo: View {
 
                 Circle()
                     .fill(Color.white)
-                    .shadow(color: .brimCyan.opacity(0.9), radius: 8)
+                    .shadow(color: .brimCyan.opacity(0.5), radius: 5)
                     .overlay(Circle().stroke(Color.primary.opacity(0.15)))
                     .frame(width: 22, height: 22)
                     .position(x: swap ? 18 : w - 18, y: up ? h * 0.25 : h * 0.78)

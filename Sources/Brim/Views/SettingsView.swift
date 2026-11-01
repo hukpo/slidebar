@@ -12,36 +12,35 @@ struct SettingsPage: View {
                 PlainIconButton(systemName: "chevron.left", help: "Back") { page = .main }
                 Text("Settings").font(.system(size: 15, weight: .semibold))
                 Spacer()
-                AppIconView(size: 20)
             }
             .frame(height: 24)
 
             SectionHeader(title: "Edge Gestures")
             Card {
-                ToggleRow(icon: "arrow.left.arrow.right", color: .indigo, title: "Swap Sides",
+                ToggleRow(icon: "arrow.left.arrow.right", title: "Swap Sides",
                           subtitle: prefs.swapSides ? "Left: Volume · Right: Brightness" : "Left: Brightness · Right: Volume",
                           isOn: $prefs.swapSides)
                 RowDivider()
-                ToggleRow(icon: "rectangle.bottomthird.inset.filled", color: .purple, title: "Bottom Quarter Only",
+                ToggleRow(icon: "rectangle.bottomthird.inset.filled", title: "Bottom Quarter Only",
                           subtitle: "Only the lower 25% responds", isOn: $prefs.bottomQuarterOnly)
                 RowDivider()
-                ToggleRow(icon: "option", color: .brown, title: "Require Fn or ⌥",
+                ToggleRow(icon: "option", title: "Require Fn or ⌥",
                           subtitle: "Only slide while holding a modifier", isOn: $prefs.requireModifier)
             }
 
             SectionHeader(title: "While Sliding")
             Card {
-                ToggleRow(icon: "cursorarrow", color: .blue, title: "Freeze Cursor",
+                ToggleRow(icon: "cursorarrow", title: "Freeze Cursor",
                           subtitle: "Pointer stays put while sliding", isOn: $prefs.freezeCursor)
                 RowDivider()
-                ToggleRow(icon: "plusminus", color: .green, title: "Fine Control",
+                ToggleRow(icon: "plusminus", title: "Fine Control",
                           subtitle: "Hold ⇧⌥ for quarter steps", isOn: $prefs.fineControl)
             }
 
             SectionHeader(title: "General")
             Card {
                 HStack(spacing: 10) {
-                    FeatureIcon(systemName: "circle.lefthalf.filled", color: Color(white: 0.35))
+                    FeatureIcon(systemName: "circle.lefthalf.filled", on: false)
                     RowLabel(title: "Appearance")
                     Spacer(minLength: 8)
                     PillPicker(options: Appearance.allCases.map { ($0, $0.title) }, selection: $prefs.appearance)
@@ -50,10 +49,10 @@ struct SettingsPage: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 7)
                 RowDivider()
-                ToggleRow(icon: "power", color: .mint, title: "Open at Login",
+                ToggleRow(icon: "power", title: "Open at Login",
                           isOn: Binding(get: { prefs.openAtLogin }, set: { prefs.setOpenAtLogin($0) }))
                 RowDivider()
-                ToggleRow(icon: "arrow.down.circle.fill", color: .cyan, title: "Automatic Updates",
+                ToggleRow(icon: "arrow.down.circle.fill", title: "Automatic Updates",
                           subtitle: "Download and install new versions", isOn: $prefs.autoUpdate)
             }
 
