@@ -263,6 +263,8 @@ private struct SpotButton<Label: View>: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // The map is one Tab stop with arrow keys inside, like a native radio group.
+        .focusable(false)
         .onHover { hovering = $0 }
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
