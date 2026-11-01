@@ -12,9 +12,9 @@ enum SelfTest {
         func line(_ ok: Bool, _ name: String, _ detail: String) { print("\(ok ? "PASS" : "FAIL")  \(name)  (\(detail))") }
         let engine = EdgeEngine.shared
         let prefs = Prefs.shared
-        let savedPaused = prefs.paused, savedModifier = prefs.requireModifier
+        let savedPaused = prefs.paused, savedModifier = prefs.requireModifier, savedHold = prefs.holdToStart
         let savedEdges = prefs.edges, savedCorners = prefs.corners, savedApps = prefs.cornerApps
-        prefs.paused = false; prefs.requireModifier = false
+        prefs.paused = false; prefs.requireModifier = false; prefs.holdToStart = false
         // Test the shipping layout: brightness left, volume right, songs bottom, mute top-right.
         prefs.edges = [.left: .brightness, .right: .volume, .top: .off, .bottom: .songs]
         prefs.corners = [.topLeft: .off, .topRight: .mute, .bottomLeft: .off, .bottomRight: .off]
@@ -84,12 +84,13 @@ enum SelfTest {
 
         // A palm that slides along the edge, then a finger lands to move the pointer → volume put back.
         let volPalmStart = SystemControls.volume() ?? 0
+        let palmUp = volPalmStart < 0.5
         nextID += 1
         let palmID = nextID
         var palmMoved = false
         for i in 0...20 {
             let t = Float(i) / 20
-            let y: Float = volUp ? 0.2 + 0.25 * t : 0.45 - 0.25 * t
+            let y: Float = palmUp ? 0.2 + 0.25 * t : 0.45 - 0.25 * t
             engine.feed([TouchPoint(id: palmID, x: 0.98, y: y, size: 0.8)], time: clock)
             clock += 0.012
             wait(0.012)
@@ -105,6 +106,33 @@ enum SelfTest {
         let volRestored = SystemControls.volume() ?? 0
         line(palmMoved && abs(volRestored - volPalmStart) < 0.01, "Palm slide is undone when a finger lands",
              String(format: "%.3f → moved → %.3f", volPalmStart, volRestored))
+
+        // Start a Slide: After a Short Rest. A pointer stroke along the edge changes nothing;
+        // resting first, then sliding, works.
+        prefs.holdToStart = true; engine.syncConfig()
+        wait(0.3)
+        let volHold0 = SystemControls.volume() ?? 0
+        let holdUp = volHold0 < 0.5
+        slide(x: 0.98, from: holdUp ? 0.2 : 0.6, to: holdUp ? 0.6 : 0.2)
+        let volHold1 = SystemControls.volume() ?? 0
+        line(abs(volHold1 - volHold0) < 0.001, "Pointer stroke along the edge changes nothing", String(format: "%.3f → %.3f", volHold0, volHold1))
+        nextID += 1
+        for _ in 0..<25 {
+            engine.feed([TouchPoint(id: nextID, x: 0.98, y: holdUp ? 0.2 : 0.6, size: 0.8)], time: clock)
+            clock += 0.012; wait(0.012)
+        }
+        for i in 0...30 {
+            let t = Float(i) / 30
+            engine.feed([TouchPoint(id: nextID, x: 0.98, y: holdUp ? 0.2 + 0.4 * t : 0.6 - 0.4 * t, size: 0.8)], time: clock)
+            clock += 0.012; wait(0.012)
+        }
+        engine.feed([], time: clock); clock += 0.05
+        wait(0.5)
+        let volHold2 = SystemControls.volume() ?? 0
+        line(abs(volHold2 - volHold1) > 0.05, "Rest, then slide changes volume", String(format: "%.2f → %.2f", volHold1, volHold2))
+        prefs.holdToStart = false; engine.syncConfig()
+        SystemControls.setVolume(volHold0)
+        wait(0.3)
 
         // Front app turned off → nothing.
         if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier {
@@ -242,7 +270,7 @@ enum SelfTest {
         line(abs((SystemControls.volume() ?? 0) - volPaused) < 0.001, "Paused ignores slides", "volume unchanged")
 
         // Restore everything.
-        prefs.paused = savedPaused; prefs.requireModifier = savedModifier
+        prefs.paused = savedPaused; prefs.requireModifier = savedModifier; prefs.holdToStart = savedHold
         prefs.edges = savedEdges; prefs.corners = savedCorners; prefs.cornerApps = savedApps
         SystemControls.setVolume(vol0)
         SystemControls.setMuted(muted0)
@@ -298,13 +326,15 @@ enum SelfTest {
         func inFront() -> Bool { NSApp.isActive && NSApp.keyWindow?.title.hasPrefix("Brim Check") == true }
 
         let prefs = Prefs.shared, engine = EdgeEngine.shared
-        let saved = prefs.edges, savedPaused = prefs.paused, savedExcluded = prefs.excludedApps
+        let saved = prefs.edges, savedPaused = prefs.paused, savedExcluded = prefs.excludedApps, savedHold = prefs.holdToStart
         prefs.paused = false
+        prefs.holdToStart = false
+        engine.syncConfig()
         prefs.excludedApps = []
         var windows: [NSWindow] = []
         func finish() {
             for w in windows { w.close() }
-            prefs.edges = saved; prefs.paused = savedPaused; prefs.excludedApps = savedExcluded
+            prefs.edges = saved; prefs.paused = savedPaused; prefs.excludedApps = savedExcluded; prefs.holdToStart = savedHold
         }
         var clock = 3000.0, nextID: Int32 = 950
         func slide(_ side: EdgeSide, up: Bool, travel: Float = 0.15) async -> Bool {
@@ -410,12 +440,16 @@ enum SelfTest {
         if Permissions.isTrusted, let vol0 {
             SystemControls.press(vol0 > 0.5 ? .soundDown : .soundUp)
             wait(0.3)
-            let vol1 = SystemControls.volume() ?? vol0
-            line(abs(vol1 - vol0) > 0.001, "Volume key event", String(format: "%.3f → %.3f", vol0, vol1))
+            let volSnapped = SystemControls.volume() ?? vol0
+            line(abs(volSnapped - vol0) > 0.001, "Volume key event", String(format: "%.3f → %.3f", vol0, volSnapped))
+            // The first press can snap an in-between level onto the step grid; measure a full step after it.
+            SystemControls.press(vol0 > 0.5 ? .soundDown : .soundUp)
+            wait(0.3)
+            let vol1 = SystemControls.volume() ?? volSnapped
             SystemControls.press(vol0 > 0.5 ? .soundUp : .soundDown, fine: true)
             wait(0.3)
             let vol2 = SystemControls.volume() ?? vol1
-            line(abs(abs(vol2 - vol1) - abs(vol1 - vol0) / 4) < 0.01, "Fine (⇧⌥) quarter step", String(format: "%.3f → %.3f", vol1, vol2))
+            line(abs(abs(vol2 - vol1) - abs(vol1 - volSnapped) / 4) < 0.01, "Fine (⇧⌥) quarter step", String(format: "%.3f → %.3f", vol1, vol2))
             SystemControls.setVolume(vol0)
             SystemControls.setMuted(muted0)
         }

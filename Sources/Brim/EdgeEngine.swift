@@ -40,25 +40,6 @@ final class LiveState: ObservableObject {
     /// Set when a gesture asked for something that needs Accessibility, so the menu can explain.
     @Published var blockedAction: String?
 
-    /// What Brim did recently and where, newest first, so accidental triggers are easy to spot.
-    struct Recent: Identifiable, Equatable {
-        let id = UUID()
-        let action: String
-        let spot: String
-        let date: Date
-    }
-    @Published var recent: [Recent] = []
-
-    func record(_ action: String, at spot: String) {
-        // One entry per gesture: a slide that keeps going doesn't fill the list.
-        if let first = recent.first, first.action == action, first.spot == spot, Date().timeIntervalSince(first.date) < 3 {
-            recent[0] = Recent(action: action, spot: spot, date: Date())
-        } else {
-            recent.insert(Recent(action: action, spot: spot, date: Date()), at: 0)
-            if recent.count > 6 { recent.removeLast() }
-        }
-    }
-
     var status: Status {
         if Prefs.shared.paused { return .paused }
         if deviceCount == 0 { return .noTrackpad }
@@ -154,6 +135,7 @@ final class EdgeEngine {
         c.sensitivity = Float(prefs.sensitivity)
         c.bottomQuarterOnly = prefs.bottomQuarterOnly
         c.freezeCursor = prefs.freezeCursor
+        c.holdToStart = prefs.holdToStart
         c.fineControl = prefs.fineControl
         c.palmRejection = prefs.palmRejection
         c.edges = Dictionary(uniqueKeysWithValues: EdgeSide.allCases.map { ($0, prefs.edge($0).kind) })
@@ -234,6 +216,10 @@ final class EdgeEngine {
             expectedLevel = nil
             releaseCursor()
 
+        case .armed:
+            // A light tap under the finger: ready to slide.
+            Haptics.tick(prefs.haptics)
+
         case .slideBegan(let side):
             let function = prefs.edge(side)
             live.activeSide = side
@@ -242,7 +228,6 @@ final class EdgeEngine {
             slideStartLevel = expectedLevel
             slideStartMuted = live.muted
             slideActions = 0
-            live.record(function.title, at: side.title)
             if prefs.edgeGlow, function.hasLevel, let level = expectedLevel {
                 EdgeGlow.shared.show(function, on: side, level: level, muted: function == .volume && live.muted)
             }
@@ -255,19 +240,14 @@ final class EdgeEngine {
 
         case .swipe(let side, let forward):
             let function = prefs.edge(side)
-            live.record(function == .songs ? (forward ? "Next Song" : "Previous Song")
-                        : function == .windows ? (forward ? "Next Window" : "Previous Window") : function.title,
-                        at: side.title)
             swipe(function, forward: forward)
 
         case .doubleTap(let side):
             if prefs.edge(side) == .songs && prefs.tapToPlay {
-                live.record("Play or Pause", at: side.title)
                 run(needsAccess: true, name: "Play and pause") { SystemControls.press(.play) }
             }
 
         case .cornerDoubleTap(let corner):
-            live.record(prefs.corner(corner).title, at: corner.title)
             cornerAction(corner)
         }
     }
@@ -347,11 +327,6 @@ final class EdgeEngine {
         slideActions = 0
         slideStartLevel = nil
         pendingSteps = 0
-        // Show it in Recently Triggered, so it's clear Brim caught it.
-        if let first = live.recent.first, first.spot == side.title {
-            live.recent.removeFirst()
-        }
-        live.record("Ignored a Palm", at: side.title)
     }
 
     private func swipe(_ function: EdgeFunction, forward: Bool) {
