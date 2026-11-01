@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#0d0d29">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="config.js"></script>
 <style>
   :root {
     --ink: #f4f4fb;
@@ -143,7 +144,8 @@
   .log ul { color: var(--ink-2); padding-left: 18px; }
 
   footer { margin-top: 110px; border-top: 1px solid var(--line); padding: 34px 0 60px; color: var(--ink-3); font-size: 13px; }
-  footer .wrap { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+  footer .wrap { display: flex; flex-direction: column; gap: 10px; }
+  footer a:hover { color: var(--ink); }
 
   .rv { opacity: 0; transform: translateY(24px); transition: opacity .8s cubic-bezier(.2,.7,.2,1), transform .8s cubic-bezier(.2,.7,.2,1); }
   .rv.in { opacity: 1; transform: none; }
@@ -167,7 +169,7 @@
       <li><a href="#features">Features</a></li>
       <li><a href="#settings">Settings</a></li>
       <li><a href="#changes">What's new</a></li>
-      <li><a href="#get" class="pill">Download</a></li>
+      <li><a href="#get" class="pill buy">Buy</a></li>
     </ul>
   </div>
 </nav>
@@ -181,7 +183,7 @@
       <a class="btn" href="#get">Download Brim</a>
       <a class="link" href="#overview">See how it works ›</a>
     </div>
-    <p class="fine">Free. For macOS 13 Ventura or later.</p>
+    <p class="fine"><span class="price-text">$5</span> once, with a 14-day free trial. For macOS 13 Ventura or later.</p>
 
     <div class="demo rv">
       <div class="laptop">
@@ -266,10 +268,11 @@
   <div class="get rv" id="get">
     <img src="img/icon-512.png" alt="">
     <h2>Brim</h2>
-    <p class="price">Free</p>
-    <ul class="checks"><li>Every feature</li><li>Open source</li><li>No account</li><li>No tracking</li></ul>
-    <a class="btn" href="Brim.dmg" download>Download for Mac</a>
-    <p class="fine">macOS 13 Ventura or later · Apple silicon &amp; Intel · Needs Accessibility access, granted on first launch.<br>Or build it yourself: <code>scripts/build.sh --dmg</code></p>
+    <p class="price"><span class="price-text">$5</span></p>
+    <p style="color:var(--ink-2);margin-top:-4px">Pay once. Yours to keep.</p>
+    <ul class="checks"><li>Every feature</li><li>Lifetime license</li><li>Free 1.x updates</li><li>No subscription</li></ul>
+    <div class="cta" style="margin-top:0"><a class="btn buy" href="#get">Buy Brim</a><a class="link" href="Brim.dmg" download>Download free trial ›</a></div>
+    <p class="fine">macOS 13 Ventura or later · Apple silicon &amp; Intel · Needs Accessibility access, granted on first launch.<br>Local taxes are added at checkout where they apply. <a href="lost-key.html" style="color:var(--cyan)">Lost your key?</a></p>
   </div>
 </div>
 
@@ -285,6 +288,7 @@
           <li>Fine Control, Freeze Cursor, Bottom Quarter Only, Swap Sides and Require Modifier.</li>
           <li>Live meters in the menu — drag them to set a level directly.</li>
           <li>Setup guide, Light / Dark / Auto appearance and Open at Login.</li>
+          <li>Updates download and install themselves. License keys work offline.</li>
         </ul>
       </article>
     </div>
@@ -293,13 +297,19 @@
 
 <footer>
   <div class="wrap">
-    <span>Brim is a menu bar app for macOS. Trackpad gestures need Accessibility access to send volume, brightness and media keys.</span>
-    <span>Mac and macOS are trademarks of Apple Inc.</span>
+    <span>Brim is a menu bar app for macOS. Trackpad gestures need Accessibility access to send volume, brightness and media keys. Mac and macOS are trademarks of Apple Inc.</span>
+    <span class="links"><a href="terms.html">Terms</a> · <a href="refund.html">Refunds</a> · <a href="manage.html">Manage activation</a> · <a href="privacy.html">Privacy</a> · <a href="lost-key.html">Lost your key?</a> · <a class="mail" href="#">Contact</a></span>
   </div>
 </footer>
 
 <script>
 (() => {
+  // Price, checkout link and contact from config.js.
+  const cfg = window.BRIM || {};
+  document.querySelectorAll('.price-text').forEach(el => el.textContent = cfg.price || '$5');
+  if (cfg.checkoutURL) document.querySelectorAll('.buy').forEach(a => { a.href = cfg.checkoutURL; a.target = '_blank'; });
+  document.querySelectorAll('.mail').forEach(a => a.href = 'mailto:' + (cfg.contactEmail || ''));
+
   // Reveal on scroll.
   const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12 });
   document.querySelectorAll('.rv').forEach(el => io.observe(el));

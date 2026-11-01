@@ -10,14 +10,20 @@ struct MenuView: View {
     @State private var page: MenuPage = .main
 
     var body: some View {
-        Group {
+        ZStack(alignment: .top) {
             switch page {
-            case .main: MainPage(page: $page)
-            case .settings: SettingsPage(page: $page)
+            case .main:
+                MainPage(page: $page)
+                    .transition(.asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .leading)).combined(with: .opacity))
+            case .settings:
+                SettingsPage(page: $page)
+                    .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .trailing)).combined(with: .opacity))
             }
         }
-        .frame(width: 330)
+        .animation(.spring(response: 0.34, dampingFraction: 0.9), value: page)
+        .frame(width: 340)
         .fixedSize(horizontal: false, vertical: true)
+        .clipped()
     }
 }
 
@@ -32,52 +38,60 @@ struct MainPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 9) {
-                AppIconView()
+                AppIconView(size: 24)
                 Text("Brim").font(.system(size: 15, weight: .semibold))
                 Spacer()
                 StatusPill()
             }
+            .padding(.horizontal, 2)
 
-            LevelsCard()
+            EdgeMeters()
 
             if live.status == .needsAccess {
                 AccessBanner()
             }
             NoticeBanners()
 
-            VStack(spacing: 10) {
-                HStack(spacing: 11) {
-                    IconBadge(systemName: "hand.tap.fill", active: prefs.haptics != .off)
-                    RowLabel(title: "Haptic Feedback", subtitle: "A light tick as you slide")
-                    Spacer(minLength: 8)
-                    Picker("", selection: $prefs.haptics) {
-                        ForEach(HapticStrength.allCases) { Text($0.title).tag($0) }
+            Card {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        FeatureIcon(systemName: "hand.tap.fill", color: .pink, on: prefs.haptics != .off)
+                        RowLabel(title: "Haptic Feedback", subtitle: "A light tick under your finger")
+                        Spacer(minLength: 0)
                     }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .controlSize(.small)
-                    .fixedSize()
-                    .onChange(of: prefs.haptics) { Haptics.tick($0) }
+                    PillPicker(options: HapticStrength.allCases.map { ($0, $0.title) },
+                               selection: $prefs.haptics,
+                               onChange: { Haptics.tick($0) })
+                        .padding(.leading, 36)
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 7)
 
-                ToggleRow(icon: "speaker.slash.fill", title: "Quick Mute",
+                RowDivider()
+
+                ToggleRow(icon: "speaker.slash.fill", color: .red, title: "Quick Mute",
                           subtitle: "Double-tap the top-right corner", isOn: $prefs.quickMute)
 
-                HStack(spacing: 11) {
-                    IconBadge(systemName: "forward.fill", active: prefs.mediaStrip)
+                RowDivider()
+
+                HStack(spacing: 10) {
+                    FeatureIcon(systemName: "forward.fill", color: .orange, on: prefs.mediaStrip)
                     VStack(alignment: .leading, spacing: 1) {
                         Button {
-                            withAnimation(.easeOut(duration: 0.18)) { showMediaOptions.toggle() }
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showMediaOptions.toggle() }
                         } label: {
-                            HStack(spacing: 3) {
+                            HStack(spacing: 4) {
                                 Text("Media Strip").font(.system(size: 13, weight: .medium))
                                 Image(systemName: "chevron.down")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .rotationEffect(.degrees(showMediaOptions ? 180 : 0))
+                                    .font(.system(size: 8, weight: .heavy))
                                     .foregroundStyle(.secondary)
+                                    .rotationEffect(.degrees(showMediaOptions ? 180 : 0))
+                                    .padding(3)
+                                    .background(Circle().fill(Color.primary.opacity(0.07)))
                             }
                         }
                         .buttonStyle(.plain)
+                        .help("More media options")
                         Text("Swipe the bottom edge to skip")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
@@ -85,6 +99,8 @@ struct MainPage: View {
                     Spacer(minLength: 8)
                     BrimSwitch(isOn: $prefs.mediaStrip)
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 7)
 
                 if showMediaOptions {
                     ToggleRow(icon: nil, title: "Tap to Play or Pause",
@@ -95,151 +111,164 @@ struct MainPage: View {
                 }
             }
 
-            Divider()
-
-            VStack(spacing: 12) {
-                SliderRow(icon: "gauge.with.dots.needle.50percent", title: "Sensitivity",
+            Card {
+                SliderRow(icon: "gauge.with.dots.needle.50percent", color: .purple, title: "Sensitivity",
                           valueText: String(format: "%g×", prefs.sensitivity),
                           value: $prefs.sensitivity, range: Prefs.sensitivityRange, step: Prefs.sensitivityStep)
-                SliderRow(icon: "arrow.left.and.right", title: "Edge Width",
+                RowDivider()
+                SliderRow(icon: "arrow.left.and.right", color: .teal, title: "Edge Width",
                           valueText: "\(Int((prefs.edgeWidth * 100).rounded()))%",
                           value: $prefs.edgeWidth, range: Prefs.edgeWidthRange, step: Prefs.edgeWidthStep)
             }
 
-            Divider()
-
-            HStack(spacing: 4) {
-                Button {
-                    page = .settings
-                } label: {
-                    Label("Settings", systemImage: "gearshape")
-                        .font(.system(size: 13))
-                }
-                .buttonStyle(.borderless)
+            HStack(spacing: 2) {
+                PlainIconButton(systemName: "gearshape", title: "Settings", help: "Settings") { page = .settings }
                 Spacer()
                 MoreMenu()
-                FooterIconButton(systemName: "power", help: "Quit Brim") { NSApp.terminate(nil) }
+                PlainIconButton(systemName: "power", help: "Quit Brim") { NSApp.terminate(nil) }
             }
         }
-        .padding(16)
+        .padding(14)
     }
 }
 
-// MARK: - Levels card
+// MARK: - Edge meters
 
-/// Live brightness and volume, each drawn on the side of the trackpad that controls it.
-struct LevelsCard: View {
+/// The brand card: a little trackpad showing live brightness and volume on the edges that control them.
+struct EdgeMeters: View {
     @ObservedObject var prefs = Prefs.shared
     @ObservedObject var live = LiveState.shared
 
     var body: some View {
-        HStack(spacing: 12) {
-            if prefs.swapSides {
-                bar(.volume)
-                readout(.volume, alignment: .leading)
-                Spacer(minLength: 0)
-                readout(.brightness, alignment: .trailing)
-                bar(.brightness)
-            } else {
-                bar(.brightness)
-                readout(.brightness, alignment: .leading)
-                Spacer(minLength: 0)
-                readout(.volume, alignment: .trailing)
-                bar(.volume)
+        ZStack(alignment: .bottom) {
+            NightBackground(cornerRadius: 16)
+
+            HStack(spacing: 12) {
+                if prefs.swapSides {
+                    meter(.volume)
+                    readout(.volume, leading: true)
+                    Spacer(minLength: 0)
+                    readout(.brightness, leading: false)
+                    meter(.brightness)
+                } else {
+                    meter(.brightness)
+                    readout(.brightness, leading: true)
+                    Spacer(minLength: 0)
+                    readout(.volume, leading: false)
+                    meter(.volume)
+                }
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 16)
+            .frame(maxHeight: .infinity)
+
+            // The media strip, lit when it's on.
+            Capsule()
+                .fill(Color.white.opacity(prefs.mediaStrip ? 0.38 : 0.1))
+                .frame(width: 54, height: 3)
+                .padding(.bottom, 7)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.primary.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08))
-        )
+        .frame(height: 116)
+        .environment(\.colorScheme, .dark)
+        .shadow(color: Color.brimViolet.opacity(0.18), radius: 10, y: 4)
     }
 
     private func value(_ c: EdgeControl) -> Float? {
         c == .brightness ? live.brightness : live.volume
     }
 
-    @ViewBuilder
-    private func readout(_ c: EdgeControl, alignment: HorizontalAlignment) -> some View {
-        let isVolume = c == .volume
-        let icon = isVolume ? (live.muted ? "speaker.slash.fill" : "speaker.wave.2.fill") : "sun.max.fill"
-        let tint: Color = isVolume ? .brimViolet : .brimAmber
-        VStack(alignment: alignment, spacing: 2) {
-            HStack(spacing: 4) {
-                if !isVolume { Image(systemName: icon).foregroundStyle(tint) }
-                Text(isVolume ? "VOLUME" : "BRIGHTNESS")
-                    .font(.system(size: 10, weight: .semibold))
-                    .kerning(1.2)
-                    .foregroundStyle(.secondary)
-                if isVolume { Image(systemName: icon).foregroundStyle(tint) }
-            }
-            .font(.system(size: 11))
-            HStack(alignment: .firstTextBaseline, spacing: 1) {
-                if let v = value(c) {
-                    Text("\(Int((v * 100).rounded()))")
-                        .font(.system(size: 34, weight: .medium, design: .rounded).monospacedDigit())
-                    Text("%").font(.system(size: 15, weight: .medium)).foregroundStyle(.secondary)
-                } else {
-                    Text("—").font(.system(size: 34, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .opacity(isVolume && live.muted ? 0.45 : 1)
-            .animation(.easeOut(duration: 0.15), value: value(c))
-        }
-    }
-
-    private func bar(_ c: EdgeControl) -> some View {
+    private func meter(_ c: EdgeControl) -> some View {
         LevelBar(control: c,
                  level: CGFloat(value(c) ?? 0),
                  active: live.activeControl == c,
                  dimmed: c == .volume && live.muted)
     }
+
+    @ViewBuilder
+    private func readout(_ c: EdgeControl, leading: Bool) -> some View {
+        let isVolume = c == .volume
+        let active = live.activeControl == c
+        let icon = isVolume ? (live.muted ? "speaker.slash.fill" : "speaker.wave.2.fill") : "sun.max.fill"
+        let tint: Color = isVolume ? .brimCyan : .brimAmberTop
+
+        VStack(alignment: leading ? .leading : .trailing, spacing: 3) {
+            HStack(spacing: 5) {
+                if leading { Image(systemName: icon).foregroundStyle(tint) }
+                Text(isVolume ? "VOLUME" : "BRIGHTNESS")
+                    .font(.system(size: 10, weight: .bold))
+                    .kerning(1.3)
+                    .foregroundStyle(.white.opacity(0.6))
+                if !leading { Image(systemName: icon).foregroundStyle(tint) }
+            }
+            .font(.system(size: 10, weight: .semibold))
+
+            HStack(alignment: .firstTextBaseline, spacing: 1) {
+                if isVolume && live.muted {
+                    Text("Muted")
+                        .font(.system(size: 30, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.55))
+                } else if let v = value(c) {
+                    Text("\(Int((v * 100).rounded()))")
+                        .font(.system(size: 38, weight: .semibold, design: .rounded).monospacedDigit())
+                        .foregroundStyle(.white)
+                    Text("%")
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.5))
+                } else {
+                    Text("—")
+                        .font(.system(size: 38, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.4))
+                }
+            }
+            .scaleEffect(active ? 1.06 : 1, anchor: leading ? .leading : .trailing)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: active)
+        }
+    }
 }
 
-/// A thin vertical meter. Drag it to set the level directly.
+/// A glowing vertical meter. Drag it to set the level directly.
 struct LevelBar: View {
     let control: EdgeControl
     let level: CGFloat
     let active: Bool
     let dimmed: Bool
+    @State private var hovering = false
 
     var body: some View {
         let colors: [Color] = control == .brightness ? [.brimAmber, .brimAmberTop] : [.brimViolet, .brimCyan]
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
-                Capsule().fill(Color.primary.opacity(0.10))
+                Capsule().fill(Color.white.opacity(0.12))
                 Capsule()
                     .fill(LinearGradient(colors: colors, startPoint: .bottom, endPoint: .top))
                     .frame(height: max(geo.size.width, geo.size.height * min(max(level, 0), 1)))
-                    .opacity(dimmed ? 0.35 : 1)
-                    .shadow(color: colors[1].opacity(active ? 0.9 : 0), radius: active ? 6 : 0)
+                    .opacity(dimmed ? 0.3 : 1)
+                    .shadow(color: colors[1].opacity(dimmed ? 0 : 0.85), radius: active || hovering ? 8 : 4)
             }
-            .contentShape(Rectangle().inset(by: -8))
+            .contentShape(Rectangle().inset(by: -10))
             .gesture(
                 DragGesture(minimumDistance: 0).onChanged { g in
-                    let v = Float(1 - g.location.y / geo.size.height)
-                    let clamped = min(max(v, 0), 1)
+                    let v = min(max(Float(1 - g.location.y / geo.size.height), 0), 1)
                     if control == .brightness {
-                        SystemControls.setBrightness(clamped)
+                        SystemControls.setBrightness(v)
                     } else {
-                        SystemControls.setVolume(clamped)
+                        SystemControls.setVolume(v)
                     }
                     LiveState.shared.refreshLevels()
                 }
             )
         }
-        .frame(width: active ? 7 : 5, height: 64)
-        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: level)
-        .animation(.easeOut(duration: 0.15), value: active)
+        .frame(width: active || hovering ? 10 : 8)
+        .onHover { hovering = $0 }
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: level)
+        .animation(.easeOut(duration: 0.15), value: active || hovering)
         .help("Drag to adjust")
+        .accessibilityLabel(control == .brightness ? "Brightness" : "Volume")
+        .accessibilityValue("\(Int((level * 100).rounded())) percent")
     }
 }
+
+// MARK: - Banners
 
 /// Trial, license and update notices.
 struct NoticeBanners: View {
@@ -247,85 +276,52 @@ struct NoticeBanners: View {
     @ObservedObject var updater = Updater.shared
 
     var body: some View {
-        VStack(spacing: 8) {
-            switch licensing.state {
-            case .expired:
-                banner(icon: "clock.badge.exclamationmark.fill", tint: .orange,
-                       text: "Your trial has ended, so edge gestures are paused.",
-                       primary: ("Buy Brim…", { licensing.openCheckout() }),
-                       secondary: ("Enter Key…", { AppActions.shared.showLicense() }))
-            case .trial(let days) where days <= 3:
-                banner(icon: "clock.fill", tint: .brimAccent,
-                       text: "\(days) day\(days == 1 ? "" : "s") left in your trial.",
-                       primary: ("Buy Brim…", { licensing.openCheckout() }),
-                       secondary: ("Enter Key…", { AppActions.shared.showLicense() }))
-            default:
-                EmptyView()
-            }
-            switch updater.phase {
-            case .available(let info):
-                banner(icon: "arrow.down.circle.fill", tint: .brimAccent,
-                       text: "Brim \(info.version) is available.",
-                       primary: ("Install & Relaunch", { Task { await updater.install(info) } }), secondary: nil)
-            case .downloading, .installing:
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text(updater.phase == .downloading ? "Downloading update…" : "Installing update…")
-                        .font(.system(size: 11))
-                    Spacer()
-                }
-                .padding(10)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.brimAccent.opacity(0.12)))
-            case .upToDate:
-                banner(icon: "checkmark.circle.fill", tint: .green, text: "Brim \(AppConfig.version) is up to date.", primary: nil, secondary: nil)
-            case .failed(let message):
-                banner(icon: "exclamationmark.triangle.fill", tint: .orange, text: message, primary: nil, secondary: nil)
-            default:
-                EmptyView()
-            }
+        switch licensing.state {
+        case .expired:
+            Banner(icon: "clock.badge.exclamationmark.fill", tint: .orange,
+                   text: "Your trial has ended, so edge gestures are paused.",
+                   primary: ("Buy Brim…", { licensing.openCheckout() }),
+                   secondary: ("Enter Key…", { AppActions.shared.showLicense() }))
+        case .trial(let days) where days <= 3:
+            Banner(icon: "clock.fill", tint: .brimAccent,
+                   text: "\(days) day\(days == 1 ? "" : "s") left in your trial.",
+                   primary: ("Buy Brim…", { licensing.openCheckout() }),
+                   secondary: ("Enter Key…", { AppActions.shared.showLicense() }))
+        default:
+            EmptyView()
         }
-    }
 
-    private func banner(icon: String, tint: Color, text: String,
-                        primary: (String, () -> Void)?, secondary: (String, () -> Void)?) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon).font(.system(size: 15)).foregroundStyle(tint)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(text).font(.system(size: 11)).fixedSize(horizontal: false, vertical: true)
-                if primary != nil || secondary != nil {
-                    HStack(spacing: 6) {
-                        if let primary { Button(primary.0, action: primary.1).controlSize(.small) }
-                        if let secondary { Button(secondary.0, action: secondary.1).controlSize(.small) }
-                    }
-                }
+        switch updater.phase {
+        case .available(let info):
+            Banner(icon: "arrow.down.circle.fill", tint: .brimAccent,
+                   text: "Brim \(info.version) is available." + (info.notes?.first.map { " \($0)" } ?? ""),
+                   primary: ("Install & Relaunch", { Task { await updater.install(info) } }))
+        case .downloading, .installing:
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(updater.phase == .downloading ? "Downloading update…" : "Installing update…")
+                    .font(.system(size: 11.5))
+                Spacer()
             }
-            Spacer(minLength: 0)
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(Color.brimAccent.opacity(0.11)))
+        case .upToDate:
+            Banner(icon: "checkmark.circle.fill", tint: .green, text: "Brim \(AppConfig.version) is up to date.")
+        case .failed(let message):
+            Banner(icon: "exclamationmark.triangle.fill", tint: .orange, text: message)
+        default:
+            EmptyView()
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(tint.opacity(0.12)))
     }
 }
 
 struct AccessBanner: View {
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "lock.shield.fill")
-                .font(.system(size: 16))
-                .foregroundStyle(.orange)
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Allow Accessibility so Brim can show the system volume and brightness display and control media.")
-                    .font(.system(size: 11))
-                    .fixedSize(horizontal: false, vertical: true)
-                Button("Allow Access…") {
-                    Permissions.requestAccess()
-                    Permissions.openAccessibilitySettings()
-                }
-                .controlSize(.small)
-            }
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.orange.opacity(0.12)))
+        Banner(icon: "lock.shield.fill", tint: .orange,
+               text: "Allow Accessibility so Brim can show the system volume and brightness display and control media.",
+               primary: ("Allow Access…", {
+                   Permissions.requestAccess()
+                   Permissions.openAccessibilitySettings()
+               }))
     }
 }

@@ -4,72 +4,83 @@ import SwiftUI
 struct SettingsPage: View {
     @Binding var page: MenuPage
     @ObservedObject var prefs = Prefs.shared
+    @ObservedObject var licensing = Licensing.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 9) {
-                AppIconView()
+            HStack(spacing: 4) {
+                PlainIconButton(systemName: "chevron.left", help: "Back") { page = .main }
                 Text("Settings").font(.system(size: 15, weight: .semibold))
                 Spacer()
+                AppIconView(size: 20)
             }
+            .frame(height: 24)
 
             SectionHeader(title: "Edge Gestures")
-            ToggleRow(icon: "arrow.left.arrow.right", title: "Swap Sides",
-                      subtitle: prefs.swapSides ? "Left: Volume · Right: Brightness" : "Left: Brightness · Right: Volume",
-                      isOn: $prefs.swapSides)
-            ToggleRow(icon: "rectangle.bottomthird.inset.filled", title: "Bottom Quarter Only",
-                      subtitle: "Ignore touches above the lower 25%", isOn: $prefs.bottomQuarterOnly)
-            ToggleRow(icon: "option", title: "Require Fn or ⌥",
-                      subtitle: "Only slide while holding a modifier", isOn: $prefs.requireModifier)
-
-            Divider()
+            Card {
+                ToggleRow(icon: "arrow.left.arrow.right", color: .indigo, title: "Swap Sides",
+                          subtitle: prefs.swapSides ? "Left: Volume · Right: Brightness" : "Left: Brightness · Right: Volume",
+                          isOn: $prefs.swapSides)
+                RowDivider()
+                ToggleRow(icon: "rectangle.bottomthird.inset.filled", color: .purple, title: "Bottom Quarter Only",
+                          subtitle: "Only the lower 25% responds", isOn: $prefs.bottomQuarterOnly)
+                RowDivider()
+                ToggleRow(icon: "option", color: .brown, title: "Require Fn or ⌥",
+                          subtitle: "Only slide while holding a modifier", isOn: $prefs.requireModifier)
+            }
 
             SectionHeader(title: "While Sliding")
-            ToggleRow(icon: "cursorarrow", title: "Freeze Cursor",
-                      subtitle: "Pointer stays put while sliding", isOn: $prefs.freezeCursor)
-            ToggleRow(icon: "plusminus", title: "Fine Control",
-                      subtitle: "Hold ⇧⌥ for quarter steps", isOn: $prefs.fineControl)
-
-            Divider()
+            Card {
+                ToggleRow(icon: "cursorarrow", color: .blue, title: "Freeze Cursor",
+                          subtitle: "Pointer stays put while sliding", isOn: $prefs.freezeCursor)
+                RowDivider()
+                ToggleRow(icon: "plusminus", color: .green, title: "Fine Control",
+                          subtitle: "Hold ⇧⌥ for quarter steps", isOn: $prefs.fineControl)
+            }
 
             SectionHeader(title: "General")
-            HStack(spacing: 11) {
-                IconBadge(systemName: "circle.lefthalf.filled")
-                RowLabel(title: "Appearance")
-                Spacer()
-                Picker("", selection: $prefs.appearance) {
-                    ForEach(Appearance.allCases) { Text($0.title).tag($0) }
+            Card {
+                HStack(spacing: 10) {
+                    FeatureIcon(systemName: "circle.lefthalf.filled", color: Color(white: 0.35))
+                    RowLabel(title: "Appearance")
+                    Spacer(minLength: 8)
+                    PillPicker(options: Appearance.allCases.map { ($0, $0.title) }, selection: $prefs.appearance)
+                        .fixedSize()
                 }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .controlSize(.small)
-                .fixedSize()
+                .padding(.horizontal, 8)
+                .padding(.vertical, 7)
+                RowDivider()
+                ToggleRow(icon: "power", color: .mint, title: "Open at Login",
+                          isOn: Binding(get: { prefs.openAtLogin }, set: { prefs.setOpenAtLogin($0) }))
+                RowDivider()
+                ToggleRow(icon: "arrow.down.circle.fill", color: .cyan, title: "Automatic Updates",
+                          subtitle: "Download and install new versions", isOn: $prefs.autoUpdate)
             }
-            ToggleRow(icon: "power", title: "Open at Login", subtitle: nil,
-                      isOn: Binding(get: { prefs.openAtLogin }, set: { prefs.setOpenAtLogin($0) }))
-            ToggleRow(icon: "arrow.down.circle", title: "Automatic Updates",
-                      subtitle: "Download and install new versions", isOn: $prefs.autoUpdate)
 
-            Divider()
-
-            HStack(spacing: 4) {
-                Button {
-                    page = .main
-                } label: {
-                    Label("Back", systemImage: "chevron.left")
-                        .font(.system(size: 13))
+            HStack(spacing: 2) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Brim \(AppActions.shared.version)")
+                        .font(.system(size: 11, weight: .medium))
+                    Text(licenseLine)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.borderless)
-                Text("Version \(AppActions.shared.version)")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 8)
+                .padding(.leading, 6)
                 Spacer()
                 MoreMenu()
-                FooterIconButton(systemName: "power", help: "Quit Brim") { NSApp.terminate(nil) }
+                PlainIconButton(systemName: "power", help: "Quit Brim") { NSApp.terminate(nil) }
             }
         }
-        .padding(16)
+        .padding(14)
         .onAppear { prefs.refreshOpenAtLogin() }
+    }
+
+    private var licenseLine: String {
+        switch licensing.state {
+        case .free: return "Free edition"
+        case .trial(let days): return "Trial · \(days) day\(days == 1 ? "" : "s") left"
+        case .licensed(let owner): return "Licensed to \(owner)"
+        case .expired: return "Trial ended"
+        }
     }
 }

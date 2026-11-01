@@ -15,7 +15,7 @@ enum Snapshot {
         LiveState.shared.deviceCount = max(LiveState.shared.deviceCount, 1)
 
         render(MenuView(), to: dir.appendingPathComponent("menu\(suffix).png"))
-        render(SettingsPage(page: .constant(.settings)).frame(width: 330), to: dir.appendingPathComponent("settings\(suffix).png"))
+        render(SettingsPage(page: .constant(.settings)).frame(width: 340), to: dir.appendingPathComponent("settings\(suffix).png"))
         render(SetupView(onDone: {}), to: dir.appendingPathComponent("setup\(suffix).png"))
         render(LicenseView(onClose: {}), to: dir.appendingPathComponent("license\(suffix).png"))
         return true

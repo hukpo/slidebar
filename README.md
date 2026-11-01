@@ -26,7 +26,7 @@ Brim sends the same key events as the keyboard's brightness and volume keys, so 
 
 **Settings:** Swap Sides, Bottom Quarter Only, Require Fn or ⌥, Freeze Cursor, Fine Control, Appearance (Auto / Light / Dark), Open at Login.
 
-Also: a first-run setup guide, Pause / Resume, rescan after sleep, menu bar only (no Dock icon).
+Also: a first-run setup guide, Pause / Resume, rescan after sleep, menu bar only (no Dock icon), a 14-day trial with offline license keys, and updates that download and install themselves.
 
 ## Build
 
@@ -43,6 +43,26 @@ Signing uses `$SIGN_IDENTITY`, or the first Apple Development / Developer ID ide
 
 On first launch, allow Brim in **System Settings → Privacy & Security → Accessibility**. Without it, Brim still changes volume and brightness directly, but there's no on-screen display and media keys won't work.
 
+### Licensing
+
+Builds embed `.secrets/license-public.key` when it exists, which turns on a 14-day trial (after it, edge gestures pause until a key is added). Build with `FREE=1` for an unlocked build.
+
+```sh
+scripts/license.sh keygen                  # once: creates .secrets/license-{private,public}.key (never commit)
+scripts/license.sh issue buyer@example.com # prints a BRIM-… key to send to a customer
+scripts/license.sh verify BRIM-…           # checks a key
+```
+
+Keys are Ed25519-signed and checked offline, so there's no server to run. Your own key is in `.secrets/my-license.txt`.
+
+### Releasing updates
+
+```sh
+WEBSITE_URL=https://your.site VERSION=1.1 NOTES="New thing|Fixed thing" scripts/build.sh --dmg
+```
+
+This writes `website/appcast.json` and `website/downloads/Brim-1.1.dmg`. Upload `website/` and every installed copy finds the update within 12 hours. Brim checks the DMG's SHA-256 and that the new app is signed by the same team, swaps itself and relaunches. Set your price, checkout link and contact email in `website/config.js`, and pass `CHECKOUT_URL=…` to the build for the in-app Buy button.
+
 ### Handy flags
 
 ```sh
@@ -58,17 +78,22 @@ Sources/
                          MultitouchSupport  raw finger positions + Force Touch actuator
                          DisplayServices    read / set built-in display brightness
   BrimCore/            EdgeRecognizer: pure gesture logic (frames in → actions out), unit tested
+                       License: offline Ed25519 license keys + trial math, unit tested
   Brim/
     EdgeEngine.swift   runs the recognizer on each trackpad frame and performs actions
     SystemControls     media key events, CoreAudio volume/mute, brightness
     Haptics.swift      actuator ticks, falls back to NSHapticFeedbackManager
     Prefs.swift        settings (UserDefaults) + Open at Login (SMAppService)
+    Licensing.swift    trial / license state, build-time config (AppConfig)
+    Updater.swift      update feed check, download, verify, swap and relaunch
     BrandArt.swift     the app icon and menu bar glyph, drawn in code
     Views/             SwiftUI menu, settings page, setup guide
 scripts/
-  build.sh             build, bundle, sign, DMG
+  build.sh             build, bundle, sign, DMG, appcast.json
+  license.sh           license key tool (LicenseTool/)
   IconTool/            renders BrandArt's icon to AppIcon.icns
-website/               landing page with an interactive trackpad demo
+website/               landing page with an interactive trackpad demo, pricing,
+                       terms, refunds, privacy, manage activation, lost key
 ```
 
 Gestures only start when a single finger **lands** in an edge zone, so moving the pointer into an edge never triggers anything. A slide is cancelled if the finger moves sideways first, or if a second finger lands before it starts (a scroll).

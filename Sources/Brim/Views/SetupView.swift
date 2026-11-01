@@ -10,19 +10,31 @@ struct SetupView: View {
     private var triedSlide: Bool { live.slideCount > slidesAtOpen }
 
     var body: some View {
-        VStack(spacing: 20) {
-            VStack(spacing: 10) {
-                AppIconView(size: 72)
-                Text("Welcome to Brim")
-                    .font(.system(size: 24, weight: .semibold))
-                Text("The edges of your trackpad are now volume and brightness sliders.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+        VStack(spacing: 0) {
+            ZStack {
+                NightBackground(cornerRadius: 0)
+                VStack(spacing: 14) {
+                    HStack(spacing: 10) {
+                        AppIconView(size: 34)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Welcome to Brim")
+                                .font(.system(size: 20, weight: .semibold))
+                            Text("Your trackpad's edges are now sliders.")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.white.opacity(0.65))
+                        }
+                        Spacer()
+                    }
+                    TrackpadDemo(swap: prefs.swapSides)
+                        .frame(height: 190)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 24)
+                .padding(.top, 34)
+                .padding(.bottom, 22)
             }
-
-            TrackpadDemo(swap: prefs.swapSides)
-                .frame(width: 300, height: 190)
+            .environment(\.colorScheme, .dark)
+            .fixedSize(horizontal: false, vertical: true)
 
             VStack(spacing: 10) {
                 StepRow(number: 1, done: live.trusted,
@@ -39,21 +51,24 @@ struct SetupView: View {
                         detail: "Rest one finger on the \(prefs.swapSides ? "left" : "right") edge of the trackpad and slide up.") {
                     EmptyView()
                 }
-            }
 
-            HStack {
-                Text(triedSlide ? "You've got it." : "You can open this guide again from the ••• menu.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button(triedSlide && live.trusted ? "Done" : "Skip for Now") {
-                    prefs.hasCompletedSetup = true
-                    onDone()
+                HStack {
+                    Text(triedSlide ? "You've got it." : "Open this guide again any time from the ⋯ menu.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(triedSlide && live.trusted ? "Done" : "Skip for Now") {
+                        prefs.hasCompletedSetup = true
+                        onDone()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.brimAccent)
+                    .keyboardShortcut(.defaultAction)
                 }
-                .keyboardShortcut(.defaultAction)
+                .padding(.top, 6)
             }
+            .padding(22)
         }
-        .padding(24)
         .frame(width: 440)
     }
 }
@@ -85,7 +100,8 @@ private struct StepRow<Accessory: View>: View {
             if !done { accessory() }
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(done ? Color.green.opacity(0.08) : Color.primary.opacity(0.045)))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(done ? Color.green.opacity(0.25) : Color.primary.opacity(0.06)))
         .animation(.easeOut(duration: 0.2), value: done)
     }
 }
