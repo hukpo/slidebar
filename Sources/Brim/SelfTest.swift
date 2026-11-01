@@ -62,9 +62,11 @@ enum SelfTest {
         line(glowGone, "Edge glow fades after release", glowGone ? "hidden" : "still visible")
 
         // A palm on the edge → nothing.
+        wait(0.4) // let the last volume steps from the previous slide land
         let volPalm = SystemControls.volume() ?? 0
         slide(x: 0.98, from: 0.2, to: 0.6, size: 4)
-        line(abs((SystemControls.volume() ?? 0) - volPalm) < 0.001, "Palm on the edge is ignored", "volume unchanged")
+        let volAfterPalm = SystemControls.volume() ?? 0
+        line(abs(volAfterPalm - volPalm) < 0.001, "Palm on the edge is ignored", String(format: "%.3f → %.3f", volPalm, volAfterPalm))
 
         // Front app turned off → nothing.
         if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier {
