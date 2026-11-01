@@ -141,20 +141,11 @@ enum SystemControls {
 extension SystemControls {
     /// Virtual key codes (Carbon kVK_*) used by Brim's actions.
     enum Key: CGKeyCode {
-        case leftArrow = 123, rightArrow = 124, leftBracket = 33, rightBracket = 30
-        case equal = 24, minus = 27, space = 49, q = 12, f11 = 103
+        case tab = 48, z = 6, grave = 50, space = 49, q = 12
     }
 
     /// Presses a keyboard shortcut, like the user typing it.
     static func shortcut(_ key: Key, _ flags: CGEventFlags) {
-        var flags = flags
-        // Real arrow and function keys carry these markers, and macOS matches system shortcuts
-        // (like Control-Arrow to switch desktops) only when they are present.
-        switch key {
-        case .leftArrow, .rightArrow: flags.formUnion([.maskSecondaryFn, .maskNumericPad])
-        case .f11: flags.formUnion(.maskSecondaryFn)
-        default: break
-        }
         for down in [true, false] {
             guard let event = CGEvent(keyboardEventSource: nil, virtualKey: key.rawValue, keyDown: down) else { continue }
             event.flags = flags
@@ -162,22 +153,10 @@ extension SystemControls {
         }
     }
 
-    /// Scrolls whatever is under the pointer, following the user's scroll direction setting.
-    static func scroll(vertical: Bool, towardTopOrRight: Bool) {
-        let natural = UserDefaults.standard.persistentDomain(forName: UserDefaults.globalDomain)?["com.apple.swipescrolldirection"] as? Bool ?? true
-        // With natural scrolling, sliding up moves content up, like dragging it.
-        var amount: Int32 = 28
-        if towardTopOrRight == natural { amount = -amount }
-        let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2,
-                            wheel1: vertical ? amount : 0, wheel2: vertical ? 0 : amount, wheel3: 0)
-        event?.post(tap: .cghidEventTap)
-    }
-
     static func openSystemApp(_ path: String) {
         NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: path), configuration: NSWorkspace.OpenConfiguration())
     }
 
-    static var hasMissionControl: Bool { FileManager.default.fileExists(atPath: "/System/Applications/Mission Control.app") }
     static var hasScreenshotApp: Bool { FileManager.default.fileExists(atPath: "/System/Applications/Utilities/Screenshot.app") }
 
     /// Locks the screen immediately, the same way the Apple menu's Lock Screen does.

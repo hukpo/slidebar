@@ -121,7 +121,11 @@ enum GestureSummary {
         if corners.count <= 2 {
             for c in corners {
                 let f = prefs.corner(c)
-                parts.append(f == .openApp ? prefs.cornerApps[c].map(AppNames.name(for:)) ?? f.title : f.title)
+                switch f {
+            case .openApp: parts.append(prefs.cornerApps[c].map(AppNames.name(for:)) ?? f.title)
+            case .runShortcut: parts.append(prefs.cornerShortcuts[c] ?? f.title)
+            default: parts.append(f.title)
+            }
             }
         } else {
             parts.append("\(corners.count) corners")
@@ -152,6 +156,19 @@ struct NoticeArea: View {
                    onDismiss: { live.blockedAction = nil })
         } else if live.showAccessNotice {
             AccessBanner()
+        }
+        if live.keepingAwake {
+            Banner(icon: "cup.and.saucer.fill",
+                   text: "Keeping your Mac awake. Its display won't turn off on its own.",
+                   primary: ("Let It Sleep", { _ = KeepAwake.toggle() }))
+        }
+        if live.micMuted && prefs.corners.values.contains(.muteMicrophone) {
+            Banner(icon: "mic.slash.fill", tint: .orange,
+                   text: "Your microphone is muted.",
+                   primary: ("Unmute", {
+                       Microphone.setMuted(false)
+                       live.micMuted = Microphone.isMuted()
+                   }))
         }
         UpdateBanner()
     }

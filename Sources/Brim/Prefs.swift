@@ -63,6 +63,10 @@ final class Prefs: ObservableObject {
     @Published var cornerApps: [Corner: String] {
         didSet { for c in Corner.allCases { defaults.set(cornerApps[c], forKey: Keys.cornerApp(c)) } }
     }
+    /// For corners set to "Run a Shortcut": the shortcut's name.
+    @Published var cornerShortcuts: [Corner: String] {
+        didSet { for c in Corner.allCases { defaults.set(cornerShortcuts[c], forKey: Keys.cornerShortcut(c)) } }
+    }
 
     // Settings page
     @Published var bottomQuarterOnly: Bool { didSet { defaults.set(bottomQuarterOnly, forKey: Keys.bottomQuarterOnly) } }
@@ -100,6 +104,7 @@ final class Prefs: ObservableObject {
         static func edge(_ side: EdgeSide) -> String { "edge.\(side.rawValue)" }
         static func corner(_ c: Corner) -> String { "corner.\(c.rawValue)" }
         static func cornerApp(_ c: Corner) -> String { "cornerApp.\(c.rawValue)" }
+        static func cornerShortcut(_ c: Corner) -> String { "cornerShortcut.\(c.rawValue)" }
         static let tapToPlay = "tapToPlay"
         static let sensitivity = "sensitivity"
         static let edgeWidth = "edgeWidth"
@@ -152,13 +157,16 @@ final class Prefs: ObservableObject {
         self.edges = edges
         var corners: [Corner: CornerFunction] = [:]
         var apps: [Corner: String] = [:]
+        var shortcuts: [Corner: String] = [:]
         for c in Corner.allCases {
             let fallback: CornerFunction = legacy.mute ? Prefs.defaultCorner(c) : .off
             corners[c] = defaults.string(forKey: Keys.corner(c)).flatMap(CornerFunction.init(rawValue:)) ?? fallback
             apps[c] = defaults.string(forKey: Keys.cornerApp(c))
+            shortcuts[c] = defaults.string(forKey: Keys.cornerShortcut(c))
         }
         self.corners = corners
         self.cornerApps = apps
+        self.cornerShortcuts = shortcuts
         bottomQuarterOnly = defaults.bool(forKey: Keys.bottomQuarterOnly)
         requireModifier = defaults.bool(forKey: Keys.requireModifier)
         freezeCursor = defaults.bool(forKey: Keys.freezeCursor)
@@ -190,7 +198,7 @@ final class Prefs: ObservableObject {
     var gesturesAreDefault: Bool {
         EdgeSide.allCases.allSatisfy { edge($0) == Prefs.defaultEdge($0) }
             && Corner.allCases.allSatisfy { corner($0) == Prefs.defaultCorner($0) }
-            && cornerApps.isEmpty && !tapToPlay
+            && cornerApps.isEmpty && cornerShortcuts.isEmpty && !tapToPlay
     }
 
     func edge(_ side: EdgeSide) -> EdgeFunction { edges[side] ?? .off }
@@ -198,8 +206,12 @@ final class Prefs: ObservableObject {
 
     /// A corner counts as active only when it has something to do.
     func cornerIsActive(_ c: Corner) -> Bool {
-        let f = corner(c)
-        return f != .off && (f != .openApp || cornerApps[c] != nil)
+        switch corner(c) {
+        case .off: return false
+        case .openApp: return cornerApps[c] != nil
+        case .runShortcut: return cornerShortcuts[c] != nil
+        default: return true
+        }
     }
 
     /// Puts only the edges and corners back the way Brim ships.
@@ -207,6 +219,7 @@ final class Prefs: ObservableObject {
         edges = Dictionary(uniqueKeysWithValues: EdgeSide.allCases.map { ($0, Prefs.defaultEdge($0)) })
         corners = Dictionary(uniqueKeysWithValues: Corner.allCases.map { ($0, Prefs.defaultCorner($0)) })
         cornerApps = [:]
+        cornerShortcuts = [:]
         tapToPlay = false
     }
 
@@ -219,6 +232,7 @@ final class Prefs: ObservableObject {
         edges = Dictionary(uniqueKeysWithValues: EdgeSide.allCases.map { ($0, Prefs.defaultEdge($0)) })
         corners = Dictionary(uniqueKeysWithValues: Corner.allCases.map { ($0, Prefs.defaultCorner($0)) })
         cornerApps = [:]
+        cornerShortcuts = [:]
         bottomQuarterOnly = false
         requireModifier = false
         freezeCursor = true

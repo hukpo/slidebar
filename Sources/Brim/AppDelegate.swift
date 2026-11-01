@@ -33,6 +33,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if SelfTest.keyCheckRequested {
+            Task { @MainActor in
+                await SelfTest.runKeyCheck()
+                NSApp.terminate(nil)
+            }
+            return
+        }
         AppActions.shared.delegate = self
         let prefs = Prefs.shared
         let live = LiveState.shared

@@ -182,6 +182,7 @@ struct TrackpadMap: View {
         case .corner(let corner):
             let f = prefs.corner(corner)
             if f == .openApp, let id = prefs.cornerApps[corner] { return "Open \(AppNames.name(for: id))" }
+            if f == .runShortcut, let name = prefs.cornerShortcuts[corner] { return "Run \u{201C}\(name)\u{201D}" }
             return f.title
         }
     }
@@ -296,6 +297,8 @@ private struct SpotEditor: View {
     let spot: MapSpot
     @ObservedObject var prefs = Prefs.shared
     @ObservedObject var live = LiveState.shared
+    @State private var shortcuts: [String] = []
+    @State private var shortcutsLoaded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -355,6 +358,7 @@ private struct SpotEditor: View {
                 set: { newValue in
                     prefs.corners[corner] = newValue
                     if newValue == .openApp && prefs.cornerApps[corner] == nil { chooseApp(for: corner) }
+                    if newValue == .runShortcut { loadShortcuts() }
                 }
             )) {
                 ForEach(Array(CornerFunction.groups.enumerated()), id: \.offset) { index, group in
@@ -394,12 +398,44 @@ private struct SpotEditor: View {
                     .controlSize(.small)
             }
         }
+        if function == .runShortcut {
+            HStack(spacing: 8) {
+                if shortcuts.isEmpty {
+                    Text(shortcutsLoaded ? "You don't have any shortcuts yet." : "Loading your shortcuts…")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Open Shortcuts") { SystemControls.openSystemApp("/System/Applications/Shortcuts.app") }
+                        .controlSize(.small)
+                } else {
+                    Text("Shortcut").font(.system(size: 12, weight: .medium))
+                    Spacer()
+                    Picker("Shortcut", selection: Binding(
+                        get: { prefs.cornerShortcuts[corner] ?? "" },
+                        set: { prefs.cornerShortcuts[corner] = $0.isEmpty ? nil : $0 }
+                    )) {
+                        Text("Choose…").tag("")
+                        ForEach(shortcuts, id: \.self) { Text($0).tag($0) }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: 190)
+                }
+            }
+            .onAppear(perform: loadShortcuts)
+        }
         if function.needsAccess && !live.trusted { NeedsAccessNote() }
+    }
+
+    private func loadShortcuts() {
+        UserShortcuts.list { names in
+            shortcuts = names
+            shortcutsLoaded = true
+        }
     }
 
     private func isAvailable(_ f: CornerFunction) -> Bool {
         switch f {
-        case .missionControl: return SystemControls.hasMissionControl
         case .screenshot: return SystemControls.hasScreenshotApp
         default: return true
         }
@@ -408,16 +444,18 @@ private struct SpotEditor: View {
     private func cornerVerb(_ f: CornerFunction, _ corner: Corner) -> String {
         switch f {
         case .off: return ""
-        case .mute: return "mute or unmute"
+        case .mute: return "mute or unmute the sound"
+        case .muteMicrophone: return "mute or unmute your microphone, handy on calls"
         case .playPause: return "play or pause"
         case .nextSong: return "skip to the next song"
         case .previousSong: return "go back to the previous song"
-        case .missionControl: return "open Mission Control"
-        case .showDesktop: return "show the desktop"
+        case .keepAwake: return "keep your Mac and its display from sleeping, and again to let it sleep"
         case .spotlight: return "open Spotlight"
+        case .emoji: return "open Emoji & Symbols where you're typing"
         case .screenshot: return "take a screenshot"
         case .lockScreen: return "lock your Mac"
         case .sleepDisplay: return "turn off the display"
+        case .runShortcut: return prefs.cornerShortcuts[corner].map { "run \u{201C}\($0)\u{201D}" } ?? "run the shortcut you choose"
         case .openApp: return prefs.cornerApps[corner].map { "open \(AppNames.name(for: $0))" } ?? "open the app you choose"
         }
     }

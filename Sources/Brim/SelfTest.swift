@@ -144,6 +144,63 @@ enum SelfTest {
         let mc1 = SystemControls.isMuted()
         line(mc1 != mc0, "Bottom-left corner set to Mute works", "\(mc0) → \(mc1)")
 
+        // New sliders: microphone volume and Night Shift warmth.
+        if Microphone.hasVolume, let mic0 = Microphone.volume() {
+            prefs.edges[.left] = .micVolume
+            engine.syncConfig()
+            let up = mic0 < 0.5
+            slide(x: 0.02, from: up ? 0.2 : 0.6, to: up ? 0.6 : 0.2)
+            let mic1 = Microphone.volume() ?? mic0
+            line(up ? mic1 > mic0 + 0.05 : mic1 < mic0 - 0.05, "Left edge set to Microphone Volume works", String(format: "%.2f → %.2f", mic0, mic1))
+            Microphone.setVolume(mic0)
+            prefs.edges[.left] = .brightness
+        }
+        if NightShift.isAvailable, let ns0 = NightShift.rawStrength() {
+            let wasActive = NightShift.isActive
+            prefs.edges[.left] = .nightShift
+            engine.syncConfig()
+            let start = NightShift.level() ?? 0
+            let up = start < 0.5
+            slide(x: 0.02, from: up ? 0.2 : 0.6, to: up ? 0.6 : 0.2)
+            let end = NightShift.level() ?? start
+            line(up ? end > start + 0.05 : end < start - 0.05, "Left edge set to Night Shift works", String(format: "%.2f → %.2f", start, end))
+            NightShift.restore(active: wasActive, strength: ns0)
+            prefs.edges[.left] = .brightness
+            let back = abs((NightShift.rawStrength() ?? -1) - ns0) < 0.01 && NightShift.isActive == wasActive
+            line(back, "Night Shift put back as it was", String(format: "strength %.2f, active %@", NightShift.rawStrength() ?? -1, NightShift.isActive ? "yes" : "no"))
+        }
+
+        // New corners: mute microphone and keep awake (each toggled twice, so nothing changes).
+        prefs.corners[.bottomRight] = .muteMicrophone
+        engine.syncConfig()
+        let micMuted0 = Microphone.isMuted()
+        tap(x: 0.95, y: 0.05); tap(x: 0.95, y: 0.05); wait(0.4)
+        let micMuted1 = Microphone.isMuted()
+        tap(x: 0.95, y: 0.05); tap(x: 0.95, y: 0.05); wait(0.4)
+        line(micMuted1 != micMuted0 && Microphone.isMuted() == micMuted0, "Corner set to Mute Microphone toggles it",
+             "\(micMuted0) → \(micMuted1) → \(Microphone.isMuted())")
+
+        prefs.corners[.bottomRight] = .keepAwake
+        engine.syncConfig()
+        func awakeAssertion() -> Bool {
+            let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/pmset"); p.arguments = ["-g", "assertions"]
+            let pipe = Pipe(); p.standardOutput = pipe; try? p.run()
+            let out = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self); p.waitUntilExit()
+            return out.contains("Brim: Keep Mac Awake")
+        }
+        tap(x: 0.95, y: 0.05); tap(x: 0.95, y: 0.05); wait(0.4)
+        let awakeOn = awakeAssertion() && KeepAwake.isOn
+        tap(x: 0.95, y: 0.05); tap(x: 0.95, y: 0.05); wait(0.4)
+        let awakeOff = !awakeAssertion() && !KeepAwake.isOn
+        line(awakeOn && awakeOff, "Corner set to Keep Mac Awake turns it on and off", "on: \(awakeOn), off again: \(awakeOff)")
+        prefs.corners[.bottomRight] = .off
+
+        // Run a Shortcut: Brim can read the user's shortcut list (without running any).
+        var shortcutNames: [String]? = nil
+        UserShortcuts.list { shortcutNames = $0 }
+        for _ in 0..<50 where shortcutNames == nil { wait(0.1) }
+        line(shortcutNames != nil, "Can list your Shortcuts", "\(shortcutNames?.count ?? 0) found")
+
         // Edges and Corners map: arrow keys move in the direction pressed.
         let n = TrackpadMap.neighbor
         let arrowsOK = n(.edge(.bottom), .right) == .corner(.bottomRight)
@@ -172,39 +229,136 @@ enum SelfTest {
         return true
     }
 
-    /// `Brim --check-desktops`: swipes a top edge set to Switch Desktop through the real engine,
-    /// checks the desktop changed, then switches back. Moves your desktop for about two seconds.
-    static func runDesktopCheckIfRequested() -> Bool {
-        guard CommandLine.arguments.contains("--check-desktops") else { return false }
-        func wait(_ s: Double) { RunLoop.main.run(until: Date().addingTimeInterval(s)) }
-        typealias ConnFn = @convention(c) () -> Int32
-        typealias SpaceFn = @convention(c) (Int32) -> UInt64
-        guard let sky = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_NOW),
-              let c = dlsym(sky, "SLSMainConnectionID"), let a = dlsym(sky, "SLSGetActiveSpace") else {
-            print("SKIP  Can't read the current desktop on this macOS"); return true
+    static var keyCheckRequested: Bool { CommandLine.arguments.contains("--check-keys") }
+
+    /// `open -n -W build/Brim.app --args --check-keys`: opens Brim's own test windows and drives real
+    /// edge gestures through the engine to check Undo and Redo, Switch Windows and Switch Tabs.
+    /// It runs inside the normally launched app so macOS delivers the keys, and it never presses a
+    /// key unless one of Brim's own test windows is in front.
+    @MainActor
+    static func runKeyCheck() async {
+        func wait(_ s: Double) async { try? await Task.sleep(nanoseconds: UInt64(s * 1_000_000_000)) }
+        func line(_ ok: Bool, _ name: String, _ detail: String) { print("\(ok ? "PASS" : "FAIL")  \(name)  (\(detail))"); fflush(stdout) }
+
+        // A minimal app with the standard Edit and Window menus, which is how real apps answer
+        // Command-Z, Shift-Command-Z and Control-Tab.
+        NSApp.setActivationPolicy(.regular)
+        let mainMenu = NSMenu()
+        func menu(_ title: String, _ items: [NSMenuItem]) -> NSMenu {
+            let m = NSMenu(title: title)
+            items.forEach(m.addItem)
+            let holder = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            holder.submenu = m
+            mainMenu.addItem(holder)
+            return m
         }
-        let space = { unsafeBitCast(a, to: SpaceFn.self)(unsafeBitCast(c, to: ConnFn.self)()) }
+        func item(_ title: String, _ action: String, _ key: String, _ mods: NSEvent.ModifierFlags) -> NSMenuItem {
+            let i = NSMenuItem(title: title, action: NSSelectorFromString(action), keyEquivalent: key)
+            i.keyEquivalentModifierMask = mods
+            return i
+        }
+        _ = menu("Edit", [item("Undo", "undo:", "z", .command), item("Redo", "redo:", "z", [.command, .shift])])
+        let windowMenu = menu("Window", [item("Show Previous Tab", "selectPreviousTab:", "\t", [.control, .shift]),
+                                         item("Show Next Tab", "selectNextTab:", "\t", .control)])
+        NSApp.mainMenu = mainMenu
+        NSApp.windowsMenu = windowMenu
+
+        func makeWindow(_ title: String, x: CGFloat) -> NSWindow {
+            let w = NSWindow(contentRect: NSRect(x: x, y: 300, width: 320, height: 200),
+                             styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            w.title = title
+            w.isReleasedWhenClosed = false
+            w.tabbingMode = .preferred
+            return w
+        }
+        func inFront() -> Bool { NSApp.isActive && NSApp.keyWindow?.title.hasPrefix("Brim Check") == true }
+
         let prefs = Prefs.shared, engine = EdgeEngine.shared
-        let saved = prefs.edges, savedPaused = prefs.paused
+        let saved = prefs.edges, savedPaused = prefs.paused, savedExcluded = prefs.excludedApps
         prefs.paused = false
-        prefs.edges[.top] = .desktops
-        engine.syncConfig()
-        var clock = 2000.0
-        func swipe(_ from: Float, _ to: Float, id: Int32) {
-            for i in 0...20 {
-                engine.feed([TouchPoint(id: id, x: from + (to - from) * Float(i) / 20, y: 0.96, size: 0.8)], time: clock)
-                clock += 0.012; wait(0.012)
+        prefs.excludedApps = []
+        var windows: [NSWindow] = []
+        func finish() {
+            for w in windows { w.close() }
+            prefs.edges = saved; prefs.paused = savedPaused; prefs.excludedApps = savedExcluded
+        }
+        var clock = 3000.0, nextID: Int32 = 950
+        func slide(_ side: EdgeSide, up: Bool, travel: Float = 0.15) async -> Bool {
+            guard inFront() else { return false }
+            nextID += 1
+            let x: Float = side == .left ? 0.02 : 0.98
+            for i in 0...24 {
+                let t = Float(i) / 24
+                let y: Float = up ? 0.25 + travel * t : 0.25 + travel - travel * t
+                engine.feed([TouchPoint(id: nextID, x: x, y: y, size: 0.8)], time: clock)
+                clock += 0.012; await wait(0.012)
             }
             engine.feed([], time: clock); clock += 0.1
+            await wait(0.5)
+            return true
         }
-        let start = space()
-        swipe(0.3, 0.7, id: 900); wait(1.2)
-        let moved = space()
-        print("\(moved != start ? "PASS" : "FAIL")  Top edge swipe switches desktop  (\(start) → \(moved))")
-        if moved != start { wait(1.0); swipe(0.7, 0.3, id: 901); wait(1.5) }
-        print("\(space() == start ? "PASS" : "FAIL")  Swipe back returns to the first desktop")
-        prefs.edges = saved; prefs.paused = savedPaused
-        return true
+        func skipped() { print("SKIP  Another app came to the front, so Brim stopped before pressing more keys"); finish() }
+
+        // Undo and Redo, in a text box.
+        let editor = makeWindow("Brim Check: Text", x: 200)
+        windows.append(editor)
+        editor.tabbingMode = .disallowed
+        let text = NSTextView(frame: NSRect(x: 0, y: 0, width: 320, height: 200))
+        text.allowsUndo = true
+        editor.contentView = text
+        editor.makeKeyAndOrderFront(nil)
+        editor.makeFirstResponder(text)
+        if #available(macOS 14, *) { NSApp.activate() } else { NSApp.activate(ignoringOtherApps: true) }
+        for _ in 0..<80 where !inFront() { await wait(0.1) }
+        guard inFront() else {
+            print("SKIP  Brim couldn't come to the front, so no keys were pressed")
+            finish(); return
+        }
+        text.insertText("hello", replacementRange: NSRange(location: NSNotFound, length: 0))
+        text.breakUndoCoalescing()
+        prefs.edges[.left] = .undo
+        engine.syncConfig()
+        guard await slide(.left, up: false) else { return skipped() }
+        line(text.string.isEmpty, "Undo slide undoes", "\"hello\" → \"\(text.string)\"")
+        guard await slide(.left, up: true) else { return skipped() }
+        line(text.string == "hello", "Redo slide redoes", "→ \"\(text.string)\"")
+
+        // Switch Windows, between two of Brim's windows.
+        let second = makeWindow("Brim Check: Second Window", x: 560)
+        windows.append(second)
+        second.tabbingMode = .disallowed
+        second.orderFront(nil)
+        editor.makeKeyAndOrderFront(nil)
+        await wait(0.4)
+        prefs.edges[.bottom] = .windows
+        engine.syncConfig()
+        guard inFront() else { return skipped() }
+        nextID += 1
+        for i in 0...20 {
+            engine.feed([TouchPoint(id: nextID, x: 0.3 + 0.4 * Float(i) / 20, y: 0.04, size: 0.8)], time: clock)
+            clock += 0.012; await wait(0.012)
+        }
+        engine.feed([], time: clock); clock += 0.1
+        await wait(0.8)
+        line(NSApp.keyWindow === second, "Window swipe switches windows", "key window: \(NSApp.keyWindow?.title ?? "none")")
+
+        // Switch Tabs, in a window with two tabs.
+        editor.orderOut(nil); second.orderOut(nil)
+        let tabA = makeWindow("Brim Check: Tab A", x: 300)
+        let tabB = makeWindow("Brim Check: Tab B", x: 300)
+        windows += [tabA, tabB]
+        tabA.makeKeyAndOrderFront(nil)
+        tabA.addTabbedWindow(tabB, ordered: .above)
+        tabA.makeKeyAndOrderFront(nil)
+        await wait(0.6)
+        prefs.edges[.right] = .tabs
+        engine.syncConfig()
+        let before = NSApp.keyWindow?.title ?? "none"
+        guard await slide(.right, up: true) else { return skipped() }
+        let after = NSApp.keyWindow?.title ?? "none"
+        line(before != after, "Tab slide switches tabs", "\(before) → \(after)")
+
+        finish()
     }
 
     static func runIfRequested() -> Bool {

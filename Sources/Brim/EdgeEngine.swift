@@ -22,7 +22,11 @@ final class LiveState: ObservableObject {
     @Published var brightness: Float?
     @Published var volume: Float?
     @Published var keyboardBrightness: Float?
+    @Published var micVolume: Float?
+    @Published var nightShift: Float?
     @Published var muted = false
+    @Published var micMuted = false
+    @Published var keepingAwake = false
     @Published var trusted = Permissions.isTrusted
     @Published var deviceCount = 0
     /// Bumped every time the user completes a slide (used by the setup guide).
@@ -50,6 +54,8 @@ final class LiveState: ObservableObject {
         case .brightness: return brightness
         case .volume: return volume
         case .keyboardBrightness: return keyboardBrightness
+        case .micVolume: return micVolume
+        case .nightShift: return nightShift
         default: return nil
         }
     }
@@ -61,9 +67,22 @@ final class LiveState: ObservableObject {
         if b != brightness { brightness = b }
         if v != volume { volume = v }
         if m != muted { muted = m }
-        if Prefs.shared.edges.values.contains(.keyboardBrightness) {
+        let edges = Prefs.shared.edges.values
+        if edges.contains(.keyboardBrightness) {
             let k = KeyboardBacklight.level()
             if k != keyboardBrightness { keyboardBrightness = k }
+        }
+        if edges.contains(.micVolume) {
+            let mv = Microphone.volume()
+            if mv != micVolume { micVolume = mv }
+        }
+        if edges.contains(.nightShift) {
+            let n = NightShift.level()
+            if n != nightShift { nightShift = n }
+        }
+        if Prefs.shared.corners.values.contains(.muteMicrophone) {
+            let mm = Microphone.isMuted()
+            if mm != micMuted { micMuted = mm }
         }
     }
 
@@ -89,6 +108,8 @@ final class EdgeEngine {
     private var refreshScheduled = false
     /// The level we expect after the steps sent so far in this slide (key events land asynchronously).
     private var expectedLevel: Float?
+    /// Steps collected toward the next tab or undo action.
+    private var pendingSteps = 0
 
     private init() {
         // Keep the recognizer's config in sync with settings.
@@ -188,6 +209,7 @@ final class EdgeEngine {
         case .slideBegan(let side):
             let function = prefs.edge(side)
             live.activeSide = side
+            pendingSteps = 0
             expectedLevel = currentLevel(function)
             if prefs.edgeGlow, function.hasLevel, let level = expectedLevel {
                 EdgeGlow.shared.show(function, on: side, level: level, muted: function == .volume && live.muted)
@@ -221,6 +243,8 @@ final class EdgeEngine {
             case .volume: stepVolume(up: up, fine: fine)
             case .brightness: stepBrightness(up: up, fine: fine)
             case .keyboardBrightness: KeyboardBacklight.setLevel(after)
+            case .micVolume: Microphone.setVolume(after)
+            case .nightShift: NightShift.setLevel(after)
             default: break
             }
             // A tick per step, a firmer bump on reaching 0% or 100%, then silence at the limit.
@@ -232,18 +256,19 @@ final class EdgeEngine {
             return
         }
 
-        switch function {
-        case .scroll:
-            run(needsAccess: true, name: function.blockedName) {
-                SystemControls.scroll(vertical: side.isVertical, towardTopOrRight: up)
+        // Stepping actions fire once every few steps, and reverse cleanly if the finger turns back.
+        if (pendingSteps > 0) != up { pendingSteps = 0 }
+        pendingSteps += up ? 1 : -1
+        guard abs(pendingSteps) >= function.stepsPerAction else { return }
+        pendingSteps = 0
+
+        run(needsAccess: function.needsAccess, name: function.blockedName) {
+            switch function {
+            case .tabs: SystemControls.shortcut(.tab, up ? .maskControl : [.maskControl, .maskShift])
+            case .undo: SystemControls.shortcut(.z, up ? [.maskCommand, .maskShift] : .maskCommand)
+            default: return
             }
-        case .zoom:
-            run(needsAccess: true, name: function.blockedName) {
-                SystemControls.shortcut(up ? .equal : .minus, .maskCommand)
-                Haptics.tick(prefs.haptics)
-            }
-        default:
-            break
+            Haptics.tick(prefs.haptics)
         }
     }
 
@@ -251,8 +276,7 @@ final class EdgeEngine {
         run(needsAccess: function.needsAccess, name: function.blockedName) {
             switch function {
             case .songs: SystemControls.press(forward ? .next : .previous)
-            case .desktops: SystemControls.shortcut(forward ? .rightArrow : .leftArrow, .maskControl)
-            case .backForward: SystemControls.shortcut(forward ? .rightBracket : .leftBracket, .maskCommand)
+            case .windows: SystemControls.shortcut(.grave, forward ? .maskCommand : [.maskCommand, .maskShift])
             default: return
             }
             Haptics.tick(prefs.haptics)
@@ -267,15 +291,27 @@ final class EdgeEngine {
             case .mute:
                 if live.trusted { SystemControls.press(.mute) } else { SystemControls.setMuted(!SystemControls.isMuted()) }
                 scheduleRefresh()
+            case .muteMicrophone:
+                let muted = !Microphone.isMuted()
+                Microphone.setMuted(muted)
+                live.micMuted = Microphone.isMuted()
+                Toast.shared.show(muted ? "Microphone Muted" : "Microphone On", icon: muted ? "mic.slash.fill" : "mic.fill")
             case .playPause: SystemControls.press(.play)
             case .nextSong: SystemControls.press(.next)
             case .previousSong: SystemControls.press(.previous)
-            case .missionControl: SystemControls.openSystemApp("/System/Applications/Mission Control.app")
-            case .showDesktop: SystemControls.shortcut(.f11, [])
-            case .spotlight: SystemControls.shortcut(.space, .maskCommand)
-            case .screenshot: SystemControls.openSystemApp("/System/Applications/Utilities/Screenshot.app")
+            case .keepAwake:
+                let on = KeepAwake.toggle()
+                Toast.shared.show(on ? "Keeping Your Mac Awake" : "Your Mac Can Sleep Again", icon: on ? "cup.and.saucer.fill" : "moon.zzz")
             case .lockScreen: SystemControls.lockScreen()
             case .sleepDisplay: SystemControls.sleepDisplay()
+            case .screenshot: SystemControls.openSystemApp("/System/Applications/Utilities/Screenshot.app")
+            case .spotlight: SystemControls.shortcut(.space, .maskCommand)
+            case .emoji: SystemControls.shortcut(.space, [.maskCommand, .maskControl])
+            case .runShortcut:
+                if let name = prefs.cornerShortcuts[corner] {
+                    UserShortcuts.run(name: name)
+                    Toast.shared.show("Running \u{201C}\(name)\u{201D}", icon: "square.2.layers.3d.fill")
+                }
             case .openApp:
                 if let id = prefs.cornerApps[corner] { SystemControls.openApp(bundleID: id) }
             }
@@ -300,6 +336,8 @@ final class EdgeEngine {
         case .volume: return SystemControls.volume()
         case .brightness: return SystemControls.brightness()
         case .keyboardBrightness: return KeyboardBacklight.level()
+        case .micVolume: return Microphone.volume()
+        case .nightShift: return NightShift.level()
         default: return nil
         }
     }

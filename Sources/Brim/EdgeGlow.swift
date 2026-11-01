@@ -97,6 +97,8 @@ extension EdgeFunction {
         switch self {
         case .brightness: return [.brimAmber, .brimAmberTop]
         case .keyboardBrightness: return [Color(white: 0.7), .white]
+        case .micVolume: return [Color(red: 0.16, green: 0.62, blue: 0.45), Color(red: 0.5, green: 0.95, blue: 0.72)]
+        case .nightShift: return [Color(red: 0.95, green: 0.42, blue: 0.12), Color(red: 1.0, green: 0.72, blue: 0.38)]
         default: return [.brimViolet, .brimCyan]
         }
     }

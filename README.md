@@ -23,8 +23,10 @@ Out of the box:
 
 **Every edge and corner is configurable** (menu → Edges and Corners):
 
-- **Edges** (left, right, top, bottom) can slide **Brightness, Volume, Keyboard Brightness, Scroll or Zoom**, or be swiped for **Next/Previous Song, Switch Desktop or Back/Forward**. Top and bottom edges slide left and right.
-- **Corners** (all four) respond to a double-tap: **Mute, Play or Pause, Next Song, Previous Song, Mission Control, Show Desktop, Spotlight, Take a Screenshot, Lock Screen, Turn Off Display, or Open an App** you choose.
+- **Edges** (left, right, top, bottom) can slide **Brightness, Volume, Keyboard Brightness, Microphone Volume, Night Shift Warmth**, step through **Tabs** or **Undo and Redo**, or be swiped for **Next/Previous Song** or **Switch Windows**. Top and bottom edges slide left and right.
+- **Corners** (all four) respond to a double-tap: **Mute Sound, Mute Microphone, Play or Pause, Next Song, Previous Song, Keep Mac Awake, Lock Screen, Turn Off Display, Take a Screenshot, Spotlight, Emoji & Symbols, Run a Shortcut, or Open an App**.
+
+Brim deliberately leaves out things macOS already does with multi-finger gestures (scrolling, zooming, switching desktops, back and forward, Mission Control).
 
 Brightness, volume and keyboard brightness use the same on-screen display as the keyboard keys. Actions that press keys need Accessibility; Brim says so in place and offers to allow it.
 
@@ -72,6 +74,8 @@ This writes `website/appcast.json` and `website/downloads/Brim-1.1.dmg`. Upload 
 ```sh
 build/Brim.app/Contents/MacOS/Brim --selftest            # checks trackpad, keys, brightness, haptics (restores levels)
 build/Brim.app/Contents/MacOS/Brim --snapshot out/ dark  # renders menu, settings and setup screens to PNG
+build/Brim.app/Contents/MacOS/Brim --simulate            # drives the gesture engine with fake fingers (restores every level)
+open -n -W build/Brim.app --args --check-keys             # live check of Undo, Tabs and Windows in Brim's own test windows
 ```
 
 ## How it works
