@@ -30,12 +30,6 @@ struct SettingsPage: View {
 
                     SectionHeader(title: "Feel")
                     Card {
-                        ChoiceRow(icon: "hand.point.up", title: "Start a Slide",
-                                  subtitle: prefs.holdToStart ? "Rest on the edge until you feel a tap. Moving the pointer never changes anything."
-                                                              : "Slide right away. Quicker, but easier to set off by accident.",
-                                  options: [(true, "After a Short Rest"), (false, "Right Away")],
-                                  selection: $prefs.holdToStart)
-                        RowDivider()
                         SliderRow(icon: "speedometer", title: "Slide Speed",
                                   lowLabel: "Slower", highLabel: "Faster",
                                   value: $prefs.sensitivity, range: Prefs.sensitivityRange, step: Prefs.sensitivityStep,

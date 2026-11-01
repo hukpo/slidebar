@@ -85,9 +85,7 @@ struct SetupView: View {
             if let side = EdgeSide.allCases.first(where: { prefs.edge($0) == f }) {
                 let way = side.isVertical ? "up" : "to the right"
                 let what = f == .volume ? "The volume goes up." : f == .brightness ? "The screen gets brighter." : "The keyboard lights up."
-                let edge = side.title.lowercased()
-                let start = prefs.holdToStart ? "until you feel a tap, then slide" : "and slide"
-                return "Rest one finger on the \(edge) of your trackpad \(start) \(way). \(what)"
+                return "Rest one finger on the \(side.title.lowercased().replacingOccurrences(of: " edge", with: "")) edge of your trackpad and slide \(way). \(what)"
             }
         }
         return "Slide one finger along an edge of your trackpad. You can choose what each edge does in Brim's menu."

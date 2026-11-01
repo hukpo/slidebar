@@ -60,8 +60,6 @@ public enum EdgeAction: Equatable {
     case freezeCursor
     /// Let the pointer move again (safe to send when not frozen).
     case releaseCursor
-    /// The finger held still on a slider edge long enough: it's ready to slide (a haptic tap says so).
-    case armed(EdgeSide)
     /// A slide along an edge was recognized.
     case slideBegan(EdgeSide)
     /// One step along a slider edge. `up` means toward the top (left/right edges)
@@ -84,9 +82,6 @@ public struct EdgeConfig: Equatable {
     /// Only the lower part of the left and right edges responds.
     public var bottomQuarterOnly = false
     public var freezeCursor = true
-    /// Sliders start only after the finger rests on the edge for a moment. Pointer moves never
-    /// pause before they go, so they can't change anything by accident.
-    public var holdToStart = false
     public var fineControl = true
     /// Ignore contacts bigger than `palmSize` (a resting palm or thumb base).
     public var palmRejection = true
@@ -138,10 +133,6 @@ public struct EdgeRecognizer {
     // Palms: they rest, then creep; and a finger usually lands next to them soon after.
     public static let engageWindow: Double = 0.5       // a slide has to get going this soon after touching
     public static let palmWatch: Double = 1.5          // another finger this soon means the first was a palm
-    // Hold to start.
-    public static let holdDelay: Double = 0.2          // how long to rest on the edge before sliding
-    public static let holdTolerance: Float = 0.012     // how still "resting" is
-    public static let holdWindow: Double = 1.0         // after resting, start sliding within this (palms just stay)
 
     struct Gesture {
         var id: Int32
@@ -152,8 +143,6 @@ public struct EdgeRecognizer {
         var last: Float
         var maxTravel: Float = 0
         var engaged = false
-        /// Held still long enough to slide (hold-to-start).
-        var armed = false
         var accumulated: Float = 0
     }
 
@@ -223,18 +212,13 @@ public struct EdgeRecognizer {
         let start: Float
         if case .edge(let side) = zone { start = side.isVertical ? t.y : t.x } else { start = 0 }
         gesture = Gesture(id: t.id, zone: zone, startX: t.x, startY: t.y, startTime: time, last: start)
-        // With hold-to-start, the pointer stays free until the slider is ready, so pointer moves aren't held back.
-        if config.freezeCursor, case .edge(let side) = zone, !needsHold(side) {
+        if config.freezeCursor, case .edge = zone {
             actions.append(.freezeCursor)
         }
         return actions
     }
 
     // MARK: - Zones
-
-    func needsHold(_ side: EdgeSide) -> Bool {
-        config.holdToStart && config.kind(side) == .slider
-    }
 
     func isPalm(_ t: TouchPoint) -> Bool {
         config.palmRejection && (t.size > config.palmSize || t.major > config.palmLength)
@@ -282,19 +266,9 @@ public struct EdgeRecognizer {
         let dx = t.x - g.startX
         let dy = t.y - g.startY
         g.maxTravel = max(g.maxTravel, (dx * dx + dy * dy).squareRoot())
-        let justArmed = !g.armed && g.maxTravel <= Self.holdTolerance && timeSinceStart(g) >= Self.holdDelay
-        if justArmed { g.armed = true }
 
         switch g.zone {
         case .edge(let side):
-            if needsHold(side) && !g.engaged {
-                if justArmed {
-                    actions.append(.armed(side))
-                    if config.freezeCursor { actions.append(.freezeCursor) }
-                }
-                // Moved before resting: a pointer move.
-                if !g.armed { return g.maxTravel <= Self.holdTolerance }
-            }
             return updateEdge(side, &g, t, dx: dx, dy: dy, context: context, actions: &actions)
 
         case .corner(let corner):
@@ -303,10 +277,6 @@ public struct EdgeRecognizer {
             let start = TouchPoint(id: t.id, x: g.startX, y: g.startY)
             let side = abs(dy) > abs(dx) ? corner.verticalEdge : corner.horizontalEdge
             guard config.kind(side) != .off, inEdge(side, start) else { return false }
-            if needsHold(side) {
-                guard g.armed else { return false }
-                actions.append(.armed(side))
-            }
             g.zone = .edge(side)
             g.last = side.isVertical ? g.startY : g.startX
             if config.freezeCursor { actions.append(.freezeCursor) }
@@ -343,7 +313,7 @@ public struct EdgeRecognizer {
                 if abs(across) > zoneDepth * 1.5 { return false }  // left the edge before starting
                 guard abs(along) >= Self.engageDistance else {
                     // Resting, then creeping: a palm or a finger parked on the edge.
-                    return timeSinceStart(g) <= (needsHold(side) ? Self.holdWindow : Self.engageWindow)
+                    return timeSinceStart(g) <= Self.engageWindow
                 }
                 guard abs(across) <= abs(along) * Self.straightness else { return false } // diagonal: a pointer move
                 g.engaged = true

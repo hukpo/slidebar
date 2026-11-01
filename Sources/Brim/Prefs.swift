@@ -72,8 +72,6 @@ final class Prefs: ObservableObject {
     @Published var bottomQuarterOnly: Bool { didSet { defaults.set(bottomQuarterOnly, forKey: Keys.bottomQuarterOnly) } }
     @Published var requireModifier: Bool { didSet { defaults.set(requireModifier, forKey: Keys.requireModifier) } }
     @Published var freezeCursor: Bool { didSet { defaults.set(freezeCursor, forKey: Keys.freezeCursor) } }
-    /// Sliders start after a brief rest on the edge, so moving the pointer never changes anything.
-    @Published var holdToStart: Bool { didSet { defaults.set(holdToStart, forKey: Keys.holdToStart) } }
     @Published var fineControl: Bool { didSet { defaults.set(fineControl, forKey: Keys.fineControl) } }
     @Published var appearance: Appearance {
         didSet {
@@ -113,7 +111,6 @@ final class Prefs: ObservableObject {
         static let bottomQuarterOnly = "bottomQuarterOnly"
         static let requireModifier = "requireModifier"
         static let freezeCursor = "freezeCursor"
-        static let holdToStart = "holdToStart"
         static let fineControl = "fineControl"
         static let appearance = "appearance"
         static let paused = "paused"
@@ -135,7 +132,6 @@ final class Prefs: ObservableObject {
             Keys.bottomQuarterOnly: false,
             Keys.requireModifier: false,
             Keys.freezeCursor: true,
-            Keys.holdToStart: true,
             Keys.fineControl: true,
             Keys.appearance: Appearance.auto.rawValue,
             Keys.paused: false,
@@ -174,7 +170,6 @@ final class Prefs: ObservableObject {
         bottomQuarterOnly = defaults.bool(forKey: Keys.bottomQuarterOnly)
         requireModifier = defaults.bool(forKey: Keys.requireModifier)
         freezeCursor = defaults.bool(forKey: Keys.freezeCursor)
-        holdToStart = defaults.bool(forKey: Keys.holdToStart)
         fineControl = defaults.bool(forKey: Keys.fineControl)
         appearance = Appearance(rawValue: defaults.string(forKey: Keys.appearance) ?? "") ?? .auto
         paused = defaults.bool(forKey: Keys.paused)
@@ -241,7 +236,6 @@ final class Prefs: ObservableObject {
         bottomQuarterOnly = false
         requireModifier = false
         freezeCursor = true
-        holdToStart = true
         fineControl = true
         palmRejection = true
         edgeGlow = true

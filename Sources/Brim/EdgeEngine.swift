@@ -135,7 +135,6 @@ final class EdgeEngine {
         c.sensitivity = Float(prefs.sensitivity)
         c.bottomQuarterOnly = prefs.bottomQuarterOnly
         c.freezeCursor = prefs.freezeCursor
-        c.holdToStart = prefs.holdToStart
         c.fineControl = prefs.fineControl
         c.palmRejection = prefs.palmRejection
         c.edges = Dictionary(uniqueKeysWithValues: EdgeSide.allCases.map { ($0, prefs.edge($0).kind) })
@@ -215,10 +214,6 @@ final class EdgeEngine {
             }
             expectedLevel = nil
             releaseCursor()
-
-        case .armed:
-            // A light tap under the finger: ready to slide.
-            Haptics.tick(prefs.haptics)
 
         case .slideBegan(let side):
             let function = prefs.edge(side)

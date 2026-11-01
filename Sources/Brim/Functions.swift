@@ -69,20 +69,18 @@ enum EdgeFunction: String, CaseIterable, Identifiable {
     }
 
     /// Plain-language description of the gesture on a given edge.
-    func detail(on side: EdgeSide, hold: Bool = Prefs.shared.holdToStart) -> String {
+    func detail(on side: EdgeSide) -> String {
         let (up, down) = side.isVertical ? ("up", "down") : ("right", "left")
         let along = side.isVertical ? "up and down" : "left and right"
-        // With hold-to-start: "Rest your finger on the edge until you feel a tap, then slide …"
-        let slide = hold ? "Rest your finger on the edge until you feel a tap, then slide" : "Slide"
         switch self {
         case .off: return "This edge works like the rest of the trackpad."
-        case .brightness: return "\(slide) \(along) to change the display brightness."
-        case .volume: return "\(slide) \(along) to change the volume."
-        case .keyboardBrightness: return "\(slide) \(along) to change the keyboard backlight."
-        case .micVolume: return "\(slide) \(along) to change how loud your microphone is, for calls and recordings."
-        case .nightShift: return "\(slide) \(up) for warmer colors and \(down) for cooler ones. Turns Night Shift on."
-        case .tabs: return "\(slide) \(up) for the next tab and \(down) for the previous one, in Safari, Chrome, Finder and most apps with tabs."
-        case .undo: return "\(slide) \(down) to undo and \(up) to redo, one change at a time."
+        case .brightness: return "Slide \(along) to change the display brightness."
+        case .volume: return "Slide \(along) to change the volume."
+        case .keyboardBrightness: return "Slide \(along) to change the keyboard backlight."
+        case .micVolume: return "Slide \(along) to change how loud your microphone is, for calls and recordings."
+        case .nightShift: return "Slide \(up) for warmer colors and \(down) for cooler ones. Turns Night Shift on."
+        case .tabs: return "Slide \(up) for the next tab and \(down) for the previous one, in Safari, Chrome, Finder and most apps with tabs."
+        case .undo: return "Slide \(down) to undo and \(up) to redo, one change at a time."
         case .songs: return "Swipe \(up) quickly for the next song and \(down) for the previous one."
         case .windows: return "Swipe \(up) for the app's next window and \(down) for the previous one."
         }
