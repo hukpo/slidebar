@@ -327,4 +327,75 @@ final class EdgeRecognizerTests: XCTestCase {
         r.config.palmRejection = false
         XCTAssertTrue(run(&r, path: line(from: (0.98, 0.2), to: (0.98, 0.6)), size: 4).contains(.slideBegan(.right)))
     }
+
+    // MARK: Resting palms
+
+    func testLongPalmEdgeIsIgnoredEvenWhenSmall() {
+        // Only part of the palm is on the trackpad, so its size looks like a finger, but it's long.
+        var r = EdgeRecognizer()
+        var actions: [EdgeAction] = []
+        var time = 0.0
+        for (x, y) in line(from: (0.98, 0.2), to: (0.98, 0.6)) {
+            actions += r.process([TouchPoint(id: 1, x: x, y: y, size: 1.2, major: 21)], time: time)
+            time += 0.01
+        }
+        XCTAssertFalse(actions.contains(.slideBegan(.right)))
+        XCTAssertTrue(steps(actions).isEmpty)
+    }
+
+    func testRestingThenCreepingDoesNotSlide() {
+        var r = EdgeRecognizer()
+        let rest = Array(repeating: (Float(0.98), Float(0.3)), count: 80) // 0.8 s still
+        let actions = run(&r, path: rest + line(from: (0.98, 0.3), to: (0.98, 0.6)))
+        XCTAssertFalse(actions.contains(.slideBegan(.right)))
+        XCTAssertTrue(steps(actions).isEmpty)
+    }
+
+    func testSlowDeliberateSlideStillWorks() {
+        var r = EdgeRecognizer()
+        let actions = run(&r, path: line(from: (0.98, 0.2), to: (0.98, 0.6), frames: 300)) // 3 s
+        XCTAssertTrue(actions.contains(.slideBegan(.right)))
+        XCTAssertGreaterThan(steps(actions).count, 10)
+    }
+
+    func testFingerLandingSoonAfterUndoesTheSlide() {
+        var r = EdgeRecognizer()
+        var actions: [EdgeAction] = []
+        var time = 0.0
+        for (x, y) in line(from: (0.98, 0.2), to: (0.98, 0.4), frames: 20) {
+            actions += r.process([TouchPoint(id: 1, x: x, y: y, size: 0.8)], time: time)
+            time += 0.01
+        }
+        XCTAssertTrue(actions.contains(.slideBegan(.right)))
+        // The index finger lands to move the pointer: the "slide" was a palm.
+        let after = r.process([TouchPoint(id: 1, x: 0.98, y: 0.4, size: 0.8),
+                               TouchPoint(id: 2, x: 0.5, y: 0.5, size: 0.8)], time: time)
+        XCTAssertEqual(after, [.slideCancelled(.right), .releaseCursor])
+        XCTAssertFalse(r.isTracking)
+    }
+
+    func testContactGrowingIntoPalmMidSlideUndoesIt() {
+        var r = EdgeRecognizer()
+        var actions: [EdgeAction] = []
+        var time = 0.0
+        for (x, y) in line(from: (0.98, 0.2), to: (0.98, 0.4), frames: 20) {
+            actions += r.process([TouchPoint(id: 1, x: x, y: y, size: 0.8)], time: time)
+            time += 0.01
+        }
+        XCTAssertTrue(actions.contains(.slideBegan(.right)))
+        let after = r.process([TouchPoint(id: 1, x: 0.98, y: 0.42, size: 3.2)], time: time)
+        XCTAssertEqual(after, [.slideCancelled(.right), .releaseCursor])
+    }
+
+    func testSecondFingerLongIntoASlideDoesNotUndoIt() {
+        var r = EdgeRecognizer()
+        var time = 0.0
+        for (x, y) in line(from: (0.98, 0.2), to: (0.98, 0.8), frames: 200) { // 2 s
+            _ = r.process([TouchPoint(id: 1, x: x, y: y, size: 0.8)], time: time)
+            time += 0.01
+        }
+        let after = r.process([TouchPoint(id: 1, x: 0.98, y: 0.8, size: 0.8),
+                               TouchPoint(id: 2, x: 0.5, y: 0.5, size: 0.8)], time: time)
+        XCTAssertFalse(after.contains(.slideCancelled(.right)))
+    }
 }

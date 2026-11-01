@@ -82,6 +82,30 @@ enum SelfTest {
         let volAfterPalm = SystemControls.volume() ?? 0
         line(abs(volAfterPalm - volPalm) < 0.001, "Palm on the edge is ignored", String(format: "%.3f → %.3f", volPalm, volAfterPalm))
 
+        // A palm that slides along the edge, then a finger lands to move the pointer → volume put back.
+        let volPalmStart = SystemControls.volume() ?? 0
+        nextID += 1
+        let palmID = nextID
+        var palmMoved = false
+        for i in 0...20 {
+            let t = Float(i) / 20
+            let y: Float = volUp ? 0.2 + 0.25 * t : 0.45 - 0.25 * t
+            engine.feed([TouchPoint(id: palmID, x: 0.98, y: y, size: 0.8)], time: clock)
+            clock += 0.012
+            wait(0.012)
+        }
+        wait(0.3)
+        palmMoved = abs((SystemControls.volume() ?? 0) - volPalmStart) > 0.03
+        nextID += 1
+        engine.feed([TouchPoint(id: palmID, x: 0.98, y: 0.45, size: 0.8),
+                     TouchPoint(id: nextID, x: 0.5, y: 0.5, size: 0.8)], time: clock); clock += 0.012
+        engine.feed([TouchPoint(id: nextID, x: 0.52, y: 0.5, size: 0.8)], time: clock); clock += 0.012
+        engine.feed([], time: clock); clock += 0.05
+        wait(0.5)
+        let volRestored = SystemControls.volume() ?? 0
+        line(palmMoved && abs(volRestored - volPalmStart) < 0.01, "Palm slide is undone when a finger lands",
+             String(format: "%.3f → moved → %.3f", volPalmStart, volRestored))
+
         // Front app turned off → nothing.
         if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier {
             prefs.excludedApps = [front]

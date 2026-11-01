@@ -114,6 +114,8 @@ static int contactFrame(MTDeviceRef device, mt_finger *fingers, int count, doubl
         touches[i].vx = fingers[i].normalized.velocity.x;
         touches[i].vy = fingers[i].normalized.velocity.y;
         touches[i].size = fingers[i].size;
+        touches[i].majorAxis = fingers[i].majorAxis;
+        touches[i].minorAxis = fingers[i].minorAxis;
     }
     cb(touches, n, timestamp, userContext);
     return 0;

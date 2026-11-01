@@ -11,6 +11,8 @@ typedef struct {
     float x, y;
     float vx, vy;
     float size;
+    // Contact ellipse. A fingertip is about 6-10 across; a palm is much longer.
+    float majorAxis, minorAxis;
 } BrimTouch;
 
 typedef void (*BrimTouchCallback)(const BrimTouch *touches, int32_t count, double timestamp, void *context);

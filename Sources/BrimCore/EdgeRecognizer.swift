@@ -8,12 +8,16 @@ public struct TouchPoint: Equatable {
     public var y: Float
     /// Contact size as reported by the trackpad. Palms are much larger than fingertips.
     public var size: Float
+    /// Length of the contact ellipse. A palm resting on an edge is long even when only part of it
+    /// is on the trackpad (and so its size looks small).
+    public var major: Float
 
-    public init(id: Int32, x: Float, y: Float, size: Float = 0) {
+    public init(id: Int32, x: Float, y: Float, size: Float = 0, major: Float = 0) {
         self.id = id
         self.x = x
         self.y = y
         self.size = size
+        self.major = major
     }
 }
 
@@ -63,6 +67,9 @@ public enum EdgeAction: Equatable {
     case step(EdgeSide, up: Bool, fine: Bool)
     /// A swipe along a swipe edge. `forward` means up (left/right edges) or right (top/bottom edges).
     case swipe(EdgeSide, forward: Bool)
+    /// A slide turned out to be a palm (it grew, or another finger landed soon after):
+    /// undo what it changed.
+    case slideCancelled(EdgeSide)
     /// Two quick taps in the same place on an edge.
     case doubleTap(EdgeSide)
     /// Two quick taps in a corner.
@@ -79,6 +86,7 @@ public struct EdgeConfig: Equatable {
     /// Ignore contacts bigger than `palmSize` (a resting palm or thumb base).
     public var palmRejection = true
     public var palmSize: Float = 2.4
+    public var palmLength: Float = 16
     public var edges: [EdgeSide: EdgeKind] = [.left: .slider, .right: .slider, .top: .off, .bottom: .swipe]
     /// Corners that respond to a double-tap.
     public var corners: Set<Corner> = [.topRight]
@@ -122,6 +130,9 @@ public struct EdgeRecognizer {
     public static let tapMaxDuration: Double = 0.25
     public static let doubleTapWindow: Double = 0.4
     public static let doubleTapSpread: Float = 0.05    // both taps land in about the same place
+    // Palms: they rest, then creep; and a finger usually lands next to them soon after.
+    public static let engageWindow: Double = 0.5       // a slide has to get going this soon after touching
+    public static let palmWatch: Double = 1.5          // another finger this soon means the first was a palm
 
     struct Gesture {
         var id: Int32
@@ -168,6 +179,17 @@ public struct EdgeRecognizer {
                 actions.append(.releaseCursor)
                 return actions
             }
+            // A slide that turns out to be a palm: stop it and put things back.
+            if g.engaged, case .edge(let side) = g.zone, config.kind(side) == .slider {
+                let palm = isPalm(t)
+                let companion = touches.count > 1 && time - g.startTime <= Self.palmWatch
+                if palm || companion {
+                    gesture = nil
+                    actions.append(.slideCancelled(side))
+                    actions.append(.releaseCursor)
+                    return actions
+                }
+            }
             if update(&g, t, context: context, actions: &actions) {
                 gesture = g
             } else {
@@ -199,7 +221,7 @@ public struct EdgeRecognizer {
     // MARK: - Zones
 
     func isPalm(_ t: TouchPoint) -> Bool {
-        config.palmRejection && t.size > config.palmSize
+        config.palmRejection && (t.size > config.palmSize || t.major > config.palmLength)
     }
 
     func sideAllowed(atY y: Float) -> Bool {
@@ -289,7 +311,10 @@ public struct EdgeRecognizer {
         case .slider:
             if !g.engaged {
                 if abs(across) > zoneDepth * 1.5 { return false }  // left the edge before starting
-                guard abs(along) >= Self.engageDistance else { return true }
+                guard abs(along) >= Self.engageDistance else {
+                    // Resting, then creeping: a palm or a finger parked on the edge.
+                    return timeSinceStart(g) <= Self.engageWindow
+                }
                 guard abs(across) <= abs(along) * Self.straightness else { return false } // diagonal: a pointer move
                 g.engaged = true
                 actions.append(.slideBegan(side))

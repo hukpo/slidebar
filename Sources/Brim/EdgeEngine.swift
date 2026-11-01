@@ -129,6 +129,11 @@ final class EdgeEngine {
     private var expectedLevel: Float?
     /// Steps collected toward the next tab or undo action.
     private var pendingSteps = 0
+    /// How things were when the current slide began, to put back if it turns out to be a palm.
+    private var slideStartLevel: Float?
+    private var slideStartMuted = false
+    /// Tab or undo actions sent in this slide (forward minus back).
+    private var slideActions = 0
 
     private init() {
         // Keep the recognizer's config in sync with settings.
@@ -166,7 +171,7 @@ final class EdgeEngine {
             if let touches, count > 0 {
                 points.reserveCapacity(Int(count))
                 for t in UnsafeBufferPointer(start: touches, count: Int(count)) where t.state == 3 || t.state == 4 {
-                    points.append(TouchPoint(id: t.identifier, x: t.x, y: t.y, size: t.size))
+                    points.append(TouchPoint(id: t.identifier, x: t.x, y: t.y, size: t.size, major: t.majorAxis))
                 }
             }
             let engine = Unmanaged<EdgeEngine>.fromOpaque(context).takeUnretainedValue()
@@ -199,7 +204,7 @@ final class EdgeEngine {
             allowed = allowed && (flags.contains(.function) || flags.contains(.option))
         }
         // Like macOS's own palm protection: ignore new edge touches right after typing.
-        let typing = CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: .keyDown) < 0.5
+        let typing = CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: .keyDown) < 1.0
         let context = EdgeContext(gestureAllowed: allowed && !typing,
                                   fineKeysHeld: flags.contains([.shift, .option]),
                                   buttonHeld: NSEvent.pressedMouseButtons != 0)
@@ -234,10 +239,16 @@ final class EdgeEngine {
             live.activeSide = side
             pendingSteps = 0
             expectedLevel = currentLevel(function)
+            slideStartLevel = expectedLevel
+            slideStartMuted = live.muted
+            slideActions = 0
             live.record(function.title, at: side.title)
             if prefs.edgeGlow, function.hasLevel, let level = expectedLevel {
                 EdgeGlow.shared.show(function, on: side, level: level, muted: function == .volume && live.muted)
             }
+
+        case .slideCancelled(let side):
+            undoSlide(prefs.edge(side), side: side)
 
         case .step(let side, let up, let fine):
             step(prefs.edge(side), side: side, up: up, fine: fine)
@@ -298,8 +309,49 @@ final class EdgeEngine {
             case .undo: SystemControls.shortcut(.z, up ? [.maskCommand, .maskShift] : .maskCommand)
             default: return
             }
+            slideActions += up ? 1 : -1
             Haptics.tick(prefs.haptics)
         }
+    }
+
+    /// A palm moved the slider: quietly put everything back the way it was.
+    private func undoSlide(_ function: EdgeFunction, side: EdgeSide) {
+        EdgeGlow.shared.hide()
+        live.activeSide = nil
+        if function.hasLevel, let level = slideStartLevel {
+            let muted = slideStartMuted
+            // After the key presses already sent have landed.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+                switch function {
+                case .volume:
+                    SystemControls.setVolume(level)
+                    SystemControls.setMuted(muted)
+                case .brightness: SystemControls.setBrightness(level)
+                case .keyboardBrightness: KeyboardBacklight.setLevel(level)
+                case .micVolume: Microphone.setVolume(level)
+                case .nightShift: NightShift.setLevel(level)
+                default: break
+                }
+                self?.scheduleRefresh()
+            }
+        } else if slideActions != 0, live.trusted {
+            let back = slideActions < 0
+            for _ in 0..<abs(slideActions) {
+                switch function {
+                case .tabs: SystemControls.shortcut(.tab, back ? .maskControl : [.maskControl, .maskShift])
+                case .undo: SystemControls.shortcut(.z, back ? [.maskCommand, .maskShift] : .maskCommand)
+                default: break
+                }
+            }
+        }
+        slideActions = 0
+        slideStartLevel = nil
+        pendingSteps = 0
+        // Show it in Recently Triggered, so it's clear Brim caught it.
+        if let first = live.recent.first, first.spot == side.title {
+            live.recent.removeFirst()
+        }
+        live.record("Ignored a Palm", at: side.title)
     }
 
     private func swipe(_ function: EdgeFunction, forward: Bool) {
