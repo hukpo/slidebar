@@ -1,6 +1,6 @@
 ---
 name: Idea
-about: Suggest something Brim could do
+about: Suggest something Slidebar could do
 labels: idea
 ---
 
@@ -10,4 +10,4 @@ labels: idea
 **Why does it matter to you?**
 
 
-Brim leaves out anything macOS already does with multi-finger gestures (scrolling, zooming, switching desktops, Mission Control).
+Slidebar leaves out anything macOS already does with multi-finger gestures (scrolling, zooming, switching desktops, Mission Control).

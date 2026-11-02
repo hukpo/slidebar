@@ -1,5 +1,5 @@
 import AppKit
-import BrimCore
+import SlidebarCore
 import SwiftUI
 
 /// What an edge of the trackpad does. Only things a plain trackpad can't already do with its own
@@ -86,7 +86,7 @@ enum EdgeFunction: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Has a level Brim can show and haptically stop at.
+    /// Has a level Slidebar can show and haptically stop at.
     var hasLevel: Bool {
         switch self {
         case .brightness, .volume, .keyboardBrightness, .micVolume, .nightShift: return true

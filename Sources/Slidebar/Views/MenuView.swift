@@ -1,4 +1,4 @@
-import BrimCore
+import SlidebarCore
 import SwiftUI
 
 /// The popover's two pages.
@@ -48,7 +48,7 @@ struct MainPage: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 9) {
                 AppIconView(size: 22)
-                Text("Brim").font(.system(size: 15, weight: .semibold))
+                Text("Slidebar").font(.system(size: 15, weight: .semibold))
                 Spacer()
                 Text(stateText)
                     .font(.system(size: 11.5, weight: .medium))
@@ -56,10 +56,10 @@ struct MainPage: View {
                     .help(stateHelp)
                 Toggle(isOn: Binding(get: { !prefs.paused }, set: { prefs.paused = !$0 })) { EmptyView() }
                     .labelsHidden()
-                    .accessibilityLabel("Brim Gestures")
+                    .accessibilityLabel("Slidebar Gestures")
                     .modifier(SwitchStyle())
                     .controlSize(.small)
-                    .help(prefs.paused ? "Turn Brim on" : "Pause Brim. Your trackpad works as usual.")
+                    .help(prefs.paused ? "Turn Slidebar on" : "Pause Slidebar. Your trackpad works as usual.")
             }
             .padding(.horizontal, 2)
 
@@ -105,15 +105,15 @@ struct NoticeArea: View {
             EmptyView()
         } else if live.showWelcome {
             Banner(icon: "menubar.arrow.up.rectangle",
-                   text: "Brim lives here in the menu bar. Click its icon any time to see your levels or change what the edges do.",
+                   text: "Slidebar lives here in the menu bar. Click its icon any time to see your levels or change what the edges do.",
                    onDismiss: { live.showWelcome = false })
         } else if live.status == .noTrackpad {
             Banner(icon: "exclamationmark.triangle", tint: .orange,
-                   text: "Brim can't find a trackpad. Turn on or connect your Magic Trackpad.",
+                   text: "Slidebar can't find a trackpad. Turn on or connect your Magic Trackpad.",
                    primary: ("Look Again", { EdgeEngine.shared.restart() }))
         } else if let action = live.blockedAction, !live.trusted {
             Banner(icon: "lock", tint: .orange,
-                   text: "\(action) needs Accessibility, so Brim can press keys for you.",
+                   text: "\(action) needs Accessibility, so Slidebar can press keys for you.",
                    primary: ("Allow…", { Permissions.ask() }),
                    onDismiss: { live.blockedAction = nil })
         } else if live.showAccessNotice {
@@ -140,7 +140,7 @@ struct UpdateBanner: View {
         switch updater.phase {
         case .available(let info):
             Banner(icon: "arrow.down.circle",
-                   text: "Brim \(info.version) is ready to install." + (info.notes?.first.map { " \($0)" } ?? ""),
+                   text: "Slidebar \(info.version) is ready to install." + (info.notes?.first.map { " \($0)" } ?? ""),
                    primary: ("Install and Relaunch", { Task { await updater.install(info) } }),
                    onDismiss: { updater.dismiss() })
         case .downloading, .installing:
@@ -151,14 +151,14 @@ struct UpdateBanner: View {
                 Spacer()
             }
             .padding(10)
-            .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(Color.brimAccent.opacity(0.1)))
+            .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(Color.brandAccent.opacity(0.1)))
         case .upToDate:
             Banner(icon: "checkmark.circle", tint: .green,
-                   text: "You have the latest version of Brim (\(AppConfig.version)).",
+                   text: "You have the latest version of Slidebar (\(AppConfig.version)).",
                    onDismiss: { updater.dismiss() })
         case .failed(let message):
             Banner(icon: "exclamationmark.triangle", tint: .orange,
-                   text: "Brim couldn't update. \(message) Your current version keeps working.",
+                   text: "Slidebar couldn't update. \(message) Your current version keeps working.",
                    primary: ("Try Again", { AppActions.shared.checkForUpdates() }),
                    onDismiss: { updater.dismiss() })
         default:
@@ -171,7 +171,7 @@ struct UpdateBanner: View {
 struct StarBanner: View {
     var body: some View {
         Banner(icon: "star", tint: .yellow,
-               text: "Enjoying Brim? A star on GitHub helps other Mac users find it.",
+               text: "Enjoying Slidebar? A star on GitHub helps other Mac users find it.",
                primary: ("Star on GitHub", {
                    AppActions.shared.openSource()
                    Prefs.shared.starNoticeDismissed = true
@@ -180,7 +180,7 @@ struct StarBanner: View {
     }
 }
 
-/// Shown while Accessibility is off. Brim works without it, so this informs rather than alarms.
+/// Shown while Accessibility is off. Slidebar works without it, so this informs rather than alarms.
 struct AccessBanner: View {
     var body: some View {
         Banner(icon: "lock.open",

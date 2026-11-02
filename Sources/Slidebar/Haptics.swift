@@ -1,5 +1,5 @@
 import AppKit
-import CBrimPrivate
+import CSlidebarPrivate
 
 /// Small "ticks" under the finger while sliding.
 enum Haptics {
@@ -8,7 +8,7 @@ enum Haptics {
     /// A firmer bump for hitting the end of a range.
     static func bump(_ strength: HapticStrength) {
         guard strength != .off else { return }
-        if actuatorWorks, BrimHapticActuate(6) { return }
+        if actuatorWorks, SlidebarHapticActuate(6) { return }
         NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
     }
 
@@ -25,7 +25,7 @@ enum Haptics {
             case .strong: id = 6
             case .off: return
             }
-            if BrimHapticActuate(id) { return }
+            if SlidebarHapticActuate(id) { return }
             actuatorWorks = false
         }
 

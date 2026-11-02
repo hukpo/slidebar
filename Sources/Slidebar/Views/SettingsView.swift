@@ -115,7 +115,7 @@ struct AdvancedPage: View {
                 HStack(spacing: 10) {
                     FeatureIcon(systemName: "arrow.counterclockwise")
                     RowLabel(title: "Restore Defaults",
-                             subtitle: confirmRestore ? "Every edge, corner and option goes back to how Brim starts." : "Edges, corners and options")
+                             subtitle: confirmRestore ? "Every edge, corner and option goes back to how Slidebar starts." : "Edges, corners and options")
                     Spacer(minLength: 8)
                     if confirmRestore {
                         Button("Cancel") { confirmRestore = false }.controlSize(.small)
@@ -132,7 +132,7 @@ struct AdvancedPage: View {
 
             MenuFooter {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("Brim \(AppActions.shared.version)")
+                    Text("Slidebar \(AppActions.shared.version)")
                         .font(.system(size: 11, weight: .medium))
                     SourceLink()
                 }
@@ -177,8 +177,8 @@ struct SourceLink: View {
                 .foregroundStyle(.secondary)
             }
             .onHover { hovering = $0 }
-            .help("View Brim on GitHub")
-            .accessibilityLabel("Free and open source. View Brim on GitHub")
+            .help("View Slidebar on GitHub")
+            .accessibilityLabel("Free and open source. View Slidebar on GitHub")
         } else {
             Text("Free and open source")
                 .font(.system(size: 11))

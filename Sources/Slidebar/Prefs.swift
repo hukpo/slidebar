@@ -1,5 +1,5 @@
 import AppKit
-import BrimCore
+import SlidebarCore
 import Combine
 import ServiceManagement
 
@@ -93,7 +93,7 @@ final class Prefs: ObservableObject {
     @Published var hasCompletedSetup: Bool { didSet { defaults.set(hasCompletedSetup, forKey: Keys.setupDone) } }
     /// The system Accessibility prompt only ever appears once; after that we open System Settings instead.
     @Published var didPromptAccess: Bool { didSet { defaults.set(didPromptAccess, forKey: Keys.didPromptAccess) } }
-    /// The user chose to use Brim without Accessibility; stop mentioning it in the menu.
+    /// The user chose to use Slidebar without Accessibility; stop mentioning it in the menu.
     @Published var accessNoticeDismissed: Bool { didSet { defaults.set(accessNoticeDismissed, forKey: Keys.accessNoticeDismissed) } }
     /// The user closed (or acted on) the "star us on GitHub" notice.
     @Published var starNoticeDismissed: Bool { didSet { defaults.set(starNoticeDismissed, forKey: Keys.starNoticeDismissed) } }
@@ -128,6 +128,7 @@ final class Prefs: ObservableObject {
     }
 
     private init() {
+        Self.carryOverFromBrim()
         defaults.register(defaults: [
             Keys.haptics: HapticStrength.medium.rawValue,
             Keys.tapToPlay: false,
@@ -210,8 +211,17 @@ final class Prefs: ObservableObject {
         }
     }
 
-    /// Puts every gesture and option back the way Brim ships. Leaves appearance, updates,
+    /// Puts every gesture and option back the way Slidebar ships. Leaves appearance, updates,
     /// Open at Login, setup and notice state alone.
+    /// Slidebar used to be called Brim. On first launch, bring over the old app's settings.
+    private static func carryOverFromBrim() {
+        let defaults = UserDefaults.standard
+        guard let id = Bundle.main.bundleIdentifier, id != "app.brim.Brim",
+              defaults.object(forKey: Keys.setupDone) == nil,
+              let old = defaults.persistentDomain(forName: "app.brim.Brim"), !old.isEmpty else { return }
+        for (key, value) in old { defaults.set(value, forKey: key) }
+    }
+
     func restoreDefaults() {
         haptics = .medium
         tapToPlay = false
@@ -248,7 +258,7 @@ final class Prefs: ObservableObject {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
-            NSLog("Brim: could not change login item: \(error.localizedDescription)")
+            NSLog("Slidebar: could not change login item: \(error.localizedDescription)")
         }
         refreshOpenAtLogin()
     }

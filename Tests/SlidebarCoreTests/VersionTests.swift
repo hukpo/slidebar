@@ -1,5 +1,5 @@
 import XCTest
-@testable import BrimCore
+@testable import SlidebarCore
 
 final class VersionTests: XCTestCase {
     func testVersionCompare() {

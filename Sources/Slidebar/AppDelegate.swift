@@ -55,14 +55,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
             button.image = Brand.menuBarGlyph(paused: prefs.paused)
             button.action = #selector(togglePopover(_:))
             button.target = self
-            button.setAccessibilityTitle("Brim")
+            button.setAccessibilityTitle("Slidebar")
         }
         // The glyph shows paused, and a dot when a gesture needs Accessibility.
         prefs.$paused.combineLatest(live.$blockedAction)
             .receive(on: RunLoop.main)
             .sink { [weak self] paused, blocked in
                 self?.statusItem.button?.image = Brand.menuBarGlyph(paused: paused, attention: blocked != nil)
-                self?.statusItem.button?.setAccessibilityTitle(blocked != nil ? "Brim, needs attention" : "Brim")
+                self?.statusItem.button?.setAccessibilityTitle(blocked != nil ? "Slidebar, needs attention" : "Slidebar")
             }
             .store(in: &cancellables)
 
@@ -102,7 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
 
         Updater.shared.startAutomaticChecks()
 
-        // Only first-timers see the guide on launch. Brim works without Accessibility, so a
+        // Only first-timers see the guide on launch. Slidebar works without Accessibility, so a
         // missing permission is shown calmly in the menu, never forced on every launch.
         if !prefs.hasCompletedSetup {
             showSetupGuide()
@@ -136,7 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         LiveState.shared.refreshTrust()
         NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        // Keep the popover above Brim's own setup window, which activation brings forward.
+        // Keep the popover above Slidebar's own setup window, which activation brings forward.
         if let window = popover.contentViewController?.view.window {
             window.level = .popUpMenu
             window.makeKey()
@@ -162,7 +162,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         if setupWindow == nil {
             let view = SetupView()
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
-            window.title = "Welcome to Brim"
+            window.title = "Welcome to Slidebar"
             window.styleMask = [.titled, .closable, .fullSizeContentView]
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
@@ -182,7 +182,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         DispatchQueue.main.async { [weak self] in self?.finishSetup() }
     }
 
-    /// Ends onboarding by opening the menu under Brim's icon, so the user sees where Brim lives.
+    /// Ends onboarding by opening the menu under Slidebar's icon, so the user sees where Slidebar lives.
     func finishSetup() {
         Prefs.shared.hasCompletedSetup = true
         if setupWindow?.isVisible == true { setupWindow?.close() }
@@ -199,7 +199,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         if let url = AppConfig.sourceURL { link[.link] = url }
         credits.append(NSAttributedString(string: "Free and open source.", attributes: link))
         NSApp.orderFrontStandardAboutPanel(options: [
-            .applicationName: "Brim",
+            .applicationName: "Slidebar",
             .applicationIcon: AppActions.shared.iconImage,
             .credits: credits,
         ])

@@ -16,26 +16,26 @@ typedef struct {
     float size;
     // Contact ellipse. A fingertip is about 6-10 across; a palm is much longer.
     float majorAxis, minorAxis;
-} BrimTouch;
+} SlidebarTouch;
 
-typedef void (*BrimTouchCallback)(const BrimTouch *touches, int32_t count, double timestamp, void *context);
+typedef void (*SlidebarTouchCallback)(const SlidebarTouch *touches, int32_t count, double timestamp, void *context);
 
 // MARK: Multitouch (MultitouchSupport.framework)
 
 /// True when the private multitouch framework could be loaded.
-bool BrimMTAvailable(void);
+bool SlidebarMTAvailable(void);
 /// Starts listening on every trackpad. Returns the number of devices found.
 /// The callback runs on a private framework thread.
-int32_t BrimMTStart(BrimTouchCallback callback, void *context);
+int32_t SlidebarMTStart(SlidebarTouchCallback callback, void *context);
 /// Stops listening on all trackpads.
-void BrimMTStop(void);
+void SlidebarMTStop(void);
 
 // MARK: Haptics (MTActuator)
 
 /// Fires the Force Touch actuator of the built-in trackpad. Returns false if unavailable.
-bool BrimHapticActuate(int32_t actuationID);
+bool SlidebarHapticActuate(int32_t actuationID);
 
 // MARK: Display brightness (DisplayServices.framework)
 
-bool BrimGetBrightness(uint32_t displayID, float *outValue);
-bool BrimSetBrightness(uint32_t displayID, float value);
+bool SlidebarGetBrightness(uint32_t displayID, float *outValue);
+bool SlidebarSetBrightness(uint32_t displayID, float value);

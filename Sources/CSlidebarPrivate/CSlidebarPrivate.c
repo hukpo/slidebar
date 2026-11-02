@@ -1,4 +1,4 @@
-#include "CBrimPrivate.h"
+#include "CSlidebarPrivate.h"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <dlfcn.h>
@@ -67,7 +67,7 @@ static pthread_once_t loadOnce = PTHREAD_ONCE_INIT;
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 static CFMutableArrayRef devices = NULL;
-static BrimTouchCallback userCallback = NULL;
+static SlidebarTouchCallback userCallback = NULL;
 static void *userContext = NULL;
 static CFTypeRef actuator = NULL;
 static bool actuatorTried = false;
@@ -102,9 +102,9 @@ static void ensureLoaded(void) { pthread_once(&loadOnce, loadAPI); }
 
 static int contactFrame(MTDeviceRef device, mt_finger *fingers, int count, double timestamp, int frame) {
     (void)device; (void)frame;
-    BrimTouchCallback cb = userCallback;
+    SlidebarTouchCallback cb = userCallback;
     if (!cb) return 0;
-    BrimTouch touches[BRIM_MAX_TOUCHES];
+    SlidebarTouch touches[BRIM_MAX_TOUCHES];
     int n = count < BRIM_MAX_TOUCHES ? count : BRIM_MAX_TOUCHES;
     for (int i = 0; i < n; i++) {
         touches[i].identifier = fingers[i].identifier;
@@ -121,7 +121,7 @@ static int contactFrame(MTDeviceRef device, mt_finger *fingers, int count, doubl
     return 0;
 }
 
-bool BrimMTAvailable(void) {
+bool SlidebarMTAvailable(void) {
     ensureLoaded();
     return api.createList && api.registerCallback && api.start;
 }
@@ -138,8 +138,8 @@ static void stopLocked(void) {
     devices = NULL;
 }
 
-int32_t BrimMTStart(BrimTouchCallback callback, void *context) {
-    if (!BrimMTAvailable()) return 0;
+int32_t SlidebarMTStart(SlidebarTouchCallback callback, void *context) {
+    if (!SlidebarMTAvailable()) return 0;
     pthread_mutex_lock(&lock);
     stopLocked();
     userCallback = callback;
@@ -158,7 +158,7 @@ int32_t BrimMTStart(BrimTouchCallback callback, void *context) {
     return count;
 }
 
-void BrimMTStop(void) {
+void SlidebarMTStop(void) {
     if (!api.loaded) return;
     pthread_mutex_lock(&lock);
     stopLocked();
@@ -195,7 +195,7 @@ static void prepareActuatorLocked(void) {
     CFRelease(list);
 }
 
-bool BrimHapticActuate(int32_t actuationID) {
+bool SlidebarHapticActuate(int32_t actuationID) {
     ensureLoaded();
     pthread_mutex_lock(&lock);
     prepareActuatorLocked();
@@ -207,13 +207,13 @@ bool BrimHapticActuate(int32_t actuationID) {
 
 // MARK: - Brightness
 
-bool BrimGetBrightness(uint32_t displayID, float *outValue) {
+bool SlidebarGetBrightness(uint32_t displayID, float *outValue) {
     ensureLoaded();
     if (!api.getBrightness || !outValue) return false;
     return api.getBrightness(displayID, outValue) == 0;
 }
 
-bool BrimSetBrightness(uint32_t displayID, float value) {
+bool SlidebarSetBrightness(uint32_t displayID, float value) {
     ensureLoaded();
     if (!api.setBrightness) return false;
     if (value < 0) value = 0;

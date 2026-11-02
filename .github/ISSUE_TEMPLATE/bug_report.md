@@ -17,5 +17,5 @@ labels: bug
 **Your Mac**
 - macOS version:
 - Mac model and trackpad (built-in or Magic Trackpad):
-- Brim version (⋯ menu → About Brim):
+- Slidebar version (⋯ menu → About Slidebar):
 - Accessibility allowed: yes / no

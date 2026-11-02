@@ -1,7 +1,7 @@
 import AppKit
 import ApplicationServices
 
-/// Accessibility access. Brim works without it, but needs it to press keys for you
+/// Accessibility access. Slidebar works without it, but needs it to press keys for you
 /// (volume and brightness keys with the on-screen display, media keys, shortcuts).
 enum Permissions {
     static var isTrusted: Bool { AXIsProcessTrusted() }

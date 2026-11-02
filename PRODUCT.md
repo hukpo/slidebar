@@ -14,11 +14,11 @@ Everyday Mac users with a MacBook or Magic Trackpad. Not necessarily technical: 
 
 ## Product Purpose
 
-Brim turns the edges of the trackpad into sliders: left edge for brightness, right edge for volume, using the same on-screen display as the keyboard keys. Extras: double-tap the top-right corner to mute, swipe the bottom edge to skip tracks, haptic ticks, fine control (⇧⌥ for quarter steps), cursor freeze, palm rejection, and an on-screen edge glow. Success: a new user installs it, grants permission without confusion, slides once, and never thinks about it again.
+Slidebar turns the edges of the trackpad into sliders: left edge for brightness, right edge for volume, using the same on-screen display as the keyboard keys. Extras: double-tap the top-right corner to mute, swipe the bottom edge to skip tracks, haptic ticks, fine control (⇧⌥ for quarter steps), cursor freeze, palm rejection, and an on-screen edge glow. Success: a new user installs it, grants permission without confusion, slides once, and never thinks about it again.
 
 ## Positioning
 
-Feel and craft. Brim should feel like Apple built it: precise haptics, a quiet native interface, nothing that looks bolted on. Competing apps (e.g. EdgeBar) offer the same basic gesture; Brim wins on how it feels in the hand and how calm and clear it is to set up.
+Feel and craft. Slidebar should feel like Apple built it: precise haptics, a quiet native interface, nothing that looks bolted on. Competing apps (e.g. EdgeBar) offer the same basic gesture; Slidebar wins on how it feels in the hand and how calm and clear it is to set up.
 
 ## Operating Context
 
@@ -28,17 +28,17 @@ Feel and craft. Brim should feel like Apple built it: precise haptics, a quiet n
 
 ## Capabilities and Constraints
 
-- Requires Accessibility permission to send volume/brightness/media key events; without it Brim still changes levels directly but shows no system on-screen display.
+- Requires Accessibility permission to send volume/brightness/media key events; without it Slidebar still changes levels directly but shows no system on-screen display.
 - Reads raw trackpad touches through a private Apple framework; future macOS updates may change behavior.
 - Brightness control covers the built-in display only.
 - Updates can download and install themselves from an update feed (`appcast.json`) when one is configured.
-- **Distribution: free and open source** under the MIT License, hosted at github.com/hukpo/brim. The website is published to GitHub Pages (hukpo.github.io/brim) and DMGs are attached to GitHub releases. No trial, license keys or payments. One closable notice asks for a GitHub star after setup; no other asks.
-- Accessibility is optional: without it, Brim still changes volume, brightness and mute directly; with it, the system on-screen display appears and media gestures work.
+- **Distribution: free and open source** under the MIT License, hosted at github.com/hukpo/slidebar. The website is published to GitHub Pages (hukpo.github.io/slidebar) and DMGs are attached to GitHub releases. No trial, license keys or payments. One closable notice asks for a GitHub star after setup; no other asks.
+- Accessibility is optional: without it, Slidebar still changes volume, brightness and mute directly; with it, the system on-screen display appears and media gestures work.
 
 ## Brand Commitments
 
-- Name: **Brim** ("filled to the brim"; the edge of something). Tagline in use: "Slide the edge."
-- App icon: a trackpad on a midnight-indigo tile, warm amber brightness edge on the left, cool cyan-violet volume edge on the right, a glowing fingertip on the volume edge. Drawn in code (`Sources/Brim/BrandArt.swift`).
+- Name: **Slidebar** (slide + bar: a slider bar on the edge of your trackpad; also a play on "sidebar"). Tagline in use: "Slide the edge." Renamed from Brim on 2026-11-02 because "Brim" collided with Brim Security/Zui in search.
+- App icon ("Lit edge"): the tile is the trackpad, an indigo-to-violet gradient with one glowing white level bar on its right edge, filled about two thirds. Master artwork: `Resources/AppIcon-1024.png`. The menu bar glyph echoes it: a rounded tile outline with a level bar on the right edge.
 - Brand color (amber → violet → cyan) is reserved for the live level meters and brand moments; app controls use the user's system accent color.
 
 ## Evidence on Hand
@@ -51,5 +51,5 @@ Feel and craft. Brim should feel like Apple built it: precise haptics, a quiet n
 1. Obvious to a first-time Mac user: plain words, one clear next step, no jargon ("Accessibility" is explained, not assumed).
 2. Feel first: every interaction should be precise and responsive, with haptics and motion that confirm, never decorate.
 3. Native and quiet: follow macOS conventions; color and glow only where they carry meaning (the levels).
-4. Never surprising: Brim must not change anything the user did not slide, tap or swipe on purpose.
+4. Never surprising: Slidebar must not change anything the user did not slide, tap or swipe on purpose.
 5. Free and honest: no nags, no fake scarcity, no claims we can't back.

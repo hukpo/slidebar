@@ -1,13 +1,13 @@
 import AppKit
-import BrimCore
-import CBrimPrivate
+import SlidebarCore
+import CSlidebarPrivate
 import Combine
 
 /// Live values shown in the menu, plus overall status.
 final class LiveState: ObservableObject {
     static let shared = LiveState()
 
-    /// Whether Brim is responding to the trackpad right now.
+    /// Whether Slidebar is responding to the trackpad right now.
     enum Status: Equatable {
         case ready, noTrackpad, paused
     }
@@ -26,7 +26,7 @@ final class LiveState: ObservableObject {
     @Published var slideCount = 0
     /// The edge currently being slid, for highlighting in the menu.
     @Published var activeSide: EdgeSide?
-    /// True right after setup, when the menu opens to show where Brim lives.
+    /// True right after setup, when the menu opens to show where Slidebar lives.
     @Published var showWelcome = false
     /// Set when a gesture asked for something that needs Accessibility, so the menu can explain.
     @Published var blockedAction: String?
@@ -137,7 +137,7 @@ final class EdgeEngine {
 
     func start() {
         let context = Unmanaged.passUnretained(self).toOpaque()
-        let count = BrimMTStart({ touches, count, timestamp, context in
+        let count = SlidebarMTStart({ touches, count, timestamp, context in
             guard let context else { return }
             var points: [TouchPoint] = []
             if let touches, count > 0 {
@@ -150,7 +150,7 @@ final class EdgeEngine {
             DispatchQueue.main.async { engine.handle(points, time: timestamp) }
         }, context)
         live.deviceCount = Int(count)
-        NSLog("Brim: listening on \(count) trackpad(s)")
+        NSLog("Slidebar: listening on \(count) trackpad(s)")
     }
 
     func restart() {
@@ -160,7 +160,7 @@ final class EdgeEngine {
     }
 
     func stop() {
-        BrimMTStop()
+        SlidebarMTStop()
         releaseCursor()
     }
 
@@ -405,7 +405,7 @@ final class EdgeEngine {
             guard let self, self.brightnessKeysWork == nil else { return }
             let after = SystemControls.brightness() ?? before
             if abs(after - before) < 0.002 {
-                NSLog("Brim: brightness keys had no effect, switching to direct control")
+                NSLog("Slidebar: brightness keys had no effect, switching to direct control")
                 self.brightnessKeysWork = false
                 self.setBrightnessDirectly(delta)
             } else {

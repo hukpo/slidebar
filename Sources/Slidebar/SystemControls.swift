@@ -1,6 +1,6 @@
 import AppKit
 import AudioToolbox
-import CBrimPrivate
+import CSlidebarPrivate
 import CoreAudio
 
 /// Hardware "aux" keys understood by macOS (from IOKit's ev_keymap.h).
@@ -126,19 +126,19 @@ enum SystemControls {
     /// Display brightness from 0 to 1, or nil if it can't be read.
     static func brightness() -> Float? {
         var value: Float = 0
-        return BrimGetBrightness(builtInDisplay(), &value) ? value : nil
+        return SlidebarGetBrightness(builtInDisplay(), &value) ? value : nil
     }
 
     @discardableResult
     static func setBrightness(_ value: Float) -> Bool {
-        BrimSetBrightness(builtInDisplay(), value)
+        SlidebarSetBrightness(builtInDisplay(), value)
     }
 }
 
 // MARK: - Shortcuts and system actions
 
 extension SystemControls {
-    /// Virtual key codes (Carbon kVK_*) used by Brim's actions.
+    /// Virtual key codes (Carbon kVK_*) used by Slidebar's actions.
     enum Key: CGKeyCode {
         case tab = 48, z = 6, grave = 50, space = 49, q = 12
     }

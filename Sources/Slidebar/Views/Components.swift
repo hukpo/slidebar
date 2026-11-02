@@ -5,17 +5,17 @@ import SwiftUI
 
 extension Color {
     /// The user's own accent color from System Settings, like any native Mac app.
-    static let brimAccent = Color.accentColor
-    static let brimAmber = Color(nsColor: Brand.amberBottom)
-    static let brimAmberTop = Color(nsColor: Brand.amberTop)
-    static let brimCyan = Color(nsColor: Brand.cyanTop)
-    static let brimViolet = Color(nsColor: Brand.violetBottom)
-    static let brimNightTop = Color(nsColor: Brand.backgroundTop)
-    static let brimNightBottom = Color(nsColor: Brand.backgroundBottom)
+    static let brandAccent = Color.accentColor
+    static let brandAmber = Color(nsColor: Brand.amberBottom)
+    static let brandAmberTop = Color(nsColor: Brand.amberTop)
+    static let brandCyan = Color(nsColor: Brand.cyanTop)
+    static let brandViolet = Color(nsColor: Brand.violetBottom)
+    static let brandNightTop = Color(nsColor: Brand.backgroundTop)
+    static let brandNightBottom = Color(nsColor: Brand.backgroundBottom)
 }
 
 extension LinearGradient {
-    static let brimNight = LinearGradient(colors: [.brimNightTop, .brimNightBottom], startPoint: .top, endPoint: .bottom)
+    static let brandNight = LinearGradient(colors: [.brandNightTop, .brandNightBottom], startPoint: .top, endPoint: .bottom)
 }
 
 /// The dark brand surface behind the setup guide's header.
@@ -25,11 +25,11 @@ struct NightBackground: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         shape
-            .fill(LinearGradient.brimNight)
+            .fill(LinearGradient.brandNight)
             .overlay(
                 ZStack {
-                    RadialGradient(colors: [Color.brimAmber.opacity(0.16), .clear], center: .leading, startRadius: 0, endRadius: 160)
-                    RadialGradient(colors: [Color.brimViolet.opacity(0.24), .clear], center: .trailing, startRadius: 0, endRadius: 160)
+                    RadialGradient(colors: [Color.brandAmber.opacity(0.16), .clear], center: .leading, startRadius: 0, endRadius: 160)
+                    RadialGradient(colors: [Color.brandViolet.opacity(0.24), .clear], center: .trailing, startRadius: 0, endRadius: 160)
                 }
                 .clipShape(shape)
             )
@@ -192,7 +192,7 @@ private struct SnapshotSwitchStyle: ToggleStyle {
         HStack(spacing: 0) {
             configuration.label
             ZStack(alignment: configuration.isOn ? .trailing : .leading) {
-                Capsule().fill(configuration.isOn ? Color.brimAccent : Color.primary.opacity(0.12))
+                Capsule().fill(configuration.isOn ? Color.brandAccent : Color.primary.opacity(0.12))
                 Circle().fill(.white).shadow(color: .black.opacity(0.25), radius: 1, y: 0.5).padding(1.5)
             }
             .frame(width: 32, height: 18)
@@ -277,14 +277,14 @@ struct MoreMenu: View {
             Button("Find Trackpads Again") { EdgeEngine.shared.restart() }
             Divider()
             if let update = updater.available {
-                Button("Install Brim \(update.version)…") { Task { await updater.install(update) } }
+                Button("Install Slidebar \(update.version)…") { Task { await updater.install(update) } }
             } else if updater.isConfigured {
                 Button("Check for Updates…") { AppActions.shared.checkForUpdates() }
             }
             if AppConfig.sourceURL != nil {
                 Button("View Source Code…") { AppActions.shared.openSource() }
             }
-            Button("About Brim") { AppActions.shared.showAbout() }
+            Button("About Slidebar") { AppActions.shared.showAbout() }
         } label: {
             Image(systemName: "ellipsis.circle")
                 .font(.system(size: 13, weight: .medium))
@@ -308,7 +308,7 @@ struct MenuFooter<Leading: View>: View {
             leading
             Spacer()
             MoreMenu()
-            PlainIconButton(systemName: "power", title: "Quit", help: "Quit Brim (⌘Q)") { NSApp.terminate(nil) }
+            PlainIconButton(systemName: "power", title: "Quit", help: "Quit Slidebar (⌘Q)") { NSApp.terminate(nil) }
                 .keyboardShortcut("q", modifiers: .command)
         }
     }
@@ -316,7 +316,7 @@ struct MenuFooter<Leading: View>: View {
 
 // MARK: - Icon and notices
 
-/// Brim's icon tile, as shown next to its name.
+/// Slidebar's icon tile, as shown next to its name.
 struct AppIconView: View {
     var size: CGFloat = 22
     var body: some View {
@@ -333,7 +333,7 @@ struct AppIconView: View {
 /// A tinted notice with an optional button and an optional close button.
 struct Banner: View {
     let icon: String
-    var tint: Color = .brimAccent
+    var tint: Color = .brandAccent
     let text: String
     var primary: (String, () -> Void)?
     var onDismiss: (() -> Void)?

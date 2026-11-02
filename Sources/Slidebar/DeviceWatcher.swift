@@ -46,7 +46,7 @@ final class DeviceWatcher {
     private func scheduleRestart() {
         pending?.cancel()
         let work = DispatchWorkItem {
-            NSLog("Brim: trackpads changed, listening again")
+            NSLog("Slidebar: trackpads changed, listening again")
             EdgeEngine.shared.restart()
         }
         pending = work

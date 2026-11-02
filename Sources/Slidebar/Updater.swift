@@ -1,5 +1,5 @@
 import AppKit
-import BrimCore
+import SlidebarCore
 import CryptoKit
 import Security
 
@@ -70,7 +70,7 @@ final class Updater: ObservableObject {
         phase = .checking
         do {
             var request = URLRequest(url: feed, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
-            request.setValue("Brim/\(AppConfig.version)", forHTTPHeaderField: "User-Agent")
+            request.setValue("Slidebar/\(AppConfig.version)", forHTTPHeaderField: "User-Agent")
             let (data, response) = try await URLSession.shared.data(for: request)
             guard (response as? HTTPURLResponse)?.statusCode ?? 200 < 400 else { throw UpdateError("The update server didn't respond.") }
             let info = try JSONDecoder().decode(UpdateInfo.self, from: data)
@@ -97,7 +97,7 @@ final class Updater: ObservableObject {
             else { throw UpdateError("The update link is broken.") }
 
             let (downloaded, _) = try await URLSession.shared.download(from: url)
-            let dmg = FileManager.default.temporaryDirectory.appendingPathComponent("Brim-update-\(UUID().uuidString).dmg")
+            let dmg = FileManager.default.temporaryDirectory.appendingPathComponent("Slidebar-update-\(UUID().uuidString).dmg")
             try FileManager.default.moveItem(at: downloaded, to: dmg)
             defer { try? FileManager.default.removeItem(at: dmg) }
 
@@ -116,7 +116,7 @@ final class Updater: ObservableObject {
 
     /// Mounts the DMG, checks the app's signature, and copies it to a staging folder.
     nonisolated private static func stage(dmg: URL) throws -> URL {
-        let mount = FileManager.default.temporaryDirectory.appendingPathComponent("BrimMount-\(UUID().uuidString)")
+        let mount = FileManager.default.temporaryDirectory.appendingPathComponent("SlidebarMount-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: mount, withIntermediateDirectories: true)
         try run("/usr/bin/hdiutil", ["attach", dmg.path, "-nobrowse", "-readonly", "-noautoopen", "-mountpoint", mount.path])
         defer {
@@ -133,9 +133,9 @@ final class Updater: ObservableObject {
             throw UpdateError("The update was signed by someone else.")
         }
 
-        let stageDir = FileManager.default.temporaryDirectory.appendingPathComponent("BrimStage-\(UUID().uuidString)")
+        let stageDir = FileManager.default.temporaryDirectory.appendingPathComponent("SlidebarStage-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: stageDir, withIntermediateDirectories: true)
-        let staged = stageDir.appendingPathComponent("Brim.app")
+        let staged = stageDir.appendingPathComponent("Slidebar.app")
         try run("/usr/bin/ditto", [newApp.path, staged.path])
         return staged
     }
@@ -143,9 +143,9 @@ final class Updater: ObservableObject {
     /// Hands off to a tiny shell script that waits for us to quit, swaps the bundle and reopens it.
     private func relaunch(replacingWith staged: URL) throws {
         let current = Bundle.main.bundleURL
-        guard current.pathExtension == "app" else { throw UpdateError("Brim isn't running from an app bundle.") }
+        guard current.pathExtension == "app" else { throw UpdateError("Slidebar isn't running from an app bundle.") }
         guard FileManager.default.isWritableFile(atPath: current.deletingLastPathComponent().path) else {
-            throw UpdateError("Brim can't write to \(current.deletingLastPathComponent().path).")
+            throw UpdateError("Slidebar can't write to \(current.deletingLastPathComponent().path).")
         }
         let script = """
         while /bin/kill -0 \(ProcessInfo.processInfo.processIdentifier) 2>/dev/null; do /bin/sleep 0.2; done

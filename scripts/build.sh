@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Builds Brim.app (and optionally a DMG) into ./build.
-#   scripts/build.sh            # release build → build/Brim.app
-#   scripts/build.sh --dmg      # also build/Brim-<version>.dmg, build/Brim.dmg and website/appcast.json
+# Builds Slidebar.app (and optionally a DMG) into ./build.
+#   scripts/build.sh            # release build → build/Slidebar.app
+#   scripts/build.sh --dmg      # also build/Slidebar-<version>.dmg, build/Slidebar.dmg and website/appcast.json
 #   scripts/build.sh --install  # also copy to /Applications and launch
 #
 # Release settings (all optional, via environment). Forks should set the first two to their own.
-#   SOURCE_URL=https://…        the repository (default github.com/hukpo/brim); the DMG is downloaded
+#   SOURCE_URL=https://…        the repository (default github.com/hukpo/slidebar); the DMG is downloaded
 #                               from its GitHub release v$VERSION
 #   WEBSITE_URL=https://…       where website/ is hosted; the update feed is $WEBSITE_URL/appcast.json
 #   UPDATE_FEED_URL=https://…   override the update feed ("" turns updates off)
@@ -18,36 +18,37 @@ cd "$(dirname "$0")/.."
 
 VERSION="${VERSION:-1.0}"
 BUILD="${BUILD_NUMBER:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
-APP="build/Brim.app"
+APP="build/Slidebar.app"
 
 echo "→ Compiling (release)"
 swift build -c release --arch arm64 --arch x86_64 2>/dev/null \
   || swift build -c release
-BIN="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path 2>/dev/null || swift build -c release --show-bin-path)/Brim"
+BIN="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path 2>/dev/null || swift build -c release --show-bin-path)/Slidebar"
 
 if [ ! -f Resources/AppIcon.icns ]; then
-  echo "→ Rendering icon"
-  mkdir -p .build
-  swiftc scripts/IconTool/main.swift Sources/Brim/BrandArt.swift -o .build/icontool
-  .build/icontool Resources
-  iconutil -c icns Resources/AppIcon.iconset -o Resources/AppIcon.icns
-  rm -rf Resources/AppIcon.iconset
+  echo "→ Making AppIcon.icns from Resources/AppIcon-1024.png"
+  ICONSET="$(mktemp -d)/AppIcon.iconset"; mkdir -p "$ICONSET"
+  for b in 16 32 128 256 512; do
+    sips -z $b $b Resources/AppIcon-1024.png --out "$ICONSET/icon_${b}x${b}.png" >/dev/null
+    sips -z $((b*2)) $((b*2)) Resources/AppIcon-1024.png --out "$ICONSET/icon_${b}x${b}@2x.png" >/dev/null
+  done
+  iconutil -c icns "$ICONSET" -o Resources/AppIcon.icns
 fi
 
 echo "→ Assembling $APP"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN" "$APP/Contents/MacOS/Brim"
-cp Resources/AppIcon.icns "$APP/Contents/Resources/"
+cp "$BIN" "$APP/Contents/MacOS/Slidebar"
+cp Resources/AppIcon.icns Resources/AppIcon-1024.png "$APP/Contents/Resources/"
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" Resources/Info.plist > "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
 PLIST="$APP/Contents/Info.plist"
-SOURCE_URL="${SOURCE_URL:-https://github.com/hukpo/brim}"
-WEBSITE_URL="${WEBSITE_URL:-https://hukpo.github.io/brim}"
+SOURCE_URL="${SOURCE_URL:-https://github.com/hukpo/slidebar}"
+WEBSITE_URL="${WEBSITE_URL:-https://hukpo.github.io/slidebar}"
 UPDATE_FEED_URL="${UPDATE_FEED_URL-${WEBSITE_URL%/}/appcast.json}"
-plutil -replace BrimUpdateFeedURL -string "$UPDATE_FEED_URL" "$PLIST"
-plutil -replace BrimSourceURL -string "$SOURCE_URL" "$PLIST"
+plutil -replace SlidebarUpdateFeedURL -string "$UPDATE_FEED_URL" "$PLIST"
+plutil -replace SlidebarSourceURL -string "$SOURCE_URL" "$PLIST"
 echo "   updates:   ${UPDATE_FEED_URL:-off}"
 
 IDENTITY="${SIGN_IDENTITY:-}"
@@ -64,15 +65,15 @@ fi
 codesign --verify --strict "$APP"
 
 if [[ " $* " == *" --dmg "* ]]; then
-  DMG="build/Brim-$VERSION.dmg"
+  DMG="build/Slidebar-$VERSION.dmg"
   echo "→ Packaging $DMG"
   STAGE="$(mktemp -d)"
   cp -R "$APP" "$STAGE/"
   ln -s /Applications "$STAGE/Applications"
   rm -f "$DMG"
-  hdiutil create -volname "Brim" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+  hdiutil create -volname "Slidebar" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
   rm -rf "$STAGE"
-  cp "$DMG" build/Brim.dmg   # the stable name the website links to (releases/latest/download/Brim.dmg)
+  cp "$DMG" build/Slidebar.dmg   # the stable name the website links to (releases/latest/download/Slidebar.dmg)
 
   echo "→ Writing website/appcast.json"
   SHA="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
@@ -82,22 +83,22 @@ version, build, sha, notes, source = sys.argv[1:6]
 print(json.dumps({
     "version": version,
     "build": int(build),
-    "url": f"{source}/releases/download/v{version}/Brim-{version}.dmg",
+    "url": f"{source}/releases/download/v{version}/Slidebar-{version}.dmg",
     "sha256": sha,
     "date": datetime.date.today().isoformat(),
     "minimumSystemVersion": "13.0",
     "notes": [n.strip() for n in notes.split("|") if n.strip()],
 }, indent=2))
 PY
-  echo "   publish:   gh release create v$VERSION $DMG build/Brim.dmg, then push website/appcast.json"
+  echo "   publish:   gh release create v$VERSION $DMG build/Slidebar.dmg, then push website/appcast.json"
 fi
 
 if [[ " $* " == *" --install "* ]]; then
   echo "→ Installing to /Applications"
-  pkill -x Brim 2>/dev/null || true
-  rm -rf /Applications/Brim.app
+  pkill -x Slidebar 2>/dev/null || true
+  rm -rf /Applications/Slidebar.app
   cp -R "$APP" /Applications/
-  open /Applications/Brim.app
+  open /Applications/Slidebar.app
 fi
 
 echo "✓ Done: $APP"

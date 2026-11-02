@@ -1,4 +1,4 @@
-import BrimCore
+import SlidebarCore
 import SwiftUI
 
 /// Something on the trackpad map the user can pick.
@@ -348,7 +348,7 @@ private struct EdgeSpot: View {
         .padding(.vertical, 4)
         .background(Capsule().fill(fill))
         .overlay(Capsule().strokeBorder(Color.white.opacity(dark ? 0.09 : 0.7), lineWidth: 0.5))
-        .overlay(Capsule().strokeBorder(Color.brimAccent, lineWidth: selected ? 2 : 0))
+        .overlay(Capsule().strokeBorder(Color.brandAccent, lineWidth: selected ? 2 : 0))
         .overlay(Capsule().inset(by: -3).stroke(Color(nsColor: .keyboardFocusIndicatorColor),
                                                 lineWidth: selected && keyboardFocused ? 3 : 0))
         .shadow(color: .black.opacity(off ? 0 : (dark ? 0.3 : 0.14)), radius: 1.5, y: 0.5)
@@ -379,7 +379,7 @@ private struct CornerSpot<Label: View>: View {
                     .padding(on ? 3 : 0)
                 Circle().strokeBorder(Color.primary.opacity(off && !selected ? 0.25 : 0), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
                     .padding(3)
-                Circle().strokeBorder(Color.brimAccent, lineWidth: selected ? 2 : 0)
+                Circle().strokeBorder(Color.brandAccent, lineWidth: selected ? 2 : 0)
                 Circle().inset(by: -3).stroke(Color(nsColor: .keyboardFocusIndicatorColor),
                                               lineWidth: selected && keyboardFocused ? 3 : 0)
                 label()
@@ -401,8 +401,8 @@ extension EdgeFunction {
     /// The strip's colors on the trackpad map: one hue per action, readable on silver and on gray.
     var mapColors: [Color] {
         switch self {
-        case .brightness: return [.brimAmber, .brimAmberTop]
-        case .volume: return [.brimViolet, .brimCyan]
+        case .brightness: return [.brandAmber, .brandAmberTop]
+        case .volume: return [.brandViolet, .brandCyan]
         case .keyboardBrightness: return [Color(red: 0.24, green: 0.52, blue: 0.98), Color(red: 0.5, green: 0.74, blue: 1)]
         case .micVolume: return [Color(red: 0.16, green: 0.62, blue: 0.45), Color(red: 0.5, green: 0.95, blue: 0.72)]
         case .nightShift: return [Color(red: 0.95, green: 0.42, blue: 0.12), Color(red: 1.0, green: 0.72, blue: 0.38)]

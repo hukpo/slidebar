@@ -161,7 +161,7 @@ enum KeepAwake {
             var id: IOPMAssertionID = 0
             let result = IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString,
                                                      IOPMAssertionLevel(kIOPMAssertionLevelOn),
-                                                     "Brim: Keep Mac Awake" as CFString, &id)
+                                                     "Slidebar: Keep Mac Awake" as CFString, &id)
             if result == kIOReturnSuccess { assertion = id }
         }
         LiveState.shared.keepingAwake = isOn

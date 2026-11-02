@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// `Brim --snapshot <dir> [light|dark]` renders each screen to a PNG (for docs and visual checks).
+/// `Slidebar --snapshot <dir> [light|dark]` renders each screen to a PNG (for docs and visual checks).
 enum Snapshot {
     static func runIfRequested() -> Bool {
         let args = CommandLine.arguments

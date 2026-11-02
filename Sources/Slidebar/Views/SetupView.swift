@@ -1,4 +1,4 @@
-import BrimCore
+import SlidebarCore
 import SwiftUI
 
 /// First-run guide: try a slide, optionally allow Accessibility, then finish in the menu bar.
@@ -17,7 +17,7 @@ struct SetupView: View {
                     HStack(spacing: 10) {
                         AppIconView(size: 34)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text("Welcome to Brim")
+                            Text("Welcome to Slidebar")
                                 .font(.system(size: 20, weight: .semibold))
                                 .accessibilityAddTraits(.isHeader)
                             Text("Slide along the edges of your trackpad to change things like volume and brightness. You choose what each edge and corner does.")
@@ -41,7 +41,7 @@ struct SetupView: View {
                 StepRow(number: 1, done: triedSlide,
                         title: live.deviceCount == 0 ? "Connect a trackpad" : "Try it now",
                         detail: live.deviceCount == 0
-                            ? "Brim can't find a trackpad. Turn on or connect your Magic Trackpad, then try again."
+                            ? "Slidebar can't find a trackpad. Turn on or connect your Magic Trackpad, then try again."
                             : firstTryText) {
                     EmptyView()
                 }
@@ -58,7 +58,7 @@ struct SetupView: View {
                 }
 
                 HStack {
-                    Text("You can open this guide again from Brim's menu bar icon.")
+                    Text("You can open this guide again from Slidebar's menu bar icon.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -88,7 +88,7 @@ struct SetupView: View {
                 return "Rest one finger on the \(side.title.lowercased().replacingOccurrences(of: " edge", with: "")) edge of your trackpad and slide \(way). \(what)"
             }
         }
-        return "Slide one finger along an edge of your trackpad. You can choose what each edge does in Brim's menu."
+        return "Slide one finger along an edge of your trackpad. You can choose what each edge does in Slidebar's menu."
     }
 
     private var accessDetail: String {
@@ -96,9 +96,9 @@ struct SetupView: View {
             return "All set. You'll see the usual volume and brightness display, and gestures that press keys, like songs, tabs and Spotlight, work too."
         }
         if prefs.didPromptAccess {
-            return "In System Settings, turn on Brim in the Accessibility list. macOS may ask for your password. Then come back here."
+            return "In System Settings, turn on Slidebar in the Accessibility list. macOS may ask for your password. Then come back here."
         }
-        return "Brim already works. Allowing this once lets it show the usual volume and brightness display and use gestures that press keys, like songs, tabs and Spotlight. Brim is open source, so anyone can check what it does."
+        return "Slidebar already works. Allowing this once lets it show the usual volume and brightness display and use gestures that press keys, like songs, tabs and Spotlight. Slidebar is open source, so anyone can check what it does."
     }
 }
 

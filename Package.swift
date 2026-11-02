@@ -2,17 +2,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "Brim",
+    name: "Slidebar",
     platforms: [.macOS(.v13)],
     targets: [
         // Thin C layer over the private macOS frameworks (loaded at runtime with dlopen).
-        .target(name: "CBrimPrivate", path: "Sources/CBrimPrivate"),
+        .target(name: "CSlidebarPrivate", path: "Sources/CSlidebarPrivate"),
         // Pure gesture logic, unit tested.
-        .target(name: "BrimCore", path: "Sources/BrimCore"),
+        .target(name: "SlidebarCore", path: "Sources/SlidebarCore"),
         .executableTarget(
-            name: "Brim",
-            dependencies: ["CBrimPrivate", "BrimCore"],
-            path: "Sources/Brim",
+            name: "Slidebar",
+            dependencies: ["CSlidebarPrivate", "SlidebarCore"],
+            path: "Sources/Slidebar",
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("CoreAudio"),
@@ -20,6 +20,6 @@ let package = Package(
                 .linkedFramework("ServiceManagement"),
             ]
         ),
-        .testTarget(name: "BrimCoreTests", dependencies: ["BrimCore"], path: "Tests/BrimCoreTests"),
+        .testTarget(name: "SlidebarCoreTests", dependencies: ["SlidebarCore"], path: "Tests/SlidebarCoreTests"),
     ]
 )

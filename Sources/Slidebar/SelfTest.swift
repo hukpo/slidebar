@@ -1,11 +1,11 @@
 import AppKit
-import BrimCore
-import CBrimPrivate
+import SlidebarCore
+import CSlidebarPrivate
 
 /// Command-line checks for verifying a build on a real Mac:
 /// `--selftest`, `--simulate` and `--check-keys`. Each one restores what it changed.
 enum SelfTest {
-    /// `Brim --simulate`: drives the real gesture engine with synthetic finger paths and checks
+    /// `Slidebar --simulate`: drives the real gesture engine with synthetic finger paths and checks
     /// that volume, brightness and mute actually change. Restores every level afterwards.
     static func runSimulationIfRequested() -> Bool {
         guard CommandLine.arguments.contains("--simulate") else { return false }
@@ -204,7 +204,7 @@ enum SelfTest {
             let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/pmset"); p.arguments = ["-g", "assertions"]
             let pipe = Pipe(); p.standardOutput = pipe; try? p.run()
             let out = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self); p.waitUntilExit()
-            return out.contains("Brim: Keep Mac Awake")
+            return out.contains("Slidebar: Keep Mac Awake")
         }
         tap(x: 0.95, y: 0.05); tap(x: 0.95, y: 0.05); wait(0.4)
         let awakeOn = awakeAssertion() && KeepAwake.isOn
@@ -213,7 +213,7 @@ enum SelfTest {
         line(awakeOn && awakeOff, "Corner set to Keep Mac Awake turns it on and off", "on: \(awakeOn), off again: \(awakeOff)")
         prefs.corners[.bottomRight] = .off
 
-        // Run a Shortcut: Brim can read the user's shortcut list (without running any).
+        // Run a Shortcut: Slidebar can read the user's shortcut list (without running any).
         var shortcutNames: [String]? = nil
         UserShortcuts.list { shortcutNames = $0 }
         for _ in 0..<50 where shortcutNames == nil { wait(0.1) }
@@ -266,10 +266,10 @@ enum SelfTest {
 
     static var keyCheckRequested: Bool { CommandLine.arguments.contains("--check-keys") }
 
-    /// `open -n -W build/Brim.app --args --check-keys`: opens Brim's own test windows and drives real
+    /// `open -n -W build/Slidebar.app --args --check-keys`: opens Slidebar's own test windows and drives real
     /// edge gestures through the engine to check Undo and Redo, Switch Windows and Switch Tabs.
     /// It runs inside the normally launched app so macOS delivers the keys, and it never presses a
-    /// key unless one of Brim's own test windows is in front.
+    /// key unless one of Slidebar's own test windows is in front.
     @MainActor
     static func runKeyCheck() async {
         func wait(_ s: Double) async { try? await Task.sleep(nanoseconds: UInt64(s * 1_000_000_000)) }
@@ -306,7 +306,7 @@ enum SelfTest {
             w.tabbingMode = .preferred
             return w
         }
-        func inFront() -> Bool { NSApp.isActive && NSApp.keyWindow?.title.hasPrefix("Brim Check") == true }
+        func inFront() -> Bool { NSApp.isActive && NSApp.keyWindow?.title.hasPrefix("Slidebar Check") == true }
 
         let prefs = Prefs.shared, engine = EdgeEngine.shared
         let saved = prefs.edges, savedPaused = prefs.paused
@@ -331,10 +331,10 @@ enum SelfTest {
             await wait(0.5)
             return true
         }
-        func skipped() { print("SKIP  Another app came to the front, so Brim stopped before pressing more keys"); finish() }
+        func skipped() { print("SKIP  Another app came to the front, so Slidebar stopped before pressing more keys"); finish() }
 
         // Undo and Redo, in a text box.
-        let editor = makeWindow("Brim Check: Text", x: 200)
+        let editor = makeWindow("Slidebar Check: Text", x: 200)
         windows.append(editor)
         editor.tabbingMode = .disallowed
         let text = NSTextView(frame: NSRect(x: 0, y: 0, width: 320, height: 200))
@@ -345,7 +345,7 @@ enum SelfTest {
         if #available(macOS 14, *) { NSApp.activate() } else { NSApp.activate(ignoringOtherApps: true) }
         for _ in 0..<80 where !inFront() { await wait(0.1) }
         guard inFront() else {
-            print("SKIP  Brim couldn't come to the front, so no keys were pressed")
+            print("SKIP  Slidebar couldn't come to the front, so no keys were pressed")
             finish(); return
         }
         text.insertText("hello", replacementRange: NSRange(location: NSNotFound, length: 0))
@@ -357,8 +357,8 @@ enum SelfTest {
         guard await slide(.left, up: true) else { return skipped() }
         line(text.string == "hello", "Redo slide redoes", "→ \"\(text.string)\"")
 
-        // Switch Windows, between two of Brim's windows.
-        let second = makeWindow("Brim Check: Second Window", x: 560)
+        // Switch Windows, between two of Slidebar's windows.
+        let second = makeWindow("Slidebar Check: Second Window", x: 560)
         windows.append(second)
         second.tabbingMode = .disallowed
         second.orderFront(nil)
@@ -378,8 +378,8 @@ enum SelfTest {
 
         // Switch Tabs, in a window with two tabs.
         editor.orderOut(nil); second.orderOut(nil)
-        let tabA = makeWindow("Brim Check: Tab A", x: 300)
-        let tabB = makeWindow("Brim Check: Tab B", x: 300)
+        let tabA = makeWindow("Slidebar Check: Tab A", x: 300)
+        let tabB = makeWindow("Slidebar Check: Tab B", x: 300)
         windows += [tabA, tabB]
         tabA.makeKeyAndOrderFront(nil)
         tabA.addTabbedWindow(tabB, ordered: .above)
@@ -395,7 +395,7 @@ enum SelfTest {
         finish()
     }
 
-    /// `Brim --selftest`: checks the system hooks Brim relies on, then restores every level it touched.
+    /// `Slidebar --selftest`: checks the system hooks Slidebar relies on, then restores every level it touched.
     static func runIfRequested() -> Bool {
         guard CommandLine.arguments.contains("--selftest") else { return false }
         func line(_ ok: Bool, _ name: String, _ detail: String = "") {
@@ -403,9 +403,9 @@ enum SelfTest {
         }
         func wait(_ s: Double) { RunLoop.main.run(until: Date().addingTimeInterval(s)) }
 
-        line(BrimMTAvailable(), "MultitouchSupport loaded")
-        let devices = BrimMTStart({ _, _, _, _ in }, nil)
-        BrimMTStop()
+        line(SlidebarMTAvailable(), "MultitouchSupport loaded")
+        let devices = SlidebarMTStart({ _, _, _, _ in }, nil)
+        SlidebarMTStop()
         line(devices > 0, "Trackpads found", "\(devices)")
         line(Permissions.isTrusted, "Accessibility granted")
         DeviceWatcher.shared.start()
@@ -444,7 +444,7 @@ enum SelfTest {
             let b2 = SystemControls.brightness() ?? b0
             line(abs(b2 - b0) < 0.01, "Direct brightness set", String(format: "back to %.3f", b2))
         }
-        line(BrimHapticActuate(6), "Force Touch actuator")
+        line(SlidebarHapticActuate(6), "Force Touch actuator")
         print("INFO  Update feed: \(AppConfig.updateFeedURL?.absoluteString ?? "off")")
         print(String(format: "Restored volume %.2f (muted: %@), brightness %.2f",
                      SystemControls.volume() ?? -1, SystemControls.isMuted() ? "yes" : "no", SystemControls.brightness() ?? -1))
