@@ -93,10 +93,15 @@ public struct EdgeConfig: Equatable {
     public var edges: [EdgeSide: EdgeKind] = [.left: .slider, .right: .slider, .top: .off, .bottom: .swipe]
     /// Corners that respond to a double-tap.
     public var corners: Set<Corner> = [.topRight]
+    /// Edges that respond to a double-tap, on top of whatever sliding or swiping they do.
+    public var edgeTaps: Set<EdgeSide> = []
 
     public init() {}
 
     public func kind(_ side: EdgeSide) -> EdgeKind { edges[side] ?? .off }
+
+    /// An edge listens when it slides, swipes or has a double-tap.
+    public func listens(_ side: EdgeSide) -> Bool { kind(side) != .off || edgeTaps.contains(side) }
 }
 
 /// Per-frame input that isn't about touches.
@@ -219,7 +224,8 @@ public struct EdgeRecognizer {
         let start: Float
         if case .edge(let side) = zone { start = side.isVertical ? t.y : t.x } else { start = 0 }
         gesture = Gesture(id: t.id, zone: zone, startX: t.x, startY: t.y, startTime: time, last: start)
-        if config.freezeCursor, case .edge = zone {
+        // Edges that only listen for a double-tap leave the pointer alone.
+        if config.freezeCursor, case .edge(let side) = zone, config.kind(side) != .off {
             actions.append(.freezeCursor)
         }
         return actions
@@ -260,7 +266,7 @@ public struct EdgeRecognizer {
         if let c = corner(at: t), config.corners.contains(c) {
             return .corner(c)
         }
-        for side in [EdgeSide.left, .right, .bottom, .top] where config.kind(side) != .off && inEdge(side, t) {
+        for side in [EdgeSide.left, .right, .bottom, .top] where config.listens(side) && inEdge(side, t) {
             return .edge(side)
         }
         return nil
@@ -301,7 +307,8 @@ public struct EdgeRecognizer {
 
         switch config.kind(side) {
         case .off:
-            return false
+            // A double-tap-only edge: keep following a finger that stays put, drop one that moves.
+            return config.edgeTaps.contains(side) && g.maxTravel <= Self.tapMaxTravel
 
         case .swipe:
             if !g.engaged {
@@ -361,7 +368,7 @@ public struct EdgeRecognizer {
            abs(g.startX - last.x) <= Self.doubleTapSpread, abs(g.startY - last.y) <= Self.doubleTapSpread {
             lastTap = nil
             switch g.zone {
-            case .edge(let side): actions.append(.doubleTap(side))
+            case .edge(let side): if config.edgeTaps.contains(side) { actions.append(.doubleTap(side)) }
             case .corner(let corner): actions.append(.cornerDoubleTap(corner))
             }
         } else {

@@ -35,7 +35,7 @@
       "@type": "SoftwareApplication",
       "@id": "https://hukpo.github.io/slidebar/#app",
       "name": "Slidebar",
-      "description": "A free, open-source Mac menu bar app that turns the edges of your trackpad into volume and brightness sliders, with corner double-taps, edge swipes and haptic feedback.",
+      "description": "A free, open-source Mac menu bar app that turns the edges of your trackpad into volume and brightness sliders, with double-taps on any edge or corner, edge swipes and haptic feedback.",
       "applicationCategory": "UtilitiesApplication",
       "operatingSystem": "macOS 13 Ventura or later",
       "softwareVersion": "1.1",
@@ -73,8 +73,8 @@
           "acceptedAnswer": { "@type": "Answer", "text": "Slidebar isn’t notarized by Apple, so macOS shows this warning the first time you open it. Open System Settings, choose Privacy & Security, scroll down and click Open Anyway next to Slidebar. You only need to do this once. The source code is on GitHub if you’d like to read it or build the app yourself." } },
         { "@type": "Question", "name": "Will Slidebar change things by accident?",
           "acceptedAnswer": { "@type": "Answer", "text": "It only responds to a deliberate slide that starts on an edge. Touches that start in the middle of the trackpad are ignored, and so is anything while you type or hold the trackpad button down. If a resting palm moves a slider, Slidebar notices and puts the level back." } },
-        { "@type": "Question", "name": "What can the corners do?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Double-tap a corner to mute the sound or your microphone, play or pause, skip songs, keep your Mac awake, lock the screen, turn off the display, take a screenshot, open Spotlight or Emoji & Symbols, run one of your Shortcuts or open an app." } },
+        { "@type": "Question", "name": "What can a double-tap do?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Double-tap a corner, or any edge on top of its slider, to mute the sound or your microphone, play or pause, skip songs, keep your Mac awake, lock the screen, turn off the display, take a screenshot, open Spotlight or Emoji & Symbols, run one of your Shortcuts or open an app." } },
         { "@type": "Question", "name": "Does Slidebar collect any data?",
           "acceptedAnswer": { "@type": "Answer", "text": "No. Touches are handled in memory on your Mac and never leave it. The only time Slidebar goes online is an optional check for updates, which asks for one small file and sends nothing about you." } },
         { "@type": "Question", "name": "How do I uninstall Slidebar?",
@@ -540,7 +540,7 @@
     <div class="wrap grid">
       <div class="edges-copy">
         <h2 class="head" id="edges-title" data-reveal>Give every edge a job</h2>
-        <p data-reveal style="--i:1">Click an edge or a corner on the trackpad in Slidebar’s menu and pick what it does. Edges slide or swipe. Corners answer a double-tap.</p>
+        <p data-reveal style="--i:1">Click an edge or a corner on the trackpad in Slidebar’s menu and pick what it does. Edges slide or swipe. Any edge or corner can also answer a double-tap: open an app from the top edge, play or pause from the bottom.</p>
         <div class="spots" role="group" aria-label="Choose an edge or corner" data-reveal style="--i:2">
           <button type="button" data-spot="left" aria-pressed="true" aria-controls="spotMenu">Left edge <span>Brightness</span></button>
           <button type="button" data-spot="right" aria-pressed="false" aria-controls="spotMenu">Right edge <span>Volume</span></button>
@@ -661,7 +661,7 @@
         <details name="faq" data-reveal style="--i:3"><summary>Why does Slidebar ask for Accessibility?</summary><p>It’s optional. Without it, Slidebar still changes volume and brightness directly. Allowing Accessibility adds the usual on-screen volume and brightness display, and the gestures that press keys for you, like skipping songs, switching tabs and opening Spotlight. Slidebar doesn’t read your screen or what you type.</p></details>
         <details name="faq" data-reveal style="--i:4"><summary>macOS says it can’t check Slidebar for malicious software. What do I do?</summary><p>Slidebar isn’t notarized by Apple, so macOS shows this warning the first time you open it. Open System Settings, choose Privacy &amp; Security, scroll down and click Open Anyway next to Slidebar. You only need to do this once. The source code is on GitHub if you’d like to read it or build the app yourself.</p></details>
         <details name="faq" data-reveal style="--i:5"><summary>Will Slidebar change things by accident?</summary><p>It only responds to a deliberate slide that starts on an edge. Touches that start in the middle of the trackpad are ignored, and so is anything while you type or hold the trackpad button down. If a resting palm moves a slider, Slidebar notices and puts the level back.</p></details>
-        <details name="faq" data-reveal style="--i:6"><summary>What can the corners do?</summary><p>Double-tap a corner to mute the sound or your microphone, play or pause, skip songs, keep your Mac awake, lock the screen, turn off the display, take a screenshot, open Spotlight or Emoji &amp; Symbols, run one of your Shortcuts or open an app.</p></details>
+        <details name="faq" data-reveal style="--i:6"><summary>What can a double-tap do?</summary><p>Double-tap a corner, or any edge on top of its slider, to mute the sound or your microphone, play or pause, skip songs, keep your Mac awake, lock the screen, turn off the display, take a screenshot, open Spotlight or Emoji &amp; Symbols, run one of your Shortcuts or open an app.</p></details>
         <details name="faq" data-reveal style="--i:7"><summary>Does Slidebar collect any data?</summary><p>No. Touches are handled in memory on your Mac and never leave it. The only time Slidebar goes online is an optional check for updates, which asks for one small file and sends nothing about you.</p></details>
         <details name="faq" data-reveal style="--i:8"><summary>How do I uninstall Slidebar?</summary><p>Choose Quit in Slidebar’s menu, then drag Slidebar from your Applications folder to the Trash. If you allowed Accessibility, you can also remove Slidebar from the list in System Settings, Privacy &amp; Security, Accessibility.</p></details>
       </div>

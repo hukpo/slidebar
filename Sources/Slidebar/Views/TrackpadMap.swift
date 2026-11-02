@@ -1,19 +1,6 @@
 import SlidebarCore
 import SwiftUI
 
-/// Something on the trackpad map the user can pick.
-enum MapSpot: Hashable {
-    case edge(EdgeSide)
-    case corner(Corner)
-
-    var title: String {
-        switch self {
-        case .edge(let side): return side.title
-        case .corner(let corner): return corner.title
-        }
-    }
-}
-
 // MARK: - Map
 
 /// The home screen's trackpad: a button for every edge and corner showing what it does, with live
@@ -155,12 +142,11 @@ struct TrackpadMap: View {
 
     private func title(for spot: MapSpot) -> String {
         switch spot {
-        case .edge(let side): return prefs.edge(side).title
-        case .corner(let corner):
-            let f = prefs.corner(corner)
-            if f == .openApp, let id = prefs.cornerApps[corner] { return "Open \(AppNames.name(for: id))" }
-            if f == .runShortcut, let name = prefs.cornerShortcuts[corner] { return "Run \u{201C}\(name)\u{201D}" }
-            return f.title
+        case .edge(let side):
+            let slide = prefs.edge(side).title
+            return prefs.tapIsActive(spot) ? "\(slide); double-tap: \(prefs.tapTitle(spot))" : slide
+        case .corner:
+            return prefs.tapTitle(spot)
         }
     }
 
@@ -174,15 +160,18 @@ struct TrackpadMap: View {
         let level = live.level(of: function).map { CGFloat($0) }
         let muted = function == .volume && live.muted
         let percent = muted ? "Muted" : level.map { "\(Int(($0 * 100).rounded()))%" }
+        let tap: TapFunction? = prefs.tapIsActive(spot) ? prefs.tap(spot) : nil
         return EdgeSpot(side: side, length: length, function: function,
                         level: function.hasLevel ? level : nil, value: function.hasLevel ? percent : nil,
+                        tap: tap, tapApp: tap == .openApp ? prefs.tapApp(spot) : nil,
+                        tapTitle: tap == nil ? nil : prefs.tapTitle(spot),
                         muted: muted, active: live.activeSide == side,
                         selected: selection == spot, keyboardFocused: mapFocused && keyboardNav,
                         anchor: anchors.anchor(spot)) {
             open(spot)
         }
-        .help("\(side.title): \(function.title). Click to change.")
-        .accessibilityLabel("\(side.title): \(function.title)")
+        .help("\(side.title): \(title(for: spot)). Click to change.")
+        .accessibilityLabel("\(side.title): \(title(for: spot))")
         .accessibilityValue(percent ?? "")
         .accessibilityHint("Opens a menu of actions")
         .accessibilitySortPriority(priority(spot))
@@ -253,6 +242,10 @@ private struct EdgeSpot: View {
     let function: EdgeFunction
     let level: CGFloat?
     let value: String?
+    /// What a double-tap on this edge does, if anything.
+    let tap: TapFunction?
+    let tapApp: String?
+    let tapTitle: String?
     let muted: Bool
     /// Being slid right now.
     let active: Bool
@@ -322,9 +315,18 @@ private struct EdgeSpot: View {
         .animation(.easeOut(duration: 0.15), value: active)
     }
 
+    /// The double-tap's mark: the app's own icon, or the action's symbol.
+    @ViewBuilder private var tapMark: some View {
+        if let id = tapApp {
+            AppIcon(bundleID: id).frame(width: 13, height: 13)
+        } else if let tap {
+            Image(systemName: tap.icon).foregroundStyle(.secondary)
+        }
+    }
+
     private var chip: some View {
         let dark = scheme == .dark
-        let off = function == .off
+        let off = function == .off && tap == nil
         let fill: Color = off
             ? Color.white.opacity(dark ? (hovering ? 0.1 : 0.05) : (hovering ? 0.6 : 0.35))
             : (dark ? Color.black.opacity(hovering ? 0.5 : 0.34) : Color.white.opacity(hovering ? 0.98 : 0.8))
@@ -332,12 +334,20 @@ private struct EdgeSpot: View {
             if off {
                 Image(systemName: "plus").font(.system(size: 9, weight: .bold))
                 Text("Add")
+            } else if function == .off, let tapTitle {
+                // Only a double-tap here.
+                tapMark
+                Text(tapTitle)
             } else {
                 Image(systemName: muted ? "speaker.slash.fill" : function.icon)
                     .foregroundStyle(function.mapColors[dark ? 1 : 0])
                 Text(function.shortTitle)
                 if let value {
                     Text(value).monospacedDigit().foregroundStyle(.secondary)
+                }
+                if tap != nil {
+                    Circle().fill(Color.secondary.opacity(0.6)).frame(width: 2.5, height: 2.5)
+                    tapMark
                 }
             }
         }
@@ -456,54 +466,70 @@ enum SpotMenu {
         for f in EdgeFunction.available where f.kind == .swipe {
             menu.addItem(item(f.title, f.icon, checked: current == f, tip: f.detail(on: side)) { choose(f) })
         }
-        if current == .songs {
-            menu.addItem(.separator())
-            menu.addItem(item("Double-Tap the Edge to Play or Pause", nil, checked: prefs.tapToPlay) {
-                prefs.tapToPlay.toggle()
-            })
-        }
+
+        // A double-tap works on top of the slide or swipe, or on an edge that does nothing else.
+        let spot = MapSpot.edge(side)
+        menu.addItem(.separator())
+        menu.addItem(header("Double-Tap"))
+        let active = prefs.tapIsActive(spot)
+        let tap = item(active ? prefs.tapTitle(spot) : "Nothing", active ? prefs.tap(spot).icon : nil, checked: active)
+        if active, prefs.tap(spot) == .openApp, let id = prefs.tapApp(spot) { tap.image = appIcon(id) }
+        let choices = NSMenu()
+        choices.autoenablesItems = false
+        addTapChoices(choices, spot)
+        tap.submenu = choices
+        menu.addItem(tap)
     }
 
     // MARK: Corners
 
     private static func buildCorner(_ menu: NSMenu, _ corner: Corner) {
-        let prefs = Prefs.shared
-        let current = prefs.corner(corner)
         menu.addItem(header("\(corner.title): Double-Tap"))
-        let choose: (CornerFunction) -> Void = { f in
-            prefs.corners[corner] = f
+        addTapChoices(menu, .corner(corner))
+    }
+
+    // MARK: Double-tap choices (corners and edges)
+
+    private static func addTapChoices(_ menu: NSMenu, _ spot: MapSpot) {
+        let prefs = Prefs.shared
+        let current = prefs.tap(spot)
+        let choose: (TapFunction) -> Void = { f in
+            prefs.setTap(spot, f)
             explainAccessIfNeeded(f.needsAccess, f.blockedName)
         }
-        for (index, group) in CornerFunction.groups.enumerated() {
+        for (index, group) in TapFunction.groups.enumerated() {
             if index > 0 { menu.addItem(.separator()) }
             for f in group where isAvailable(f) {
                 switch f {
                 case .openApp:
-                    let app = current == .openApp ? prefs.cornerApps[corner] : nil
+                    let app = current == .openApp ? prefs.tapApp(spot) : nil
                     let title = app.map { "Open \(AppNames.name(for: $0))" } ?? "Open an App…"
-                    let open = item(title, f.icon, checked: app != nil) { chooseApp(for: corner) }
-                    if let app, let url = AppNames.url(for: app) {
-                        let icon = NSWorkspace.shared.icon(forFile: url.path)
-                        icon.size = NSSize(width: 16, height: 16)
-                        open.image = icon
-                    }
+                    let open = item(title, f.icon, checked: app != nil) { chooseApp(for: spot) }
+                    if let app { open.image = appIcon(app) }
                     menu.addItem(open)
                     if app != nil {
-                        menu.addItem(item("Choose Another App…", nil, indent: 1) { chooseApp(for: corner) })
+                        menu.addItem(item("Choose Another App…", nil, indent: 1) { chooseApp(for: spot) })
                     }
                 case .runShortcut:
                     let run = item(f.title, f.icon, checked: current == .runShortcut)
-                    run.submenu = shortcutsMenu(corner, chosen: current == .runShortcut ? prefs.cornerShortcuts[corner] : nil)
+                    run.submenu = shortcutsMenu(spot, chosen: current == .runShortcut ? prefs.tapShortcut(spot) : nil)
                     menu.addItem(run)
                 default:
-                    let tip = f.isDisruptive ? "Pick a corner your palm doesn't rest on, so it doesn't happen by accident." : nil
+                    let tip = f.isDisruptive ? "Pick a spot your palm doesn't rest on, so it doesn't happen by accident." : nil
                     menu.addItem(item(f.title, f == .off ? nil : f.icon, checked: current == f, tip: tip) { choose(f) })
                 }
             }
         }
     }
 
-    private static func shortcutsMenu(_ corner: Corner, chosen: String?) -> NSMenu {
+    private static func appIcon(_ bundleID: String) -> NSImage? {
+        guard let url = AppNames.url(for: bundleID) else { return nil }
+        let icon = NSWorkspace.shared.icon(forFile: url.path)
+        icon.size = NSSize(width: 16, height: 16)
+        return icon
+    }
+
+    private static func shortcutsMenu(_ spot: MapSpot, chosen: String?) -> NSMenu {
         let sub = NSMenu()
         sub.autoenablesItems = false
         let names = UserShortcuts.cached
@@ -514,8 +540,7 @@ enum SpotMenu {
         }
         for name in names {
             sub.addItem(item(name, nil, checked: name == chosen) {
-                Prefs.shared.cornerShortcuts[corner] = name
-                Prefs.shared.corners[corner] = .runShortcut
+                Prefs.shared.setTap(spot, .runShortcut, shortcut: name)
             })
         }
         sub.addItem(.separator())
@@ -523,21 +548,19 @@ enum SpotMenu {
         return sub
     }
 
-    private static func chooseApp(for corner: Corner) {
-        let prefs = Prefs.shared
+    private static func chooseApp(for spot: MapSpot) {
         let panel = NSOpenPanel()
-        panel.title = "Choose an App for the \(corner.title)"
+        panel.title = "Choose an App to Open with a Double-Tap on the \(spot.title)"
         panel.prompt = "Choose"
         panel.allowedContentTypes = [.application]
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
         NSApp.activate(ignoringOtherApps: true)
         if panel.runModal() == .OK, let url = panel.url, let id = Bundle(url: url)?.bundleIdentifier {
-            prefs.cornerApps[corner] = id
-            prefs.corners[corner] = .openApp
+            Prefs.shared.setTap(spot, .openApp, app: id)
         }
     }
 
-    private static func isAvailable(_ f: CornerFunction) -> Bool {
+    private static func isAvailable(_ f: TapFunction) -> Bool {
         f == .screenshot ? SystemControls.hasScreenshotApp : true
     }
 

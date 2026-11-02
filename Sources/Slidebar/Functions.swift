@@ -129,8 +129,8 @@ enum EdgeFunction: String, CaseIterable, Identifiable {
     }
 }
 
-/// What a double-tap in a corner of the trackpad does.
-enum CornerFunction: String, CaseIterable, Identifiable {
+/// What a double-tap does, in a corner or on an edge.
+enum TapFunction: String, CaseIterable, Identifiable {
     case off
     case mute, muteMicrophone, playPause, nextSong, previousSong
     case keepAwake, lockScreen, sleepDisplay, screenshot
@@ -199,7 +199,7 @@ enum CornerFunction: String, CaseIterable, Identifiable {
     var isDisruptive: Bool { self == .lockScreen || self == .sleepDisplay }
 
     /// Grouped for the menu: sound, your Mac, typing, your own.
-    static let groups: [[CornerFunction]] = [
+    static let groups: [[TapFunction]] = [
         [.off],
         [.mute, .muteMicrophone, .playPause, .nextSong, .previousSong],
         [.keepAwake, .lockScreen, .sleepDisplay, .screenshot],
@@ -226,6 +226,19 @@ extension Corner {
         case .topRight: return "Top-Right Corner"
         case .bottomLeft: return "Bottom-Left Corner"
         case .bottomRight: return "Bottom-Right Corner"
+        }
+    }
+}
+
+/// A place on the trackpad that can do something: an edge or a corner.
+enum MapSpot: Hashable {
+    case edge(EdgeSide)
+    case corner(Corner)
+
+    var title: String {
+        switch self {
+        case .edge(let side): return side.title
+        case .corner(let corner): return corner.title
         }
     }
 }

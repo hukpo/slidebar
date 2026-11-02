@@ -15,7 +15,9 @@ enum SelfTest {
         let prefs = Prefs.shared
         let savedPaused = prefs.paused, savedModifier = prefs.requireModifier
         let savedEdges = prefs.edges, savedCorners = prefs.corners, savedApps = prefs.cornerApps
+        let savedTaps = prefs.edgeTaps, savedTapApps = prefs.edgeTapApps, savedTapShortcuts = prefs.edgeTapShortcuts
         prefs.paused = false; prefs.requireModifier = false
+        prefs.edgeTaps = [:]
         // Test the shipping layout: brightness left, volume right, songs bottom, mute top-right.
         prefs.edges = [.left: .brightness, .right: .volume, .top: .off, .bottom: .songs]
         prefs.corners = [.topLeft: .off, .topRight: .mute, .bottomLeft: .off, .bottomRight: .off]
@@ -213,6 +215,24 @@ enum SelfTest {
         line(awakeOn && awakeOff, "Corner set to Keep Mac Awake turns it on and off", "on: \(awakeOn), off again: \(awakeOff)")
         prefs.corners[.bottomRight] = .off
 
+        // A double-tap on an edge: alongside a slider (left edge), and on an edge that does nothing else (top).
+        prefs.edgeTaps = [.left: .keepAwake]
+        engine.syncConfig()
+        tap(x: 0.02, y: 0.5); tap(x: 0.02, y: 0.5); wait(0.4)
+        let sliderTapOn = KeepAwake.isOn
+        tap(x: 0.02, y: 0.5); tap(x: 0.02, y: 0.5); wait(0.4)
+        let sliderTapOff = !KeepAwake.isOn
+        prefs.edgeTaps = [.top: .keepAwake]
+        engine.syncConfig()
+        tap(x: 0.5, y: 0.96); tap(x: 0.5, y: 0.96); wait(0.4)
+        let topTapOn = KeepAwake.isOn
+        tap(x: 0.5, y: 0.96); tap(x: 0.5, y: 0.96); wait(0.4)
+        let topTapOff = !KeepAwake.isOn
+        prefs.edgeTaps = [:]
+        engine.syncConfig()
+        line(sliderTapOn && sliderTapOff && topTapOn && topTapOff, "Double-tapping an edge runs its action",
+             "slider edge \(sliderTapOn)/\(sliderTapOff), tap-only edge \(topTapOn)/\(topTapOff)")
+
         // Run a Shortcut: Slidebar can read the user's shortcut list (without running any).
         var shortcutNames: [String]? = nil
         UserShortcuts.list { shortcutNames = $0 }
@@ -238,9 +258,11 @@ enum SelfTest {
             if let volumeItem, let action = volumeItem.action { _ = (volumeItem.target as AnyObject).perform(action) }
             let edgeOK = prefs.edge(.right) == .volume && checkedRight == EdgeFunction.volume.title
             let cornerMenu = SpotMenu.make(for: .corner(.bottomRight))
-            let hasLock = cornerMenu.items.contains { $0.title == CornerFunction.lockScreen.title }
-            let hasShortcuts = cornerMenu.items.first { $0.title == CornerFunction.runShortcut.title }?.submenu != nil
-            line(edgeOK && hasLock && hasShortcuts, "Spot menus list actions and apply the choice",
+            let hasLock = cornerMenu.items.contains { $0.title == TapFunction.lockScreen.title }
+            let hasShortcuts = cornerMenu.items.first { $0.title == TapFunction.runShortcut.title }?.submenu != nil
+            // Every edge menu ends with its double-tap choices.
+            let edgeTapChoices = edgeMenu.items.last?.submenu?.items.contains { $0.title == TapFunction.playPause.title } ?? false
+            line(edgeOK && hasLock && hasShortcuts && edgeTapChoices, "Spot menus list actions and apply the choice",
                  "\(edgeMenu.items.count) edge items, \(cornerMenu.items.count) corner items")
             prefs.edges = [.left: .brightness, .right: .volume, .top: .off, .bottom: .songs]
             engine.syncConfig()
@@ -255,6 +277,7 @@ enum SelfTest {
         // Restore everything.
         prefs.paused = savedPaused; prefs.requireModifier = savedModifier
         prefs.edges = savedEdges; prefs.corners = savedCorners; prefs.cornerApps = savedApps
+        prefs.edgeTaps = savedTaps; prefs.edgeTapApps = savedTapApps; prefs.edgeTapShortcuts = savedTapShortcuts
         SystemControls.setVolume(vol0)
         SystemControls.setMuted(muted0)
         SystemControls.setBrightness(b0)

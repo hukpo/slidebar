@@ -129,7 +129,8 @@ final class EdgeEngine {
         c.fineControl = prefs.fineControl
         c.palmRejection = prefs.palmRejection
         c.edges = Dictionary(uniqueKeysWithValues: EdgeSide.allCases.map { ($0, prefs.edge($0).kind) })
-        c.corners = Set(Corner.allCases.filter { prefs.cornerIsActive($0) })
+        c.corners = Set(Corner.allCases.filter { prefs.tapIsActive(.corner($0)) })
+        c.edgeTaps = Set(EdgeSide.allCases.filter { prefs.tapIsActive(.edge($0)) })
         recognizer.config = c
     }
 
@@ -223,12 +224,10 @@ final class EdgeEngine {
             swipe(function, forward: forward)
 
         case .doubleTap(let side):
-            if prefs.edge(side) == .songs && prefs.tapToPlay {
-                run(needsAccess: true, name: "Play and pause") { SystemControls.press(.play) }
-            }
+            tapAction(.edge(side))
 
         case .cornerDoubleTap(let corner):
-            cornerAction(corner)
+            tapAction(.corner(corner))
         }
     }
 
@@ -320,8 +319,9 @@ final class EdgeEngine {
         }
     }
 
-    private func cornerAction(_ corner: Corner) {
-        let function = prefs.corner(corner)
+    /// A double-tap on a corner or an edge.
+    private func tapAction(_ spot: MapSpot) {
+        let function = prefs.tap(spot)
         run(needsAccess: function.needsAccess, name: function.blockedName) {
             switch function {
             case .off: return
@@ -345,12 +345,12 @@ final class EdgeEngine {
             case .spotlight: SystemControls.shortcut(.space, .maskCommand)
             case .emoji: SystemControls.shortcut(.space, [.maskCommand, .maskControl])
             case .runShortcut:
-                if let name = prefs.cornerShortcuts[corner] {
+                if let name = prefs.tapShortcut(spot) {
                     UserShortcuts.run(name: name)
                     Toast.shared.show("Running \u{201C}\(name)\u{201D}", icon: "square.2.layers.3d.fill")
                 }
             case .openApp:
-                if let id = prefs.cornerApps[corner] { SystemControls.openApp(bundleID: id) }
+                if let id = prefs.tapApp(spot) { SystemControls.openApp(bundleID: id) }
             }
             Haptics.tick(prefs.haptics)
         }

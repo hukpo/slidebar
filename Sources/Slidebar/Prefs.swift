@@ -52,7 +52,7 @@ final class Prefs: ObservableObject {
     @Published var edges: [EdgeSide: EdgeFunction] {
         didSet { for (side, f) in edges { defaults.set(f.rawValue, forKey: Keys.edge(side)) } }
     }
-    @Published var corners: [Corner: CornerFunction] {
+    @Published var corners: [Corner: TapFunction] {
         didSet { for (c, f) in corners { defaults.set(f.rawValue, forKey: Keys.corner(c)) } }
     }
     /// For corners set to "Open an App": the app's bundle ID.
@@ -63,8 +63,16 @@ final class Prefs: ObservableObject {
     @Published var cornerShortcuts: [Corner: String] {
         didSet { for c in Corner.allCases { defaults.set(cornerShortcuts[c], forKey: Keys.cornerShortcut(c)) } }
     }
-    /// Double-tapping a Songs edge plays or pauses.
-    @Published var tapToPlay: Bool { didSet { defaults.set(tapToPlay, forKey: Keys.tapToPlay) } }
+    /// What a double-tap on each edge does, alongside its slide or swipe.
+    @Published var edgeTaps: [EdgeSide: TapFunction] {
+        didSet { for side in EdgeSide.allCases { defaults.set(edgeTaps[side]?.rawValue, forKey: Keys.edgeTap(side)) } }
+    }
+    @Published var edgeTapApps: [EdgeSide: String] {
+        didSet { for side in EdgeSide.allCases { defaults.set(edgeTapApps[side], forKey: Keys.edgeTapApp(side)) } }
+    }
+    @Published var edgeTapShortcuts: [EdgeSide: String] {
+        didSet { for side in EdgeSide.allCases { defaults.set(edgeTapShortcuts[side], forKey: Keys.edgeTapShortcut(side)) } }
+    }
 
     // Feel
     @Published var haptics: HapticStrength { didSet { defaults.set(haptics.rawValue, forKey: Keys.haptics) } }
@@ -105,7 +113,10 @@ final class Prefs: ObservableObject {
         static func corner(_ c: Corner) -> String { "corner.\(c.rawValue)" }
         static func cornerApp(_ c: Corner) -> String { "cornerApp.\(c.rawValue)" }
         static func cornerShortcut(_ c: Corner) -> String { "cornerShortcut.\(c.rawValue)" }
-        static let tapToPlay = "tapToPlay"
+        static func edgeTap(_ side: EdgeSide) -> String { "edgeTap.\(side.rawValue)" }
+        static func edgeTapApp(_ side: EdgeSide) -> String { "edgeTapApp.\(side.rawValue)" }
+        static func edgeTapShortcut(_ side: EdgeSide) -> String { "edgeTapShortcut.\(side.rawValue)" }
+        static let tapToPlay = "tapToPlay"       // legacy: "double-tap the Songs edge to play or pause"
         static let sensitivity = "sensitivity"
         static let edgeWidth = "edgeWidth"
         static let bottomQuarterOnly = "bottomQuarterOnly"
@@ -131,7 +142,6 @@ final class Prefs: ObservableObject {
         Self.carryOverFromBrim()
         defaults.register(defaults: [
             Keys.haptics: HapticStrength.medium.rawValue,
-            Keys.tapToPlay: false,
             Keys.sensitivity: 1.5,
             Keys.edgeWidth: 0.05,
             Keys.bottomQuarterOnly: false,
@@ -146,7 +156,6 @@ final class Prefs: ObservableObject {
             Keys.setupDone: false,
         ])
         haptics = HapticStrength(rawValue: defaults.string(forKey: Keys.haptics) ?? "") ?? .medium
-        tapToPlay = defaults.bool(forKey: Keys.tapToPlay)
         sensitivity = defaults.double(forKey: Keys.sensitivity)
         edgeWidth = defaults.double(forKey: Keys.edgeWidth)
         // Edges and corners, carrying over the older Swap Sides / Media Strip / Quick Mute switches.
@@ -159,18 +168,31 @@ final class Prefs: ObservableObject {
             edges[side] = defaults.string(forKey: Keys.edge(side)).flatMap(EdgeFunction.init(rawValue:)) ?? fallback
         }
         self.edges = edges
-        var corners: [Corner: CornerFunction] = [:]
+        var corners: [Corner: TapFunction] = [:]
         var apps: [Corner: String] = [:]
         var shortcuts: [Corner: String] = [:]
         for c in Corner.allCases {
-            let fallback: CornerFunction = legacy.mute ? Prefs.defaultCorner(c) : .off
-            corners[c] = defaults.string(forKey: Keys.corner(c)).flatMap(CornerFunction.init(rawValue:)) ?? fallback
+            let fallback: TapFunction = legacy.mute ? Prefs.defaultCorner(c) : .off
+            corners[c] = defaults.string(forKey: Keys.corner(c)).flatMap(TapFunction.init(rawValue:)) ?? fallback
             apps[c] = defaults.string(forKey: Keys.cornerApp(c))
             shortcuts[c] = defaults.string(forKey: Keys.cornerShortcut(c))
         }
         self.corners = corners
         self.cornerApps = apps
         self.cornerShortcuts = shortcuts
+        var taps: [EdgeSide: TapFunction] = [:], tapApps: [EdgeSide: String] = [:], tapShortcuts: [EdgeSide: String] = [:]
+        for side in EdgeSide.allCases {
+            taps[side] = defaults.string(forKey: Keys.edgeTap(side)).flatMap(TapFunction.init(rawValue:))
+            tapApps[side] = defaults.string(forKey: Keys.edgeTapApp(side))
+            tapShortcuts[side] = defaults.string(forKey: Keys.edgeTapShortcut(side))
+            // The old "double-tap the Songs edge to play or pause" switch becomes that edge's double-tap.
+            if taps[side] == nil, edges[side] == .songs, defaults.bool(forKey: Keys.tapToPlay) {
+                taps[side] = .playPause
+            }
+        }
+        self.edgeTaps = taps
+        self.edgeTapApps = tapApps
+        self.edgeTapShortcuts = tapShortcuts
         bottomQuarterOnly = defaults.bool(forKey: Keys.bottomQuarterOnly)
         requireModifier = defaults.bool(forKey: Keys.requireModifier)
         freezeCursor = defaults.bool(forKey: Keys.freezeCursor)
@@ -196,19 +218,64 @@ final class Prefs: ObservableObject {
         }
     }
 
-    static func defaultCorner(_ c: Corner) -> CornerFunction { c == .topRight ? .mute : .off }
+    static func defaultCorner(_ c: Corner) -> TapFunction { c == .topRight ? .mute : .off }
 
     func edge(_ side: EdgeSide) -> EdgeFunction { edges[side] ?? .off }
-    func corner(_ c: Corner) -> CornerFunction { corners[c] ?? .off }
+    func corner(_ c: Corner) -> TapFunction { corners[c] ?? .off }
 
-    /// A corner counts as active only when it has something to do.
-    func cornerIsActive(_ c: Corner) -> Bool {
-        switch corner(c) {
+    // MARK: Double-taps, on corners and edges alike
+
+    func tap(_ spot: MapSpot) -> TapFunction {
+        switch spot {
+        case .corner(let c): return corner(c)
+        case .edge(let side): return edgeTaps[side] ?? .off
+        }
+    }
+
+    func tapApp(_ spot: MapSpot) -> String? {
+        switch spot {
+        case .corner(let c): return cornerApps[c]
+        case .edge(let side): return edgeTapApps[side]
+        }
+    }
+
+    func tapShortcut(_ spot: MapSpot) -> String? {
+        switch spot {
+        case .corner(let c): return cornerShortcuts[c]
+        case .edge(let side): return edgeTapShortcuts[side]
+        }
+    }
+
+    /// Sets what a double-tap does; `app` and `shortcut` go with Open an App and Run a Shortcut.
+    func setTap(_ spot: MapSpot, _ function: TapFunction, app: String? = nil, shortcut: String? = nil) {
+        switch spot {
+        case .corner(let c):
+            if let app { cornerApps[c] = app }
+            if let shortcut { cornerShortcuts[c] = shortcut }
+            corners[c] = function
+        case .edge(let side):
+            if let app { edgeTapApps[side] = app }
+            if let shortcut { edgeTapShortcuts[side] = shortcut }
+            edgeTaps[side] = function
+        }
+    }
+
+    /// A double-tap counts only when it has something to do.
+    func tapIsActive(_ spot: MapSpot) -> Bool {
+        switch tap(spot) {
         case .off: return false
-        case .openApp: return cornerApps[c] != nil
-        case .runShortcut: return cornerShortcuts[c] != nil
+        case .openApp: return tapApp(spot) != nil
+        case .runShortcut: return tapShortcut(spot) != nil
         default: return true
         }
+    }
+
+    /// The double-tap's name as the user would say it ("Open Safari", "Run “Focus”").
+    func tapTitle(_ spot: MapSpot) -> String {
+        let f = tap(spot)
+        if f == .openApp, let id = tapApp(spot) { return "Open \(AppNames.name(for: id))" }
+        if f == .runShortcut, let name = tapShortcut(spot) { return "Run \u{201C}\(name)\u{201D}" }
+        return f.title
     }
 
     /// Puts every gesture and option back the way Slidebar ships. Leaves appearance, updates,
@@ -224,7 +291,9 @@ final class Prefs: ObservableObject {
 
     func restoreDefaults() {
         haptics = .medium
-        tapToPlay = false
+        edgeTaps = [:]
+        edgeTapApps = [:]
+        edgeTapShortcuts = [:]
         sensitivity = 1.5
         edgeWidth = 0.05
         edges = Dictionary(uniqueKeysWithValues: EdgeSide.allCases.map { ($0, Prefs.defaultEdge($0)) })
