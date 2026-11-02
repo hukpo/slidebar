@@ -187,8 +187,30 @@ extension SystemControls {
     /// or on another desktop, so a running app gets a click on its Dock icon instead.
     static func openApp(bundleID: String) {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
-        let running = !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty
-        if running, DockIcon.click(appAt: url) { return }
+        if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first,
+           DockIcon.click(appAt: url) {
+            clickUntilInFront(app, url: url, clicksLeft: 2)
+            return
+        }
         NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+    }
+
+    /// One Dock click isn't always enough. An app that doesn't raise its own window (Telegram) may
+    /// come to the front without leaving this desktop, or macOS may switch to its desktop and then
+    /// hand focus to the app last used there. So once any switch has settled, check, and click again.
+    private static func clickUntilInFront(_ app: NSRunningApplication, url: URL, clicksLeft: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            guard clicksLeft > 0, !app.isTerminated, !isInFront(app), DockIcon.click(appAt: url) else { return }
+            clickUntilInFront(app, url: url, clicksLeft: clicksLeft - 1)
+        }
+    }
+
+    /// The app is the active one and its window is the top one on this desktop.
+    private static func isInFront(_ app: NSRunningApplication) -> Bool {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier else { return false }
+        let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+            as? [[String: Any]] ?? []
+        let top = windows.first { ($0[kCGWindowLayer as String] as? Int) == 0 }
+        return (top?[kCGWindowOwnerPID as String] as? pid_t) == app.processIdentifier
     }
 }
