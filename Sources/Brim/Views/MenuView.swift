@@ -112,6 +112,8 @@ struct NoticeArea: View {
                    onDismiss: { live.blockedAction = nil })
         } else if live.showAccessNotice {
             AccessBanner()
+        } else if !prefs.starNoticeDismissed, prefs.hasCompletedSetup, AppConfig.sourceURL != nil {
+            StarBanner()
         }
         if live.keepingAwake {
             Banner(icon: "cup.and.saucer.fill",
@@ -156,6 +158,19 @@ struct UpdateBanner: View {
         default:
             EmptyView()
         }
+    }
+}
+
+/// A gentle, closable ask for a GitHub star, shown once nothing more useful needs saying.
+struct StarBanner: View {
+    var body: some View {
+        Banner(icon: "star", tint: .yellow,
+               text: "Enjoying Brim? A star on GitHub helps other Mac users find it.",
+               primary: ("Star on GitHub", {
+                   AppActions.shared.openSource()
+                   Prefs.shared.starNoticeDismissed = true
+               }),
+               onDismiss: { Prefs.shared.starNoticeDismissed = true })
     }
 }
 

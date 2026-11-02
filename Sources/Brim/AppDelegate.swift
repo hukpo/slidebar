@@ -192,10 +192,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     func showAbout() {
         popover.performClose(nil)
         NSApp.activate(ignoringOtherApps: true)
-        let credits = NSAttributedString(
-            string: "Trackpad edges as volume and brightness sliders.\nFree and open source.",
-            attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor]
-        )
+        let style: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor]
+        let credits = NSMutableAttributedString(string: "Trackpad edges as volume and brightness sliders.\n", attributes: style)
+        var link = style
+        if let url = AppConfig.sourceURL { link[.link] = url }
+        credits.append(NSAttributedString(string: "Free and open source.", attributes: link))
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "Brim",
             .applicationIcon: AppActions.shared.iconImage,

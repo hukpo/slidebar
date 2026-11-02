@@ -92,6 +92,8 @@ final class Prefs: ObservableObject {
     @Published var didPromptAccess: Bool { didSet { defaults.set(didPromptAccess, forKey: Keys.didPromptAccess) } }
     /// The user chose to use Brim without Accessibility; stop mentioning it in the menu.
     @Published var accessNoticeDismissed: Bool { didSet { defaults.set(accessNoticeDismissed, forKey: Keys.accessNoticeDismissed) } }
+    /// The user closed (or acted on) the "star us on GitHub" notice.
+    @Published var starNoticeDismissed: Bool { didSet { defaults.set(starNoticeDismissed, forKey: Keys.starNoticeDismissed) } }
     @Published private(set) var openAtLogin: Bool = false
 
     private enum Keys {
@@ -118,6 +120,7 @@ final class Prefs: ObservableObject {
         static let setupDone = "setupDone"
         static let didPromptAccess = "didPromptAccess"
         static let accessNoticeDismissed = "accessNoticeDismissed"
+        static let starNoticeDismissed = "starNoticeDismissed"
     }
 
     private init() {
@@ -175,6 +178,7 @@ final class Prefs: ObservableObject {
         hasCompletedSetup = defaults.bool(forKey: Keys.setupDone)
         didPromptAccess = defaults.bool(forKey: Keys.didPromptAccess)
         accessNoticeDismissed = defaults.bool(forKey: Keys.accessNoticeDismissed)
+        starNoticeDismissed = defaults.bool(forKey: Keys.starNoticeDismissed)
         refreshOpenAtLogin()
     }
 

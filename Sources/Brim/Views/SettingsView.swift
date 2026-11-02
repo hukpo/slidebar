@@ -134,9 +134,7 @@ struct AdvancedPage: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Brim \(AppActions.shared.version)")
                         .font(.system(size: 11, weight: .medium))
-                    Text("Free and open source")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                    SourceLink()
                 }
                 .padding(.leading, 6)
             }
@@ -159,5 +157,32 @@ struct PageHeader: View {
             Spacer()
         }
         .frame(height: 24)
+    }
+}
+
+/// "Free and open source", linking to the code on GitHub.
+struct SourceLink: View {
+    @State private var hovering = false
+
+    var body: some View {
+        if let url = AppConfig.sourceURL {
+            Link(destination: url) {
+                HStack(spacing: 3) {
+                    Text("Free and open source")
+                        .underline(hovering)
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 8, weight: .bold))
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            }
+            .onHover { hovering = $0 }
+            .help("View Brim on GitHub")
+            .accessibilityLabel("Free and open source. View Brim on GitHub")
+        } else {
+            Text("Free and open source")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
     }
 }
