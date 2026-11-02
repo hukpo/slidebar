@@ -8,6 +8,8 @@ import SwiftUI
 /// Arrow keys move in the direction pressed; VoiceOver reads the spots clockwise.
 struct TrackpadMap: View {
     @Binding var selection: MapSpot?
+    /// The spot whose settings are open under the map.
+    @Binding var editing: MapSpot?
     @ObservedObject var prefs = Prefs.shared
     @ObservedObject var live = LiveState.shared
     @FocusState private var mapFocused: Bool
@@ -73,7 +75,10 @@ struct TrackpadMap: View {
             guard let current = selection else { select(.edge(.left), fromKeyboard: true); return }
             if let next = Self.neighbor(of: current, direction) { select(next, fromKeyboard: true) }
         }
-        .onExitCommand { selection = nil }
+        .onExitCommand {
+            withAnimation(.easeOut(duration: 0.18)) { editing = nil }
+            selection = nil
+        }
         .modifier(OpenWithKeys { if let spot = selection { open(spot, fromKeyboard: true) } })
         .onAppear { UserShortcuts.preload() }
         .animation(.easeOut(duration: 0.2), value: prefs.paused)
@@ -113,12 +118,13 @@ struct TrackpadMap: View {
         return ring.first { cell($0) == (x, y) }
     }
 
-    /// Opens a spot's actions menu right under it; the spot stays highlighted while it's open.
+    /// Opens the spot's settings under the map (clicking the open spot again closes them).
     private func open(_ spot: MapSpot, fromKeyboard: Bool = false) {
         select(spot, fromKeyboard: fromKeyboard)
-        guard let view = anchors.anchor(spot).view else { return }
-        SpotMenu.show(for: spot, under: view)
-        if !keyboardNav { selection = nil }
+        withAnimation(.easeOut(duration: 0.18)) {
+            editing = (editing == spot && !fromKeyboard) ? nil : spot
+        }
+        if editing == nil && !keyboardNav { selection = nil }
     }
 
     private func select(_ spot: MapSpot, fromKeyboard: Bool = false) {
@@ -427,30 +433,20 @@ extension EdgeFunction {
 
 // MARK: - Actions menu
 
-/// The native menu that opens under an edge or corner when you click it: every action it can
-/// have, the current one checked, plus that action's own options.
+/// The native menus behind the spot editor's pop-up buttons: what an edge slides or swipes, and
+/// what a double-tap on an edge or corner does. Each is one flat list with the current choice checked.
 enum SpotMenu {
-    /// Shows the menu under `view` and returns when it closes.
-    static func show(for spot: MapSpot, under view: NSView) {
-        make(for: spot).popUp(positioning: nil, at: NSPoint(x: 0, y: -6), in: view)
+    /// Opens `menu` just under `view`.
+    static func pop(_ menu: NSMenu, under view: NSView) {
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: -4), in: view)
     }
 
-    static func make(for spot: MapSpot) -> NSMenu {
+    /// Nothing, then every slide, then every swipe.
+    static func slideMenu(for side: EdgeSide) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        switch spot {
-        case .edge(let side): buildEdge(menu, side)
-        case .corner(let corner): buildCorner(menu, corner)
-        }
-        return menu
-    }
-
-    // MARK: Edges
-
-    private static func buildEdge(_ menu: NSMenu, _ side: EdgeSide) {
         let prefs = Prefs.shared
         let current = prefs.edge(side)
-        menu.addItem(header(side.title))
         let choose: (EdgeFunction) -> Void = { f in
             prefs.edges[side] = f
             explainAccessIfNeeded(f.needsAccess, f.blockedName)
@@ -466,27 +462,18 @@ enum SpotMenu {
         for f in EdgeFunction.available where f.kind == .swipe {
             menu.addItem(item(f.title, f.icon, checked: current == f, tip: f.detail(on: side)) { choose(f) })
         }
-
-        // A double-tap works on top of the slide or swipe, or on an edge that does nothing else.
-        let spot = MapSpot.edge(side)
-        menu.addItem(.separator())
-        menu.addItem(header("Double-Tap"))
-        let active = prefs.tapIsActive(spot)
-        let tap = item(active ? prefs.tapTitle(spot) : "Nothing", active ? prefs.tap(spot).icon : nil, checked: active)
-        if active, prefs.tap(spot) == .openApp, let id = prefs.tapApp(spot) { tap.image = appIcon(id) }
-        let choices = NSMenu()
-        choices.autoenablesItems = false
-        addTapChoices(choices, spot)
-        tap.submenu = choices
-        menu.addItem(tap)
+        return menu
     }
 
-    // MARK: Corners
-
-    private static func buildCorner(_ menu: NSMenu, _ corner: Corner) {
-        menu.addItem(header("\(corner.title): Double-Tap"))
-        addTapChoices(menu, .corner(corner))
+    /// What a double-tap on an edge or corner can do.
+    static func tapMenu(for spot: MapSpot) -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        addTapChoices(menu, spot)
+        return menu
     }
+
+    static func appIconImage(_ bundleID: String) -> NSImage? { appIcon(bundleID) }
 
     // MARK: Double-tap choices (corners and edges)
 
@@ -635,7 +622,7 @@ private struct OpenWithKeys: ViewModifier {
     }
 }
 
-private struct AnchorView: NSViewRepresentable {
+struct AnchorView: NSViewRepresentable {
     let anchor: MenuAnchor
     func makeNSView(context: Context) -> NSView {
         let view = NSView()

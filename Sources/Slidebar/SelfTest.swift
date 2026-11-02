@@ -251,19 +251,23 @@ enum SelfTest {
 
         // Clicking a spot opens its actions menu; choosing an item changes it.
         do {
-            let edgeMenu = SpotMenu.make(for: .edge(.right))
+            let edgeMenu = SpotMenu.slideMenu(for: .right)
             let volumeItem = edgeMenu.items.first { $0.title == EdgeFunction.volume.title }
             let checkedRight = edgeMenu.items.first { $0.state == .on }?.title
             prefs.edges[.right] = .off
             if let volumeItem, let action = volumeItem.action { _ = (volumeItem.target as AnyObject).perform(action) }
             let edgeOK = prefs.edge(.right) == .volume && checkedRight == EdgeFunction.volume.title
-            let cornerMenu = SpotMenu.make(for: .corner(.bottomRight))
+            let cornerMenu = SpotMenu.tapMenu(for: .corner(.bottomRight))
             let hasLock = cornerMenu.items.contains { $0.title == TapFunction.lockScreen.title }
             let hasShortcuts = cornerMenu.items.first { $0.title == TapFunction.runShortcut.title }?.submenu != nil
-            // Every edge menu ends with its double-tap choices.
-            let edgeTapChoices = edgeMenu.items.last?.submenu?.items.contains { $0.title == TapFunction.playPause.title } ?? false
-            line(edgeOK && hasLock && hasShortcuts && edgeTapChoices, "Spot menus list actions and apply the choice",
-                 "\(edgeMenu.items.count) edge items, \(cornerMenu.items.count) corner items")
+            // Edges offer the same double-tap choices, and picking one sets that edge's double-tap.
+            let edgeTapMenu = SpotMenu.tapMenu(for: .edge(.top))
+            let playItem = edgeTapMenu.items.first { $0.title == TapFunction.playPause.title }
+            if let playItem, let action = playItem.action { _ = (playItem.target as AnyObject).perform(action) }
+            let edgeTapOK = prefs.tap(.edge(.top)) == .playPause
+            prefs.edgeTaps = [:]
+            line(edgeOK && hasLock && hasShortcuts && edgeTapOK, "Spot menus list actions and apply the choice",
+                 "\(edgeMenu.items.count) slide items, \(cornerMenu.items.count) double-tap items")
             prefs.edges = [.left: .brightness, .right: .volume, .top: .off, .bottom: .songs]
             engine.syncConfig()
         }

@@ -43,6 +43,8 @@ struct MainPage: View {
     @ObservedObject var live = LiveState.shared
     /// The spot whose menu is open (or that has keyboard focus).
     @State private var selection: MapSpot?
+    /// The spot whose settings are open under the map.
+    @State private var editing: MapSpot?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -65,9 +67,18 @@ struct MainPage: View {
 
             NoticeArea()
 
-            TrackpadMap(selection: $selection)
+            TrackpadMap(selection: $selection, editing: $editing)
                 .frame(height: 216)
                 .padding(.bottom, 4)
+
+            if let spot = editing {
+                SpotEditor(spot: spot) {
+                    withAnimation(.easeOut(duration: 0.18)) { editing = nil }
+                    selection = nil
+                }
+                .id(spot)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
 
             SettingsSections()
 
