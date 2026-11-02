@@ -1,11 +1,13 @@
 {
-  "version": "1.0",
-  "build": 31,
-  "url": "https://github.com/hukpo/slidebar/releases/download/v1.0/Slidebar-1.0.dmg",
-  "sha256": "52e3db37014990a82317ba890c5f9fb5060f9a7c2e9693575d9d667cf0d75b59",
+  "version": "1.1",
+  "build": 35,
+  "url": "https://github.com/hukpo/slidebar/releases/download/v1.1/Slidebar-1.1.dmg",
+  "sha256": "04216a2312553bb8b1faa007fa7cc143ac39498fa45cbb5217bbaa08c3cff09b",
   "date": "2026-11-02",
   "minimumSystemVersion": "13.0",
   "notes": [
-    "First public release"
+    "Brim is now Slidebar, with a new icon",
+    "Every setting on one screen",
+    "Star us on GitHub"
   ]
 }
