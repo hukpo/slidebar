@@ -291,6 +291,14 @@ final class Prefs: ObservableObject {
     /// The edge listens for double-taps when any of its current spots has one.
     func edgeHasTaps(_ side: EdgeSide) -> Bool { tapSpots(on: side).contains(where: tapIsActive) }
 
+    /// A short name for small places: the app's or shortcut's own name, or the action's short title.
+    func tapShortTitle(_ spot: TapSpot) -> String {
+        let f = tap(spot)
+        if f == .openApp, let id = tapApp(spot) { return AppNames.name(for: id) }
+        if f == .runShortcut, let name = tapShortcut(spot) { return name }
+        return f.shortTitle
+    }
+
     /// The double-tap's name as the user would say it ("Open Safari", "Run “Focus”").
     func tapTitle(_ spot: TapSpot) -> String {
         let f = tap(spot)

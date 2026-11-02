@@ -9,13 +9,15 @@ enum MenuPage: Hashable {
 /// Root view of the menu bar popover.
 struct MenuView: View {
     @State private var page: MenuPage = .main
+    /// A spot to open on appear (used by --snapshot).
+    var openSpot: MapSpot? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack(alignment: .top) {
             switch page {
             case .main:
-                MainPage(page: $page)
+                MainPage(page: $page, editing: openSpot)
                     .transition(transition(from: .leading))
             case .advanced:
                 AdvancedPage(page: $page)
@@ -41,10 +43,16 @@ struct MainPage: View {
     @Binding var page: MenuPage
     @ObservedObject var prefs = Prefs.shared
     @ObservedObject var live = LiveState.shared
-    /// The spot whose menu is open (or that has keyboard focus).
+    /// The spot that's selected on the map (open, or focused from the keyboard).
     @State private var selection: MapSpot?
     /// The spot whose settings are open under the map.
     @State private var editing: MapSpot?
+
+    init(page: Binding<MenuPage>, editing: MapSpot? = nil) {
+        _page = page
+        _selection = State(initialValue: editing)
+        _editing = State(initialValue: editing)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -71,16 +79,19 @@ struct MainPage: View {
                 .frame(height: 216)
                 .padding(.bottom, 4)
 
+            // A clicked spot's settings take the place of the general settings, so the popover
+            // keeps its height and the map stays in view.
             if let spot = editing {
                 SpotEditor(spot: spot) {
                     withAnimation(.easeOut(duration: 0.18)) { editing = nil }
                     selection = nil
                 }
                 .id(spot)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.opacity)
+            } else {
+                SettingsSections()
+                    .transition(.opacity)
             }
-
-            SettingsSections()
 
             MenuFooter {
                 PlainIconButton(systemName: "slider.horizontal.3", title: "Advanced", help: "Advanced options") { page = .advanced }

@@ -139,6 +139,26 @@ enum TapFunction: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// Fits a small tile ("Screenshot" rather than "Take a Screenshot").
+    var shortTitle: String {
+        switch self {
+        case .off: return "Nothing"
+        case .mute: return "Mute"
+        case .muteMicrophone: return "Mute Mic"
+        case .playPause: return "Play/Pause"
+        case .nextSong: return "Next Song"
+        case .previousSong: return "Prev Song"
+        case .keepAwake: return "Keep Awake"
+        case .lockScreen: return "Lock"
+        case .sleepDisplay: return "Display Off"
+        case .screenshot: return "Screenshot"
+        case .spotlight: return "Spotlight"
+        case .emoji: return "Emoji"
+        case .runShortcut: return "Shortcut"
+        case .openApp: return "App"
+        }
+    }
+
     var title: String {
         switch self {
         case .off: return "Nothing"

@@ -64,10 +64,20 @@ struct SpotEditor: View {
                     .controlSize(.small)
                     .fixedSize()
                 }
-                ForEach(prefs.tapSpots(on: side), id: \.self) { tapSpot in
-                    PartRow(title: partTitle(tapSpot)) { tapField(tapSpot) }
+                if prefs.splitEdges.contains(side) {
+                    // The three parts side by side, like the edge itself.
+                    HStack(spacing: 6) {
+                        ForEach(prefs.tapSpots(on: side), id: \.self) { tapSpot in
+                            PartTile(label: partTitle(tapSpot), spot: tapSpot)
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.top, 2)
+                    .padding(.bottom, 8)
+                } else {
+                    PartRow(title: "Whole edge") { tapField(.edge(side, nil)) }
+                        .padding(.bottom, 2)
                 }
-                .padding(.bottom, 2)
             }
         }
     }
@@ -175,6 +185,58 @@ private struct PopUpField: View {
         .onHover { hovering = $0 }
         .accessibilityLabel(accessibilityName)
         .accessibilityValue(title)
+        .accessibilityHint("Shows the choices")
+    }
+}
+
+/// One third of a split edge: its place on the edge, and what a double-tap there does (or a faint
+/// plus when nothing). Click it to choose.
+private struct PartTile: View {
+    let label: String
+    let spot: TapSpot
+    @ObservedObject var prefs = Prefs.shared
+    @State private var anchor = MenuAnchor()
+    @State private var hovering = false
+
+    var body: some View {
+        let on = prefs.tapIsActive(spot)
+        let tap = prefs.tap(spot)
+        Button {
+            guard let view = anchor.view else { return }
+            SpotMenu.pop(SpotMenu.tapMenu(for: spot), under: view)
+        } label: {
+            VStack(spacing: 5) {
+                Text(label)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Group {
+                    if on, tap == .openApp, let id = prefs.tapApp(spot) {
+                        AppIcon(bundleID: id).frame(width: 22, height: 22)
+                    } else if on {
+                        Image(systemName: tap.icon).font(.system(size: 15))
+                    } else {
+                        Image(systemName: "plus").font(.system(size: 12, weight: .semibold)).foregroundStyle(.tertiary)
+                    }
+                }
+                .frame(height: 22)
+                Text(on ? prefs.tapShortTitle(spot) : "Add")
+                    .font(.system(size: 11))
+                    .foregroundStyle(on ? .primary : .tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 6)
+            .frame(maxWidth: .infinity)
+            .background(RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(Color.primary.opacity(hovering ? 0.12 : (on ? 0.08 : 0.04))))
+            .background(AnchorView(anchor: anchor))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .accessibilityLabel("\(spot.title) double-tap")
+        .accessibilityValue(on ? prefs.tapTitle(spot) : "Nothing")
         .accessibilityHint("Shows the choices")
     }
 }
