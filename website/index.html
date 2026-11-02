@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slidebar: trackpad edge sliders for Mac volume and brightness</title>
-<meta name="description" content="Slidebar is a free, open-source menu bar app that turns your Mac trackpad’s edges into volume and brightness sliders, with haptic ticks and corner shortcuts.">
+<meta name="description" content="Slidebar is a free, open-source menu bar app that turns your Mac trackpad’s edges into volume and brightness sliders, with double-taps, long presses and push-to-talk dictation.">
 <link rel="canonical" href="https://hukpo.github.io/slidebar/">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="author" content="Pavlo Huk">
@@ -35,7 +35,7 @@
       "@type": "SoftwareApplication",
       "@id": "https://hukpo.github.io/slidebar/#app",
       "name": "Slidebar",
-      "description": "A free, open-source Mac menu bar app that turns the edges of your trackpad into volume and brightness sliders, with double-taps on any edge or corner, edge swipes and haptic feedback.",
+      "description": "A free, open-source Mac menu bar app that turns the edges of your trackpad into volume and brightness sliders, with double-taps and long presses on any edge or corner, push-to-talk dictation, edge swipes and haptic feedback.",
       "applicationCategory": "UtilitiesApplication",
       "operatingSystem": "macOS 13 Ventura or later",
       "softwareVersion": "1.1",
@@ -73,8 +73,10 @@
           "acceptedAnswer": { "@type": "Answer", "text": "Slidebar isn’t notarized by Apple, so macOS shows this warning the first time you open it. Open System Settings, choose Privacy & Security, scroll down and click Open Anyway next to Slidebar. You only need to do this once. The source code is on GitHub if you’d like to read it or build the app yourself." } },
         { "@type": "Question", "name": "Will Slidebar change things by accident?",
           "acceptedAnswer": { "@type": "Answer", "text": "It only responds to a deliberate slide that starts on an edge. Touches that start in the middle of the trackpad are ignored, and so is anything while you type or hold the trackpad button down. If a resting palm moves a slider, Slidebar notices and puts the level back." } },
+        { "@type": "Question", "name": "Can I dictate by holding my trackpad?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Set an edge or corner’s long press to Dictate in Slidebar’s menu. Rest one finger still there for half a second to start dictating into the app in front, and lift it to stop. It uses the app’s own Start Dictation command, so turn on Dictation in System Settings, Keyboard first, and allow Accessibility for Slidebar." } },
         { "@type": "Question", "name": "What can a double-tap do?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Double-tap a corner, or any edge on top of its slider, to mute the sound or your microphone, play or pause, skip songs, keep your Mac awake, lock the screen, turn off the display, take a screenshot, open Spotlight or Emoji & Symbols, run one of your Shortcuts or open an app." } },
+          "acceptedAnswer": { "@type": "Answer", "text": "Double-tap a corner, or any edge on top of its slider, to mute the sound or your microphone, play or pause, skip songs, start dictation, keep your Mac awake, lock the screen, turn off the display, take a screenshot, open Spotlight or Emoji & Symbols, run one of your Shortcuts or open an app. Split an edge into three parts to give each third its own double-tap, and a long press can do any of the same things." } },
         { "@type": "Question", "name": "Does Slidebar collect any data?",
           "acceptedAnswer": { "@type": "Answer", "text": "No. Touches are handled in memory on your Mac and never leave it. The only time Slidebar goes online is an optional check for updates, which asks for one small file and sends nothing about you." } },
         { "@type": "Question", "name": "How do I uninstall Slidebar?",
@@ -281,11 +283,11 @@
   .edges-all { margin-top: 2rem; color: var(--muted); max-width: 52ch; }
   .sheet { grid-column: 7 / span 6; position: relative; min-height: 640px; border-radius: var(--radius); background: var(--surface); overflow: hidden; }
   .sheet-inner { position: absolute; left: clamp(24px, 5%, 64px); top: 64px; width: 340px; }
-  [data-ui] .ring { position: absolute; border-radius: 10px; box-shadow: 0 0 0 2px #7f78ff, 0 0 0 5px rgba(127,120,255,0.3); pointer-events: none; transition: left 260ms var(--ease-out), top 260ms var(--ease-out), width 260ms var(--ease-out), height 260ms var(--ease-out); }
+  #spotShot { display: block; transition: opacity 180ms ease; }
+  #spotShot.swap { opacity: 0; }
   /* A native macOS menu (NSMenu), drawn at its true size */
   [data-ui].menu { position: absolute; z-index: 2; width: 236px; padding: 5px; border-radius: 10px; background: rgba(40,40,44,0.97); box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.16), 0 0 0 0.5px rgba(0,0,0,0.7), 0 14px 38px rgba(0,0,0,0.5); font-size: 13px; line-height: 1.25; color: #fff; transition: opacity 200ms ease, transform 200ms var(--ease-out); }
   [data-ui].menu.static { position: relative; width: 150px; }
-  [data-ui].menu.swap { opacity: 0; transform: translateY(-4px); }
   [data-ui] .menu-h { padding: 5px 10px 3px 26px; font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.5); }
   [data-ui] .menu-i { position: relative; display: flex; align-items: center; gap: 7px; padding: 3px 10px 3px 26px; border-radius: 5px; min-height: 22px; }
   [data-ui] .menu-i svg { width: 14px; height: 14px; color: rgba(255,255,255,0.8); flex: none; }
@@ -296,7 +298,7 @@
   .sheet-caption { position: absolute; left: clamp(24px, 5%, 64px); right: 24px; bottom: 24px; z-index: 3; color: var(--ink); max-width: 46ch; padding: 0.9rem 1.1rem; border-radius: 10px; background: var(--surface-2); }
   .sheet-caption strong { display: block; font-weight: 650; }
   @media (max-width: 74.99em) {
-    .sheet { display: flex; flex-direction: column; min-height: 0; height: 720px; }
+    .sheet { display: flex; flex-direction: column; min-height: 780px; padding-bottom: 24px; }
     .sheet-caption { position: static; order: -1; margin: 16px 16px 0; max-width: none; }
     .sheet-inner { position: relative; left: auto; top: auto; margin: 24px 0 0 clamp(16px, 5%, 64px); flex: none; }
   }
@@ -420,7 +422,7 @@
   /* ---------- Tablet and phone ---------- */
   @media (max-width: 63.99em) {
     .edges-copy, .sheet, .feel-head, .proofs, .install-copy, .faq-head, .tiles, .get-copy, .get-window { grid-column: 1 / -1; }
-    .sheet { margin-top: 2.5rem; min-height: 560px; }
+    .sheet { margin-top: 2.5rem; }
     .feel-head, .faq-head { position: static; margin-bottom: 2.5rem; }
     .install { position: relative; }
     .install .grid { display: flex; flex-direction: column; }
@@ -441,7 +443,7 @@
     .spots button::before { display: none; }
     .spots button span { display: none; }
     .spots button[aria-pressed="true"] { background: var(--accent); color: #fff; }
-    .sheet { margin-inline: calc(var(--margin) * -1); border-radius: 0; height: 640px; }
+    .sheet { margin-inline: calc(var(--margin) * -1); border-radius: 0; }
     .sheet-inner { margin-left: 16px; }
     .stage-scale { transform: scale(0.72); }
     .tiles summary { min-height: 64px; padding: 1rem 3.5rem 1rem 1.25rem; font-size: 1.125rem; }
@@ -530,7 +532,7 @@
 
     <figure class="hero-pop" aria-label="Slidebar’s menu">
       <div class="pop" data-ui>
-        <picture><source srcset="img/menu-dark.webp" type="image/webp"><img src="img/menu-dark.png" width="340" height="789" fetchpriority="high" decoding="async" alt="Slidebar’s menu bar window: a drawing of the trackpad with Brightness on the left edge, Volume on the right, Keyboard on the top, Songs on the bottom and a shortcut in each corner, above settings for slide speed, edge width, haptic feedback, keeping the pointer still and the edge glow."></picture>
+        <picture><source srcset="img/menu-dark.webp" type="image/webp"><img src="img/menu-dark.png" width="340" height="789" fetchpriority="high" decoding="async" alt="Slidebar’s menu bar window: a drawing of the trackpad with Brightness on the left edge, Volume on the right, Keyboard on the top with three app double-taps and Dictate on a long press, Songs with Play or Pause on the bottom and a shortcut in each corner, above settings for slide speed, edge width, haptic feedback, keeping the pointer still and the edge glow."></picture>
       </div>
     </figure>
   </header>
@@ -542,23 +544,21 @@
         <h2 class="head" id="edges-title" data-reveal>Give every edge a job</h2>
         <p data-reveal style="--i:1">Click an edge or a corner on the trackpad in Slidebar’s menu and pick what it does. Edges slide or swipe. Any edge or corner can also answer a double-tap: open an app from the top edge, play or pause from the bottom. Split an edge into three parts and each third gets its own. Or hold a finger still on it to dictate, and lift to stop.</p>
         <div class="spots" role="group" aria-label="Choose an edge or corner" data-reveal style="--i:2">
-          <button type="button" data-spot="left" aria-pressed="true" aria-controls="spotMenu">Left edge <span>Brightness</span></button>
-          <button type="button" data-spot="right" aria-pressed="false" aria-controls="spotMenu">Right edge <span>Volume</span></button>
-          <button type="button" data-spot="bottom" aria-pressed="false" aria-controls="spotMenu">Bottom edge <span>Songs</span></button>
-          <button type="button" data-spot="top" aria-pressed="false" aria-controls="spotMenu">Top edge <span>Keyboard light</span></button>
-          <button type="button" data-spot="corner" aria-pressed="false" aria-controls="spotMenu">Corners <span>Mute and more</span></button>
+          <button type="button" data-spot="top" aria-pressed="true" aria-controls="spotShot">Top edge <span>Keyboard, apps, dictation</span></button>
+          <button type="button" data-spot="bottom" aria-pressed="false" aria-controls="spotShot">Bottom edge <span>Songs, play or pause</span></button>
+          <button type="button" data-spot="left" aria-pressed="false" aria-controls="spotShot">Left edge <span>Brightness</span></button>
+          <button type="button" data-spot="right" aria-pressed="false" aria-controls="spotShot">Right edge <span>Volume</span></button>
+          <button type="button" data-spot="corner" aria-pressed="false" aria-controls="spotShot">Corners <span>Mute and more</span></button>
         </div>
-        <p class="edges-all" data-reveal style="--i:3">Edges can slide brightness, volume, the keyboard backlight, microphone volume or Night Shift warmth, step through browser tabs or undo history, or swipe to skip songs and switch windows. Corners can mute the sound or your microphone, play or pause, skip songs, keep your Mac awake, lock the screen, turn off the display, take a screenshot, open Spotlight or Emoji &amp; Symbols, run a Shortcut or open an app.</p>
+        <p class="edges-all" data-reveal style="--i:3">Edges can slide brightness, volume, the keyboard backlight, microphone volume or Night Shift warmth, step through browser tabs or undo history, or swipe to skip songs and switch windows. A double-tap or a long press, on any edge or corner, can mute the sound or your microphone, play or pause, skip songs, start dictation, keep your Mac awake, lock the screen, turn off the display, take a screenshot, open Spotlight or Emoji &amp; Symbols, run a Shortcut or open an app.</p>
       </div>
       <div class="sheet" data-reveal style="--i:1">
         <div class="sheet-inner">
-          <div class="pop" data-ui style="position:relative">
-            <picture><source srcset="img/menu-dark.webp" type="image/webp"><img src="img/menu-dark.png" width="340" height="789" loading="lazy" decoding="async" alt="Slidebar’s menu, with the trackpad drawing at the top: Brightness 63% on the left edge, Volume on the right, Keyboard 63% on the top and Songs on the bottom."></picture>
-            <span class="ring" id="ring" data-ui aria-hidden="true"></span>
+          <div class="pop" data-ui>
+            <picture><source id="spotShotWebp" srcset="img/spot-top.webp" type="image/webp"><img id="spotShot" src="img/spot-top.png" width="340" height="569" loading="lazy" decoding="async" alt="Slidebar’s menu with the Top Edge settings open: slide for Keyboard brightness, a double-tap split into three parts that open Messages, Safari and Notes, and a long press set to Dictate."></picture>
           </div>
-          <div class="menu" data-ui id="spotMenu" role="img" aria-label=""></div>
         </div>
-        <p class="sheet-caption small" id="spotDetail" aria-live="polite"><strong>Brightness</strong>Slide up and down to change the display brightness.</p>
+        <p class="sheet-caption small" id="spotDetail" aria-live="polite"><strong>Keyboard light, three apps and dictation</strong>Slide to change the keyboard backlight. The edge is split in three, so a double-tap on the left, middle or right opens Messages, Safari or Notes. Hold a finger still on it to dictate, and lift to stop.</p>
       </div>
     </div>
   </section>
@@ -661,9 +661,10 @@
         <details name="faq" data-reveal style="--i:3"><summary>Why does Slidebar ask for Accessibility?</summary><p>It’s optional. Without it, Slidebar still changes volume and brightness directly. Allowing Accessibility adds the usual on-screen volume and brightness display, and the gestures that press keys for you, like skipping songs, switching tabs and opening Spotlight. Slidebar doesn’t read your screen or what you type.</p></details>
         <details name="faq" data-reveal style="--i:4"><summary>macOS says it can’t check Slidebar for malicious software. What do I do?</summary><p>Slidebar isn’t notarized by Apple, so macOS shows this warning the first time you open it. Open System Settings, choose Privacy &amp; Security, scroll down and click Open Anyway next to Slidebar. You only need to do this once. The source code is on GitHub if you’d like to read it or build the app yourself.</p></details>
         <details name="faq" data-reveal style="--i:5"><summary>Will Slidebar change things by accident?</summary><p>It only responds to a deliberate slide that starts on an edge. Touches that start in the middle of the trackpad are ignored, and so is anything while you type or hold the trackpad button down. If a resting palm moves a slider, Slidebar notices and puts the level back.</p></details>
-        <details name="faq" data-reveal style="--i:6"><summary>What can a double-tap do?</summary><p>Double-tap a corner, or any edge on top of its slider, to mute the sound or your microphone, play or pause, skip songs, keep your Mac awake, lock the screen, turn off the display, take a screenshot, open Spotlight or Emoji &amp; Symbols, run one of your Shortcuts or open an app.</p></details>
-        <details name="faq" data-reveal style="--i:7"><summary>Does Slidebar collect any data?</summary><p>No. Touches are handled in memory on your Mac and never leave it. The only time Slidebar goes online is an optional check for updates, which asks for one small file and sends nothing about you.</p></details>
-        <details name="faq" data-reveal style="--i:8"><summary>How do I uninstall Slidebar?</summary><p>Choose Quit in Slidebar’s menu, then drag Slidebar from your Applications folder to the Trash. If you allowed Accessibility, you can also remove Slidebar from the list in System Settings, Privacy &amp; Security, Accessibility.</p></details>
+        <details name="faq" data-reveal style="--i:6"><summary>What can a double-tap do?</summary><p>Double-tap a corner, or any edge on top of its slider, to mute the sound or your microphone, play or pause, skip songs, start dictation, keep your Mac awake, lock the screen, turn off the display, take a screenshot, open Spotlight or Emoji &amp; Symbols, run one of your Shortcuts or open an app. Split an edge into three parts to give each third its own double-tap, and a long press can do any of the same things.</p></details>
+        <details name="faq" data-reveal style="--i:7"><summary>Can I dictate by holding my trackpad?</summary><p>Yes. Set an edge or corner’s long press to Dictate in Slidebar’s menu. Rest one finger still there for half a second to start dictating into the app in front, and lift it to stop. It uses the app’s own Start Dictation command, so turn on Dictation in System Settings, Keyboard first, and allow Accessibility for Slidebar.</p></details>
+        <details name="faq" data-reveal style="--i:8"><summary>Does Slidebar collect any data?</summary><p>No. Touches are handled in memory on your Mac and never leave it. The only time Slidebar goes online is an optional check for updates, which asks for one small file and sends nothing about you.</p></details>
+        <details name="faq" data-reveal style="--i:9"><summary>How do I uninstall Slidebar?</summary><p>Choose Quit in Slidebar’s menu, then drag Slidebar from your Applications folder to the Trash. If you allowed Accessibility, you can also remove Slidebar from the list in System Settings, Privacy &amp; Security, Accessibility.</p></details>
       </div>
     </div>
   </section>
@@ -892,78 +893,37 @@
   document.addEventListener('visibilitychange', () => document.hidden && stopGhost());
   render();
 
-  /* ---------- Edges: the real menu for each edge and corner ---------- */
-  const IC = {
-    sun: ICON.sun, speaker: ICON.speaker,
-    kb: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
-    mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
-    moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
-    tabs: '<rect x="3" y="7" width="14" height="14" rx="2"/><path d="M7 3h12a2 2 0 0 1 2 2v12"/>',
-    undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
-    fwd: '<path d="m3 6 8 6-8 6zM13 6l8 6-8 6z"/>',
-    win: '<rect x="3" y="5" width="14" height="11" rx="2"/><path d="M7 19h12a2 2 0 0 0 2-2V9"/>',
-    mute: ICON.mute,
-    micoff: '<path d="M15 9.3V6a3 3 0 0 0-5.7-1.3M9 9v2a3 3 0 0 0 5 2.2M5 11a7 7 0 0 0 11.7 5.2M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18"/>',
-    pp: '<path d="m4 5 8 7-8 7zM15 5v14M20 5v14"/>',
-    next: '<path d="m5 5 9 7-9 7zM18 5v14"/>', prev: '<path d="m19 5-9 7 9 7zM6 5v14"/>',
-    cup: '<path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM17 10h1.5a2.5 2.5 0 0 1 0 5H17M4 21h13"/>',
-    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
-    disp: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
-    shot: '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/>',
-    search: '<circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/>',
-    smile: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14a4 4 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/>',
-    layers: '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
-    app: '<rect x="4" y="4" width="16" height="16" rx="4"/>',
-  };
-  const edgeItems = (cur, extra) => [
-    ['h', null], ['i', 'Nothing', null, cur === 'off'], ['s'],
-    ['h', 'Slide'],
-    ['i', 'Brightness', 'sun', cur === 'brightness'], ['i', 'Volume', 'speaker', cur === 'volume'],
-    ['i', 'Keyboard Brightness', 'kb', cur === 'kb'], ['i', 'Microphone Volume', 'mic'], ['i', 'Night Shift Warmth', 'moon'],
-    ['i', 'Switch Tabs', 'tabs'], ['i', 'Undo and Redo', 'undo'], ['s'],
-    ['h', 'Swipe'], ['i', 'Next or Previous Song', 'fwd', cur === 'songs'], ['i', 'Switch Windows', 'win'],
-    ...(extra || []),
-  ];
-  // Positions of each spot on the 340-point-wide screenshot.
+  /* ---------- Edges: the app's real settings for each edge and corner ---------- */
   const SPOTS = {
-    left:   { title: 'Left Edge', items: edgeItems('brightness'), ring: [10, 84, 22, 146], menu: [26, 236], detail: 'Brightness: slide up and down to change the display brightness.' },
-    right:  { title: 'Right Edge', items: edgeItems('volume'), ring: [308, 84, 22, 146], menu: [96, 236], detail: 'Volume: slide up and down to change the volume.' },
-    bottom: { title: 'Bottom Edge', items: edgeItems('songs', [['s'], ['i', 'Double-Tap the Edge to Play or Pause']]), ring: [50, 248, 240, 20], menu: [52, 274], detail: 'Next or Previous Song: swipe right quickly for the next song and left for the previous one.' },
-    top:    { title: 'Top Edge', items: edgeItems('kb'), ring: [50, 42, 240, 20], menu: [52, 68], detail: 'Keyboard Brightness: slide right and left to change the keyboard backlight.' },
-    corner: { title: 'Top-Right Corner: Double-Tap', ring: [288, 52, 34, 34], menu: [96, 92], detail: 'Mute Sound: double-tap the corner to mute or unmute. It turns orange while your Mac is muted.', items: [
-      ['h', null], ['i', 'Nothing'], ['s'],
-      ['i', 'Mute Sound', 'mute', true], ['i', 'Mute Microphone', 'micoff'], ['i', 'Play or Pause', 'pp'], ['i', 'Next Song', 'next'], ['i', 'Previous Song', 'prev'], ['s'],
-      ['i', 'Keep Mac Awake', 'cup'], ['i', 'Lock Screen', 'lock'], ['i', 'Turn Off Display', 'disp'], ['i', 'Take a Screenshot', 'shot'], ['s'],
-      ['i', 'Spotlight', 'search'], ['i', 'Emoji & Symbols', 'smile'], ['s'],
-      ['i', 'Run a Shortcut', 'layers', false, true], ['i', 'Open an App…', 'app'] ] },
+    top: { h: 569, title: 'Keyboard light, three apps and dictation', detail: 'Slide to change the keyboard backlight. The edge is split in three, so a double-tap on the left, middle or right opens Messages, Safari or Notes. Hold a finger still on it to dictate, and lift to stop.',
+      alt: 'Slidebar’s menu with the Top Edge settings open: slide for Keyboard brightness, a double-tap split into three parts that open Messages, Safari and Notes, and a long press set to Dictate.' },
+    bottom: { h: 515, title: 'Songs, and play or pause', detail: 'Swipe right quickly for the next song and left for the previous one. Double-tap anywhere on the edge to play or pause.',
+      alt: 'Slidebar’s menu with the Bottom Edge settings open: swipe for Songs, and a double-tap on the whole edge set to Play or Pause.' },
+    left: { h: 515, title: 'Brightness', detail: 'Slide up and down to change the display brightness. A double-tap or long press here is free for anything else.',
+      alt: 'Slidebar’s menu with the Left Edge settings open: slide for Brightness, with no double-tap or long press.' },
+    right: { h: 515, title: 'Volume', detail: 'Slide up and down to change the volume, in the same 16 steps as the volume keys.',
+      alt: 'Slidebar’s menu with the Right Edge settings open: slide for Volume, with no double-tap or long press.' },
+    corner: { h: 445, title: 'Mute in the top-right corner', detail: 'Double-tap the corner to mute or unmute. It turns orange while your Mac is muted. Each corner can also take a long press.',
+      alt: 'Slidebar’s menu with the Top-Right Corner settings open: a double-tap set to Mute Sound, and no long press.' },
   };
-  const menu = $('spotMenu'), ring = $('ring'), detail = $('spotDetail');
+  const shot = $('spotShot'), shotWebp = $('spotShotWebp'), detail = $('spotDetail');
   const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  const drawSpot = key => {
+  const showSpot = key => {
     const s = SPOTS[key];
-    const html = s.items.map(([t, label, icon, on, more]) => {
-      if (t === 's') return '<div class="menu-sep"></div>';
-      if (t === 'h') return `<div class="menu-h">${esc(label || s.title)}</div>`;
-      const svg = icon ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${IC[icon]}</svg>` : '';
-      return `<div class="menu-i${on ? ' on' : ''}">${svg}<span>${esc(label)}</span>${more ? '<span class="more">›</span>' : ''}</div>`;
-    }).join('');
+    detail.innerHTML = `<strong>${esc(s.title)}</strong>${esc(s.detail)}`;
     const apply = () => {
-      menu.innerHTML = html;
-      menu.setAttribute('aria-label', `${s.title} menu: ${s.items.filter(i => i[0] === 'i').map(i => i[1] + (i[3] ? ' (chosen)' : '')).join(', ')}`);
-      menu.style.left = s.menu[0] + 'px'; menu.style.top = s.menu[1] + 'px';
-      menu.classList.remove('swap');
+      shotWebp.srcset = `img/spot-${key}.webp`;
+      Object.assign(shot, { src: `img/spot-${key}.png`, alt: s.alt, height: s.h });
+      shot.classList.remove('swap');
     };
-    const [x, y, w, h] = s.ring;
-    Object.assign(ring.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
-    const [dt, dd] = s.detail.split(': ');
-    detail.innerHTML = `<strong>${esc(dt)}</strong>${esc(dd.charAt(0).toUpperCase() + dd.slice(1))}`;
-    if (reduceMotion || !menu.innerHTML) apply(); else { menu.classList.add('swap'); setTimeout(apply, 180); }
+    if (reduceMotion) apply(); else { shot.classList.add('swap'); setTimeout(apply, 180); }
   };
   document.querySelectorAll('.spots button').forEach(b => b.addEventListener('click', () => {
     document.querySelectorAll('.spots button').forEach(o => o.setAttribute('aria-pressed', o === b));
-    drawSpot(b.dataset.spot);
+    showSpot(b.dataset.spot);
   }));
-  drawSpot('left');
+  // Fetch the other screenshots once the section is near, so switching is instant.
+  new IntersectionObserver((es, o) => { if (es.some(e => e.isIntersecting)) { o.disconnect(); Object.keys(SPOTS).forEach(k => { const i = new Image(); i.src = `img/spot-${k}.webp`; }); } }, { rootMargin: '600px' }).observe(shot);
 
   /* ---------- Install: the stage follows the step nearest the middle ---------- */
   const stage = $('installStage'), steps = document.querySelectorAll('.step');

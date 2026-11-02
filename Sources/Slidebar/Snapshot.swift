@@ -19,6 +19,12 @@ enum Snapshot {
 
         render(MenuView(), to: dir.appendingPathComponent("menu\(suffix).png"))
         render(MenuView(openSpot: .edge(.top)), to: dir.appendingPathComponent("menu-editing\(suffix).png"))
+        // The menu with each spot's card open, for the website.
+        let spots: [(String, MapSpot)] = [("left", .edge(.left)), ("right", .edge(.right)), ("top", .edge(.top)),
+                                          ("bottom", .edge(.bottom)), ("corner", .corner(.topRight))]
+        for (name, spot) in spots {
+            render(MenuView(openSpot: spot), to: dir.appendingPathComponent("spot-\(name)\(suffix).png"))
+        }
         render(SetupView(), to: dir.appendingPathComponent("setup\(suffix).png"))
         render(AdvancedPage(page: .constant(.advanced)).frame(width: 340),
                to: dir.appendingPathComponent("advanced\(suffix).png"))
