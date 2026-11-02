@@ -599,6 +599,21 @@ final class EdgeRecognizerTests: XCTestCase {
         XCTAssertTrue(steps(actions).isEmpty)
     }
 
+    func testWithPalmRejectionOffASecondFingerDoesNotUndoTheSlide() {
+        var c = EdgeConfig()
+        c.palmRejection = false
+        var r = EdgeRecognizer(config: c)
+        var time = 0.0
+        for (x, y) in line(from: (0.98, 0.2), to: (0.98, 0.3), frames: 20) {
+            _ = r.process([TouchPoint(id: 1, x: x, y: y, size: 0.8)], time: time)
+            time += 0.01
+        }
+        let after = r.process([TouchPoint(id: 1, x: 0.98, y: 0.3, size: 0.8),
+                               TouchPoint(id: 2, x: 0.5, y: 0.5, size: 0.8)], time: time)
+        XCTAssertFalse(after.contains(.slideCancelled(.right)))
+        XCTAssertTrue(r.isTracking)
+    }
+
     func testFingerLandingSoonAfterUndoesTheSlide() {
         var r = EdgeRecognizer()
         var actions: [EdgeAction] = []

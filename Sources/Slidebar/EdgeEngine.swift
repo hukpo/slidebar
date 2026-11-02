@@ -187,10 +187,12 @@ final class EdgeEngine {
             allowed = allowed && (flags.contains(.function) || flags.contains(.option))
         }
         // Like macOS's own palm protection: ignore new edge touches right after typing. Keys Slidebar
-        // pressed itself (Switch Tabs, Undo) don't count, or one slide would block the next.
-        let sinceKey = CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: .keyDown)
-        let lastKeyTime = ProcessInfo.processInfo.systemUptime - sinceKey
-        let typing = sinceKey < 1.0 && abs(lastKeyTime - SystemControls.lastShortcutTime) > 0.25
+        // pressed itself (Switch Tabs, Undo) mustn't count, or one slide would block the next. macOS
+        // doesn't tell them apart from typing, and records them late with an unreliable time, so the
+        // check rests for as long as one of ours could still look like typing.
+        let ownKeysRecently = ProcessInfo.processInfo.systemUptime - SystemControls.lastShortcutTime < 1.5
+        let typing = !ownKeysRecently
+            && CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: .keyDown) < 1.0
         let context = EdgeContext(gestureAllowed: allowed && !typing,
                                   fineKeysHeld: flags.contains([.shift, .option]),
                                   buttonHeld: NSEvent.pressedMouseButtons != 0)

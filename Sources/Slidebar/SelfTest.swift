@@ -14,6 +14,8 @@ enum SelfTest {
         let engine = EdgeEngine.shared
         let prefs = Prefs.shared
         let savedPaused = prefs.paused, savedModifier = prefs.requireModifier
+        let savedPalmRejection = prefs.palmRejection
+        prefs.palmRejection = true
         let savedEdges = prefs.edges, savedCorners = prefs.corners, savedApps = prefs.cornerApps
         let savedTaps = prefs.edgeTaps, savedTapApps = prefs.edgeTapApps, savedTapShortcuts = prefs.edgeTapShortcuts
         let savedSplit = prefs.splitEdges
@@ -90,6 +92,16 @@ enum SelfTest {
         let glowGone = !NSApp.windows.contains { $0 is NSPanel && $0.isVisible && $0.frame.width < 40 }
         line(glowGone, "Edge glow fades after release", glowGone ? "hidden" : "still visible")
 
+        // Right after Slidebar presses a key itself (as Switch Tabs does), the next slide still works.
+        SystemControls.shortcut(.f20, [])
+        wait(0.15)
+        let volKey0 = SystemControls.volume() ?? 0.5
+        let keyUp = volKey0 < 0.5
+        slide(x: 0.98, from: keyUp ? 0.3 : 0.5, to: keyUp ? 0.5 : 0.3)  // a short slide: stay clear of mute
+        let volKey1 = SystemControls.volume() ?? volKey0
+        line(abs(volKey1 - volKey0) > 0.05, "A slide right after Slidebar presses a key still works",
+             String(format: "%.2f → %.2f", volKey0, volKey1))
+
         // A palm on the edge → nothing.
         wait(0.4) // let the last volume steps from the previous slide land
         let volPalm = SystemControls.volume() ?? 0
@@ -105,7 +117,7 @@ enum SelfTest {
         var palmMoved = false
         for i in 0...20 {
             let t = Float(i) / 20
-            let y: Float = palmUp ? 0.2 + 0.25 * t : 0.45 - 0.25 * t
+            let y: Float = palmUp ? 0.2 + 0.1 * t : 0.3 - 0.1 * t  // a palm creeps a short way
             engine.feed([TouchPoint(id: palmID, x: 0.98, y: y, size: 0.8)], time: clock)
             clock += 0.012
             wait(0.012)
@@ -113,7 +125,7 @@ enum SelfTest {
         wait(0.3)
         palmMoved = abs((SystemControls.volume() ?? 0) - volPalmStart) > 0.03
         nextID += 1
-        engine.feed([TouchPoint(id: palmID, x: 0.98, y: 0.45, size: 0.8),
+        engine.feed([TouchPoint(id: palmID, x: 0.98, y: palmUp ? 0.3 : 0.2, size: 0.8),
                      TouchPoint(id: nextID, x: 0.5, y: 0.5, size: 0.8)], time: clock); clock += 0.012
         engine.feed([TouchPoint(id: nextID, x: 0.52, y: 0.5, size: 0.8)], time: clock); clock += 0.012
         engine.feed([], time: clock); clock += 0.05
@@ -324,6 +336,7 @@ enum SelfTest {
 
         // Restore everything.
         prefs.paused = savedPaused; prefs.requireModifier = savedModifier
+        prefs.palmRejection = savedPalmRejection
         prefs.edges = savedEdges; prefs.corners = savedCorners; prefs.cornerApps = savedApps
         prefs.edgeTaps = savedTaps; prefs.edgeTapApps = savedTapApps; prefs.edgeTapShortcuts = savedTapShortcuts
         prefs.splitEdges = savedSplit

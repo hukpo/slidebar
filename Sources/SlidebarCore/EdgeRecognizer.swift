@@ -243,7 +243,7 @@ public struct EdgeRecognizer {
             // A slide that turns out to be a palm: stop it and put things back. A palm creeps, so a
             // finger that lands soon after one counts against it, but not against a slide that has
             // clearly gone somewhere (a thumb brushing the trackpad mid-slide).
-            if g.engaged, case .edge(let side) = g.zone, config.kind(side) == .slider {
+            if config.palmRejection, g.engaged, case .edge(let side) = g.zone, config.kind(side) == .slider {
                 let palm = isPalm(t)
                 let companion = touches.count > 1 && time - g.startTime <= Self.palmWatch
                     && g.maxTravel < Self.deliberateTravel

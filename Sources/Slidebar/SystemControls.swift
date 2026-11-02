@@ -141,6 +141,8 @@ extension SystemControls {
     /// Virtual key codes (Carbon kVK_*) used by Slidebar's actions.
     enum Key: CGKeyCode {
         case tab = 48, z = 6, grave = 50, space = 49, q = 12
+        /// A key nothing uses, for checks that need a key press.
+        case f20 = 90
     }
 
     /// When Slidebar last pressed a shortcut itself (system uptime), so it isn't mistaken for typing.
