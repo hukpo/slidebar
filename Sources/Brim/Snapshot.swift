@@ -21,6 +21,7 @@ enum Snapshot {
         render(SetupView(), to: dir.appendingPathComponent("setup\(suffix).png"))
         render(AdvancedPage(page: .constant(.advanced)).frame(width: 340),
                to: dir.appendingPathComponent("advanced\(suffix).png"))
+        render(StarBanner().padding(14).frame(width: 340), to: dir.appendingPathComponent("star-notice\(suffix).png"))
         render(EdgeGlow.preview(level: 0.62).frame(width: 26, height: 260).padding(20).background(Color.gray.opacity(0.3)),
                to: dir.appendingPathComponent("glow\(suffix).png"))
         return true
