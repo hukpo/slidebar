@@ -12,8 +12,10 @@ struct SetupView: View {
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
-                NightBackground(cornerRadius: 0)
-                VStack(spacing: 14) {
+                // The app icon's indigo-to-violet, so the guide feels like the icon opened up.
+                LinearGradient(colors: [Color(red: 0.11, green: 0.13, blue: 0.42), Color(red: 0.26, green: 0.15, blue: 0.56)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                VStack(spacing: 16) {
                     HStack(spacing: 10) {
                         AppIconView(size: 34)
                         VStack(alignment: .leading, spacing: 1) {
@@ -22,12 +24,12 @@ struct SetupView: View {
                                 .accessibilityAddTraits(.isHeader)
                             Text("Slide along the edges of your trackpad to change things like volume and brightness. You choose what each edge and corner does.")
                                 .font(.system(size: 12))
-                                .foregroundStyle(.white.opacity(0.72))
+                                .foregroundStyle(.white.opacity(0.82))
                         }
                         Spacer()
                     }
                     TrackpadDemo(left: prefs.edge(.left), right: prefs.edge(.right), bottom: prefs.edge(.bottom))
-                        .frame(height: 180)
+                        .frame(height: 190)
                 }
                 .foregroundStyle(.white)
                 .padding(.horizontal, 24)
@@ -139,13 +141,15 @@ private struct StepRow<Accessory: View>: View {
     }
 }
 
-/// A trackpad showing a finger sliding up the volume edge. Still under Reduce Motion.
+/// The trackpad from the menu, with a fingertip sliding up the volume edge and its strip filling
+/// as it goes. Still under Reduce Motion.
 private struct TrackpadDemo: View {
     let left: EdgeFunction
     let right: EdgeFunction
     let bottom: EdgeFunction
     @State private var up = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.snapshotMode) private var snapshotMode
 
     /// Demonstrate on the volume edge when there is one, otherwise the right edge.
     private var fingerOnLeft: Bool { left == .volume && right != .volume || (right == .off && left != .off) }
@@ -153,51 +157,68 @@ private struct TrackpadDemo: View {
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width, h = geo.size.height
-            ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.primary.opacity(0.05))
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1.5)
+            let inset: CGFloat = 40, strip: CGFloat = 4
+            let trackLength = h - 2 * inset
+            ZStack(alignment: .topLeading) {
+                TrackpadSurface()
 
-                if left != .off { edge(colors: left.levelColors, label: left.shortTitle, x: 18, h: h) }
-                if right != .off { edge(colors: right.levelColors, label: right.shortTitle, x: w - 18, h: h) }
-
+                if left != .off { sideEdge(left, x: 4, length: trackLength, top: inset, isDemo: fingerOnLeft) }
+                if right != .off { sideEdge(right, x: w - 4 - strip, length: trackLength, top: inset, isDemo: !fingerOnLeft) }
                 if bottom != .off {
-                    Capsule().fill(Color.primary.opacity(0.18))
-                        .frame(width: 70, height: 4)
-                        .position(x: w / 2, y: h - 12)
-                    Text(bottom.shortTitle).font(.system(size: 10)).foregroundStyle(.secondary)
-                        .position(x: w / 2, y: h - 25)
+                    Capsule().fill(LinearGradient(colors: bottom.mapColors, startPoint: .leading, endPoint: .trailing))
+                        .frame(width: w - 2 * inset - 40, height: strip)
+                        .offset(x: inset + 20, y: h - 4 - strip)
+                    chip(bottom).frame(width: w).offset(y: h - 4 - strip - 32)
                 }
 
+                // The fingertip, riding the top of the demo edge's level.
+                let level = up ? 0.82 : 0.22
                 Circle()
                     .fill(Color.white)
-                    .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
-                    .overlay(Circle().stroke(Color.primary.opacity(0.15)))
+                    .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
                     .frame(width: 22, height: 22)
-                    .position(x: fingerOnLeft ? 18 : w - 18, y: up ? h * 0.25 : h * 0.78)
+                    .offset(x: (fingerOnLeft ? 4 + strip / 2 : w - 4 - strip / 2) - 11,
+                            y: inset + trackLength * (1 - level) - 11)
             }
+            .clipShape(TrackpadSurface.shape.inset(by: -12))
         }
+        .environment(\.colorScheme, .dark)
         .accessibilityElement()
         .accessibilityLabel("Illustration: a finger slides up the \(fingerOnLeft ? "left" : "right") edge of the trackpad.")
         .onAppear {
-            guard !reduceMotion else { up = true; return }
+            guard !reduceMotion, !snapshotMode else { up = true; return }
             withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) { up = true }
         }
     }
 
-    private func edge(colors: [Color], label: String, x: CGFloat, h: CGFloat) -> some View {
-        ZStack {
-            Capsule()
-                .fill(LinearGradient(colors: colors, startPoint: .bottom, endPoint: .top))
-                .frame(width: 6, height: h - 50)
-                .position(x: x, y: h / 2)
-            Text(label)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.secondary)
-                .rotationEffect(.degrees(-90))
+    /// A side edge: a dim track, a colored fill to the current level, and its label chip beside it.
+    private func sideEdge(_ function: EdgeFunction, x: CGFloat, length: CGFloat, top: CGFloat, isDemo: Bool) -> some View {
+        let level: CGFloat = isDemo ? (up ? 0.82 : 0.22) : 0.6
+        return ZStack(alignment: .topLeading) {
+            Capsule().fill(Color.white.opacity(0.14))
+                .frame(width: 4, height: length)
+            Capsule().fill(LinearGradient(colors: function.mapColors, startPoint: .bottom, endPoint: .top))
+                .frame(width: 4, height: length * level)
+                .offset(y: length * (1 - level))
+                .shadow(color: (function.mapColors.last ?? .clear).opacity(isDemo ? 0.8 : 0), radius: 5)
+            chip(function)
                 .fixedSize()
-                .position(x: x < 50 ? x + 18 : x - 18, y: h / 2)
+                .offset(x: x < 40 ? 14 : -14, y: length / 2 - 12)
+                .frame(width: 4, alignment: x < 40 ? .leading : .trailing)
         }
+        .offset(x: x, y: top)
+    }
+
+    private func chip(_ function: EdgeFunction) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: function.icon).foregroundStyle(function.mapColors[1])
+            Text(function.shortTitle)
+        }
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(Color.black.opacity(0.34)))
+        .overlay(Capsule().strokeBorder(Color.white.opacity(0.09), lineWidth: 0.5))
     }
 }
