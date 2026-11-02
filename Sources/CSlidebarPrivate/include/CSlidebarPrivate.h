@@ -38,6 +38,12 @@ double SlidebarMTSurfaceAspect(void);
 /// Fires the Force Touch actuator of the built-in trackpad. Returns false if unavailable.
 bool SlidebarHapticActuate(int32_t actuationID);
 
+// MARK: Windows (SkyLight.framework)
+
+/// Brings the app's frontmost window forward and makes it the key window, without switching
+/// desktops (the way window switchers do). False when it has no window on any desktop.
+bool SlidebarFocusFrontWindow(int32_t pid);
+
 // MARK: Display brightness (DisplayServices.framework)
 
 bool SlidebarGetBrightness(uint32_t displayID, float *outValue);

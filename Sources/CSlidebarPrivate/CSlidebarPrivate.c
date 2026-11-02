@@ -1,8 +1,10 @@
 #include "CSlidebarPrivate.h"
 
+#include <ApplicationServices/ApplicationServices.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <dlfcn.h>
 #include <pthread.h>
+#include <string.h>
 
 // MARK: - Private types (layout used by MultitouchSupport since 10.x)
 
@@ -239,4 +241,82 @@ bool SlidebarSetBrightness(uint32_t displayID, float value) {
     if (value < 0) value = 0;
     if (value > 1) value = 1;
     return api.setBrightness(displayID, value) == 0;
+}
+
+// MARK: - Windows
+
+typedef int32_t (*fn_SLSMainConnectionID)(void);
+typedef CFArrayRef (*fn_SLSCopySpacesForWindows)(int32_t, int32_t, CFArrayRef);
+typedef CGError (*fn_SLPSSetFrontProcessWithOptions)(ProcessSerialNumber *, uint32_t, uint32_t);
+typedef CGError (*fn_SLPSPostEventRecordTo)(ProcessSerialNumber *, uint8_t *);
+
+static struct {
+    fn_SLSMainConnectionID mainConnection;
+    fn_SLSCopySpacesForWindows spacesForWindows;
+    fn_SLPSSetFrontProcessWithOptions setFrontProcess;
+    fn_SLPSPostEventRecordTo postEventRecord;
+} sky;
+static pthread_once_t skyOnce = PTHREAD_ONCE_INIT;
+
+static void loadSkyLight(void) {
+    void *sl = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_NOW);
+    if (!sl) return;
+    sky.mainConnection = (fn_SLSMainConnectionID)dlsym(sl, "SLSMainConnectionID");
+    sky.spacesForWindows = (fn_SLSCopySpacesForWindows)dlsym(sl, "SLSCopySpacesForWindows");
+    sky.setFrontProcess = (fn_SLPSSetFrontProcessWithOptions)dlsym(sl, "_SLPSSetFrontProcessWithOptions");
+    sky.postEventRecord = (fn_SLPSPostEventRecordTo)dlsym(sl, "SLPSPostEventRecordTo");
+}
+
+/// The app's frontmost ordinary window that's on a desktop, or 0.
+static uint32_t frontWindowOf(pid_t pid) {
+    CFArrayRef list = CGWindowListCopyWindowInfo(kCGWindowListOptionAll | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
+    if (!list) return 0;
+    uint32_t found = 0;
+    int32_t connection = sky.mainConnection();
+    for (CFIndex i = 0; i < CFArrayGetCount(list) && !found; i++) {  // front to back
+        CFDictionaryRef w = CFArrayGetValueAtIndex(list, i);
+        int owner = 0, layer = -1;
+        uint32_t number = 0;
+        CGRect bounds = CGRectZero;
+        CFNumberGetValue(CFDictionaryGetValue(w, kCGWindowOwnerPID), kCFNumberIntType, &owner);
+        CFNumberGetValue(CFDictionaryGetValue(w, kCGWindowLayer), kCFNumberIntType, &layer);
+        CFNumberGetValue(CFDictionaryGetValue(w, kCGWindowNumber), kCFNumberIntType, &number);
+        CGRectMakeWithDictionaryRepresentation(CFDictionaryGetValue(w, kCGWindowBounds), &bounds);
+        if (owner != pid || layer != 0 || bounds.size.height < 100) continue;
+        CFNumberRef n = CFNumberCreate(NULL, kCFNumberIntType, &number);
+        CFArrayRef ids = CFArrayCreate(NULL, (const void **)&n, 1, &kCFTypeArrayCallBacks);
+        CFArrayRef spaces = sky.spacesForWindows(connection, 7, ids);
+        if (spaces) {
+            if (CFArrayGetCount(spaces) > 0) found = number;
+            CFRelease(spaces);
+        }
+        CFRelease(ids);
+        CFRelease(n);
+    }
+    CFRelease(list);
+    return found;
+}
+
+bool SlidebarFocusFrontWindow(int32_t pid) {
+    pthread_once(&skyOnce, loadSkyLight);
+    if (!sky.mainConnection || !sky.spacesForWindows || !sky.setFrontProcess || !sky.postEventRecord) return false;
+    uint32_t window = frontWindowOf(pid);
+    if (!window) return false;
+    ProcessSerialNumber psn;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    if (GetProcessForPID(pid, &psn) != noErr) return false;
+#pragma clang diagnostic pop
+    sky.setFrontProcess(&psn, window, 0x200);  // kCPSUserGenerated
+    // Make it the key window: a press and release record addressed to the window.
+    for (uint8_t kind = 1; kind <= 2; kind++) {
+        uint8_t record[0xf8] = { 0 };
+        record[0x04] = 0xf8;
+        record[0x08] = kind;
+        record[0x3a] = 0x10;
+        memset(record + 0x20, 0xff, 0x10);
+        memcpy(record + 0x3c, &window, sizeof window);
+        sky.postEventRecord(&psn, record);
+    }
+    return true;
 }

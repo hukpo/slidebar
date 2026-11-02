@@ -185,32 +185,17 @@ extension SystemControls {
     /// Opens an app like clicking it in the Dock. Asking a running app to open only brings it to the
     /// front, which shows nothing when its window is closed (Telegram keeps running with no window)
     /// or on another desktop, so a running app gets a click on its Dock icon instead.
+    ///
+    /// The click alone isn't enough when macOS is set not to follow apps to their desktop: an app
+    /// that doesn't raise its own window (Telegram) may stay out of sight, or the desktop switch may
+    /// hand focus to whatever was last used there. So its window is brought forward first, unseen,
+    /// and the click then makes a single switch straight to it.
     static func openApp(bundleID: String) {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
-        if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first,
-           DockIcon.click(appAt: url) {
-            clickUntilInFront(app, url: url, clicksLeft: 2)
-            return
+        if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first {
+            _ = SlidebarFocusFrontWindow(app.processIdentifier)
+            if DockIcon.click(appAt: url) { return }
         }
         NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
-    }
-
-    /// One Dock click isn't always enough. An app that doesn't raise its own window (Telegram) may
-    /// come to the front without leaving this desktop, or macOS may switch to its desktop and then
-    /// hand focus to the app last used there. So once any switch has settled, check, and click again.
-    private static func clickUntilInFront(_ app: NSRunningApplication, url: URL, clicksLeft: Int) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            guard clicksLeft > 0, !app.isTerminated, !isInFront(app), DockIcon.click(appAt: url) else { return }
-            clickUntilInFront(app, url: url, clicksLeft: clicksLeft - 1)
-        }
-    }
-
-    /// The app is the active one and its window is the top one on this desktop.
-    private static func isInFront(_ app: NSRunningApplication) -> Bool {
-        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier else { return false }
-        let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
-            as? [[String: Any]] ?? []
-        let top = windows.first { ($0[kCGWindowLayer as String] as? Int) == 0 }
-        return (top?[kCGWindowOwnerPID as String] as? pid_t) == app.processIdentifier
     }
 }
