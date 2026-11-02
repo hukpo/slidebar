@@ -340,14 +340,23 @@ final class EdgeRecognizerTests: XCTestCase {
         XCTAssertTrue(steps(run(&r, path: line(from: (0.98, 0.30), to: (0.98, 0.32)))).isEmpty)
     }
 
-    func testWanderingOffTheEdgeEndsTheSlide() {
+    func testSlideKeepsGoingAfterTheFingerLeavesTheEdge() {
         var r = EdgeRecognizer()
-        // Slides up the edge, then drifts well into the trackpad: steps stop once it leaves the lane.
+        // Slides up the edge, then drifts well into the trackpad: it keeps counting until the lift.
         let path = line(from: (0.98, 0.2), to: (0.98, 0.4)) + line(from: (0.98, 0.4), to: (0.6, 0.8))
-        let s = steps(run(&r, path: path))
-        // Staying on the edge for the whole 0.6 of travel would give 22 steps.
-        XCTAssertLessThan(s.count, 13)
-        XCTAssertFalse(s.isEmpty)
+        let actions = run(&r, path: path)
+        // 0.6 of travel up the edge at 1.5× gives 22 steps, all of them up.
+        XCTAssertEqual(steps(actions).count, 22)
+        XCTAssertTrue(steps(actions).allSatisfy { $0 == .step(.right, up: true, fine: false) })
+    }
+
+    func testTopSlideKeepsGoingWhenTheFingerDriftsDown() {
+        var c = EdgeConfig()
+        c.edges[.top] = .slider
+        var r = EdgeRecognizer(config: c)
+        // Starts along the top edge, then curves down into the middle while still moving right.
+        let path = line(from: (0.2, 0.97), to: (0.4, 0.97)) + line(from: (0.4, 0.97), to: (0.8, 0.5))
+        XCTAssertEqual(steps(run(&r, path: path)).count, 22)
     }
 
     func testSlowDragAlongBottomDoesNotSwipe() {

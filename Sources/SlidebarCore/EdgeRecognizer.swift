@@ -156,7 +156,6 @@ public struct EdgeRecognizer {
     public static let baseStepDistance: Float = 0.04   // finger travel per step at 1× sensitivity
     public static let engageDistance: Float = 0.025    // travel along the edge before a slide starts
     public static let straightness: Float = 0.6        // before starting, sideways travel must stay under this × along
-    public static let laneDrift: Float = 0.10          // a started slide stops if the finger wanders this far across
     public static let stripHeight: Float = 0.09        // the least depth of the top and bottom edges
     public static let bottomQuarter: Float = 0.25
     public static let cornerSize: Float = 0.10
@@ -401,9 +400,8 @@ public struct EdgeRecognizer {
                 // g.last still holds the start, so the travel so far counts.
             }
 
-            // Once sliding, wandering far off the edge ends the slide.
-            if abs(across) > Self.laneDrift { return false }
-
+            // Once sliding, the finger is followed wherever it goes until it lifts; only travel
+            // along the edge counts.
             let stepDistance = Self.baseStepDistance / max(config.sensitivity, 0.1)
             g.accumulated += position - g.last
             g.last = position
