@@ -89,9 +89,10 @@ open -n -W build/Slidebar.app --args --check-keys            # live check of Und
 ### Releasing
 
 ```sh
-VERSION=1.1 NOTES="New thing|Fixed thing" scripts/build.sh --dmg
-gh release create v1.1 build/Slidebar-1.1.dmg build/Slidebar.dmg --title "Slidebar 1.1"
-git add website/appcast.json && git commit -m "Release 1.1" && git push
+echo 1.2 > VERSION   # bump the version first
+NOTES="New thing|Fixed thing" scripts/build.sh --dmg
+gh release create v1.2 build/Slidebar-1.2.dmg build/Slidebar.dmg --title "Slidebar 1.2"
+git add VERSION website/appcast.json && git commit -m "Release 1.2" && git push
 ```
 
 `--dmg` writes `website/appcast.json`, which points at the release's DMG. Once the website redeploys, every installed copy finds the update within 12 hours. Before it swaps itself and relaunches, Slidebar checks that the download's SHA-256 matches and that the new app is signed by the same team.

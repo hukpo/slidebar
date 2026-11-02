@@ -9,14 +9,16 @@
 #                               from its GitHub release v$VERSION
 #   WEBSITE_URL=https://…       where website/ is hosted; the update feed is $WEBSITE_URL/appcast.json
 #   UPDATE_FEED_URL=https://…   override the update feed ("" turns updates off)
-#   VERSION=1.1                 marketing version (default 1.0)
+#   VERSION=1.2                 marketing version (default: the VERSION file)
 #   NOTES="Fix A|Add B"         release notes for appcast.json, separated by |
 # Signing: uses $SIGN_IDENTITY, else the first "Apple Development"/"Developer ID" identity, else ad-hoc.
 # A stable identity matters: macOS ties the Accessibility grant to the signature.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="${VERSION:-1.0}"
+# The version lives in ./VERSION, so local builds are never "older" than the release and
+# get replaced by the auto-updater. Bump it when releasing.
+VERSION="${VERSION:-$(cat VERSION 2>/dev/null || echo 1.0)}"
 BUILD="${BUILD_NUMBER:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
 APP="build/Slidebar.app"
 
