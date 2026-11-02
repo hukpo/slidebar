@@ -29,8 +29,9 @@ struct TrackpadMap: View {
     @State private var keyboardNav = false
     @State private var clickingFocus = false
 
-    private let bar: CGFloat = 30
-    private let gap: CGFloat = 6
+    /// Edges start this far from each corner, leaving the corners free.
+    private let edgeInset: CGFloat = 42
+    private let cornerPad: CGFloat = 6
 
     /// Clockwise from the top-left corner.
     static let ring: [MapSpot] = [.corner(.topLeft), .edge(.top), .corner(.topRight), .edge(.right),
@@ -39,29 +40,37 @@ struct TrackpadMap: View {
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width, h = geo.size.height
-            let corner = bar
-            ZStack(alignment: .topLeading) {
-                NightBackground(cornerRadius: 18)
+            ZStack {
+                TrackpadSurface()
 
-                CenterReadout(selection: selection)
-                    .frame(width: w - 2 * (bar + 2 * gap) - 16, height: h - 2 * (bar + 2 * gap) - 8)
-                    .offset(x: bar + 2 * gap + 8, y: bar + 2 * gap + 4)
+                ZStack {
+                    edgeButton(.top, length: w - 2 * edgeInset).frame(maxHeight: .infinity, alignment: .top)
+                    edgeButton(.bottom, length: w - 2 * edgeInset).frame(maxHeight: .infinity, alignment: .bottom)
+                    edgeButton(.left, length: h - 2 * edgeInset).frame(maxWidth: .infinity, alignment: .leading)
+                    edgeButton(.right, length: h - 2 * edgeInset).frame(maxWidth: .infinity, alignment: .trailing)
 
-                // Edges
-                edgeButton(.top).frame(width: w - 2 * (corner + 2 * gap), height: bar)
-                    .offset(x: corner + 2 * gap, y: gap)
-                edgeButton(.bottom).frame(width: w - 2 * (corner + 2 * gap), height: bar)
-                    .offset(x: corner + 2 * gap, y: h - bar - gap)
-                edgeButton(.left).frame(width: bar, height: h - 2 * (corner + 2 * gap))
-                    .offset(x: gap, y: corner + 2 * gap)
-                edgeButton(.right).frame(width: bar, height: h - 2 * (corner + 2 * gap))
-                    .offset(x: w - bar - gap, y: corner + 2 * gap)
+                    cornerButton(.topLeft).padding(cornerPad)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    cornerButton(.topRight).padding(cornerPad)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    cornerButton(.bottomLeft).padding(cornerPad)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    cornerButton(.bottomRight).padding(cornerPad)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                }
+                .clipShape(TrackpadSurface.shape)
+                .saturation(prefs.paused ? 0 : 1)
+                .opacity(prefs.paused ? 0.55 : 1)
 
-                // Corners
-                cornerButton(.topLeft).offset(x: gap, y: gap)
-                cornerButton(.topRight).offset(x: w - corner - gap, y: gap)
-                cornerButton(.bottomLeft).offset(x: gap, y: h - corner - gap)
-                cornerButton(.bottomRight).offset(x: w - corner - gap, y: h - corner - gap)
+                if prefs.paused {
+                    Text("Paused")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 9).padding(.vertical, 4)
+                        .background(Capsule().fill(.regularMaterial))
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
             }
         }
         .focusable()
@@ -80,8 +89,6 @@ struct TrackpadMap: View {
         .onExitCommand { selection = nil }
         .modifier(OpenWithKeys { if let spot = selection { open(spot, fromKeyboard: true) } })
         .onAppear { UserShortcuts.preload() }
-        .environment(\.colorScheme, .dark)
-        .opacity(prefs.paused ? 0.6 : 1)
         .animation(.easeOut(duration: 0.2), value: prefs.paused)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Trackpad map. Arrow keys move between edges and corners.")
@@ -161,47 +168,18 @@ struct TrackpadMap: View {
         Double(Self.ring.count - (Self.ring.firstIndex(of: spot) ?? 0))
     }
 
-    private func edgeButton(_ side: EdgeSide) -> some View {
+    private func edgeButton(_ side: EdgeSide, length: CGFloat) -> some View {
         let function = prefs.edge(side)
         let spot = MapSpot.edge(side)
         let level = live.level(of: function).map { CGFloat($0) }
         let muted = function == .volume && live.muted
         let percent = muted ? "Muted" : level.map { "\(Int(($0 * 100).rounded()))%" }
-        return SpotButton(selected: selection == spot, keyboardFocused: mapFocused && keyboardNav, off: function == .off,
-                          shape: .capsule, levelValue: function.hasLevel ? level : nil, vertical: side.isVertical,
-                          colors: function.levelColors, dimmed: muted, active: live.activeSide == side,
-                          anchor: anchors.anchor(spot)) {
+        return EdgeSpot(side: side, length: length, function: function,
+                        level: function.hasLevel ? level : nil, value: function.hasLevel ? percent : nil,
+                        muted: muted, active: live.activeSide == side,
+                        selected: selection == spot, keyboardFocused: mapFocused && keyboardNav,
+                        anchor: anchors.anchor(spot)) {
             open(spot)
-        } label: {
-            if function == .off {
-                EmptySpotMark()
-            } else {
-                if side.isVertical {
-                    VStack(spacing: 4) {
-                        Image(systemName: muted ? "speaker.slash.fill" : function.icon)
-                        Text(function.shortTitle)
-                            .font(.system(size: 9, weight: .medium))
-                            .fixedSize()
-                            .rotationEffect(.degrees(side == .left ? -90 : 90))
-                            .frame(width: 12, height: 60)
-                        if let percent, !muted {
-                            Text(percent.dropLast())
-                                .font(.system(size: 9, weight: .semibold).monospacedDigit())
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                } else {
-                    HStack(spacing: 5) {
-                        Image(systemName: function.icon)
-                        Text(function.shortTitle).font(.system(size: 11, weight: .medium))
-                        if let percent {
-                            Text(percent)
-                                .font(.system(size: 11, weight: .medium).monospacedDigit())
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
         }
         .help("\(side.title): \(function.title). Click to change.")
         .accessibilityLabel("\(side.title): \(function.title)")
@@ -213,23 +191,22 @@ struct TrackpadMap: View {
     private func cornerButton(_ corner: Corner) -> some View {
         let function = prefs.corner(corner)
         let spot = MapSpot.corner(corner)
-        // Mute corners show when they're on: orange, filled, so a muted mic is never a surprise.
+        // Mute corners show when they're on: filled orange, so a muted mic is never a surprise.
         let isMuted = (function == .muteMicrophone && live.micMuted) || (function == .mute && live.muted)
-        return SpotButton(selected: selection == spot, keyboardFocused: mapFocused && keyboardNav, off: function == .off,
-                          shape: .circle, tint: isMuted ? .orange : nil, anchor: anchors.anchor(spot)) {
+        return CornerSpot(selected: selection == spot, keyboardFocused: mapFocused && keyboardNav,
+                          off: function == .off, on: isMuted, anchor: anchors.anchor(spot)) {
             open(spot)
         } label: {
             if function == .openApp, let id = prefs.cornerApps[corner] {
                 AppIcon(bundleID: id).frame(width: 18, height: 18)
             } else if isMuted {
-                Image(systemName: function.icon + ".fill").foregroundStyle(.orange)
+                Image(systemName: function.icon + ".fill").foregroundStyle(.white)
             } else if function != .off {
                 Image(systemName: function.icon)
             } else {
-                EmptySpotMark()
+                Image(systemName: "plus").font(.system(size: 9, weight: .bold)).foregroundStyle(.tertiary)
             }
         }
-        .frame(width: bar, height: bar)
         .help("\(corner.title): \(title(for: spot))\(isMuted ? (function == .mute ? ". Sound is muted" : ". Microphone is muted") : ""). Click to change.")
         .accessibilityLabel("\(corner.title): \(title(for: spot))")
         .accessibilityValue(isMuted ? "Muted" : "")
@@ -238,39 +215,60 @@ struct TrackpadMap: View {
     }
 }
 
-/// One spot on the map. The selected spot gets an accent ring; empty spots are dashed outlines.
-private struct SpotButton<Label: View>: View {
-    enum Shape { case capsule, circle }
-    let selected: Bool
-    /// The map has keyboard focus: the selected spot shows the system focus halo.
-    let keyboardFocused: Bool
-    let off: Bool
-    let shape: Shape
-    /// Colors the spot while its toggle is on (a muted mic or sound).
-    var tint: Color? = nil
-    /// A live level (0…1) filling the edge from the bottom or the left.
-    var levelValue: CGFloat? = nil
-    var vertical = false
-    var colors: [Color] = []
-    var dimmed = false
+// MARK: - Trackpad drawing
+
+/// A Magic Trackpad seen from above: brushed silver in light mode, dark gray in dark mode,
+/// with a lit top rim, a shaded bottom rim and a soft shadow underneath.
+struct TrackpadSurface: View {
+    static let shape = RoundedRectangle(cornerRadius: 15, style: .continuous)
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let dark = scheme == .dark
+        let shape = Self.shape
+        shape
+            .fill(LinearGradient(colors: dark ? [Color(white: 0.29), Color(white: 0.19)]
+                                              : [Color(white: 0.96), Color(white: 0.80)],
+                                 startPoint: .topLeading, endPoint: .bottomTrailing))
+            // Glass sheen across the top.
+            .overlay(shape.fill(LinearGradient(colors: [Color.white.opacity(dark ? 0.07 : 0.4), .clear],
+                                               startPoint: .top, endPoint: UnitPoint(x: 0.5, y: 0.55))))
+            // Bevel: light catches the top rim, the bottom rim falls into shade.
+            .overlay(shape.strokeBorder(LinearGradient(colors: [Color.white.opacity(dark ? 0.24 : 1),
+                                                                Color.white.opacity(dark ? 0.05 : 0.35),
+                                                                Color.black.opacity(dark ? 0.45 : 0.14)],
+                                                       startPoint: .top, endPoint: .bottom), lineWidth: 1))
+            .overlay(shape.inset(by: -0.5).stroke(Color.black.opacity(dark ? 0.65 : 0.22), lineWidth: 0.5))
+            .shadow(color: .black.opacity(dark ? 0.5 : 0.2), radius: 7, y: 4)
+            .shadow(color: .black.opacity(dark ? 0.35 : 0.12), radius: 1, y: 1)
+            .accessibilityHidden(true)
+    }
+}
+
+/// One edge: a color strip along the trackpad's rim (filled to the live level) and a label chip
+/// beside it. The whole band is one button.
+private struct EdgeSpot: View {
+    let side: EdgeSide
+    let length: CGFloat
+    let function: EdgeFunction
+    let level: CGFloat?
+    let value: String?
+    let muted: Bool
     /// Being slid right now.
-    var active = false
-    /// Where the actions menu opens from.
+    let active: Bool
+    let selected: Bool
+    let keyboardFocused: Bool
     let anchor: MenuAnchor
     let action: () -> Void
-    @ViewBuilder let label: () -> Label
     @State private var hovering = false
+    @Environment(\.colorScheme) private var scheme
+
+    private let thickness: CGFloat = 4
+    private let spacing: CGFloat = 7
 
     var body: some View {
         Button(action: action) {
-            ZStack {
-                background
-                label()
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.primary)
-            }
-            .contentShape(Rectangle())
-            .background(AnchorView(anchor: anchor))
+            layout.contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         // The map is one Tab stop with arrow keys inside, like a native radio group.
@@ -279,100 +277,140 @@ private struct SpotButton<Label: View>: View {
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
-    @ViewBuilder private var background: some View {
-        let fill = Color.primary.opacity(off ? (hovering ? 0.05 : 0) : (hovering || active ? 0.14 : 0.08))
-        let dash = StrokeStyle(lineWidth: 1, dash: [3, 3])
-        switch shape {
-        case .capsule:
-            Capsule().fill(fill)
-                .overlay(levelFill)
-                .overlay(Capsule().strokeBorder(Color.primary.opacity(off && !selected ? 0.25 : 0), style: dash))
-                .overlay(Capsule().strokeBorder(Color.brimAccent, lineWidth: selected ? 2 : 0))
-                .overlay(Capsule().inset(by: -3).stroke(Color(nsColor: .keyboardFocusIndicatorColor),
-                                                        lineWidth: selected && keyboardFocused ? 3 : 0))
-        case .circle:
-            Circle().fill(tint.map { $0.opacity(hovering ? 0.32 : 0.24) } ?? fill)
-                .overlay(Circle().strokeBorder(tint?.opacity(0.6) ?? .clear, lineWidth: 1))
-                .overlay(Circle().strokeBorder(Color.primary.opacity(off && !selected ? 0.3 : 0), style: dash))
-                .overlay(Circle().strokeBorder(Color.brimAccent, lineWidth: selected ? 2 : 0))
-                .overlay(Circle().inset(by: -3).stroke(Color(nsColor: .keyboardFocusIndicatorColor),
-                                                       lineWidth: selected && keyboardFocused ? 3 : 0))
+    @ViewBuilder private var layout: some View {
+        switch side {
+        case .left: HStack(spacing: spacing) { strip; chip }.frame(height: length)
+        case .right: HStack(spacing: spacing) { chip; strip }.frame(height: length)
+        case .top: VStack(spacing: spacing) { strip; chip }.frame(width: length)
+        case .bottom: VStack(spacing: spacing) { chip; strip }.frame(width: length)
         }
     }
-}
 
-/// A faint plus in an empty spot: there's room for something here.
-private struct EmptySpotMark: View {
-    var body: some View {
-        Image(systemName: "plus")
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(.tertiary)
-            .accessibilityHidden(true)
-    }
-}
-
-extension SpotButton {
-    @ViewBuilder var levelFill: some View {
-        if let level = levelValue, colors.count > 0 {
-            GeometryReader { g in
-                let v = min(max(level, 0), 1)
-                LinearGradient(colors: colors, startPoint: vertical ? .bottom : .leading, endPoint: vertical ? .top : .trailing)
-                    .frame(width: vertical ? g.size.width : max(g.size.height, g.size.width * v),
-                           height: vertical ? max(g.size.width, g.size.height * v) : g.size.height)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: vertical ? .bottom : .leading)
-            }
-            .clipShape(Capsule())
-            .opacity(dimmed ? 0.12 : (active ? 0.6 : 0.38))
-            .animation(.spring(response: 0.3, dampingFraction: 0.85), value: level)
-            .animation(.easeOut(duration: 0.15), value: active)
+    /// The rim side of the strip, which keeps a small gap from the trackpad's edge.
+    private var outward: Edge.Set {
+        switch side {
+        case .left: return .leading
+        case .right: return .trailing
+        case .top: return .top
+        case .bottom: return .bottom
         }
     }
-}
 
-/// The middle of the map: a hint when nothing is open, the live level while sliding.
-private struct CenterReadout: View {
-    let selection: MapSpot?
-    @ObservedObject var prefs = Prefs.shared
-    @ObservedObject var live = LiveState.shared
-
-    var body: some View {
-        Group {
-            if let side = live.activeSide, prefs.edge(side).hasLevel, let v = live.level(of: prefs.edge(side)) {
-                let function = prefs.edge(side)
-                let muted = function == .volume && live.muted
-                VStack(spacing: 2) {
-                    Label(function.shortTitle, systemImage: muted ? "speaker.slash.fill" : function.icon)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.7))
-                    HStack(alignment: .firstTextBaseline, spacing: 1) {
-                        Text(muted ? "Muted" : "\(Int((v * 100).rounded()))")
-                            .font(.system(size: 34, weight: .medium).monospacedDigit())
-                        if !muted {
-                            Text("%").font(.system(size: 14, weight: .medium)).foregroundStyle(.white.opacity(0.65))
-                        }
-                    }
-                    .foregroundStyle(.white)
+    private var strip: some View {
+        let vertical = side.isVertical
+        let colors = function.mapColors
+        return ZStack {
+            if function == .off {
+                Capsule().strokeBorder(Color.primary.opacity(hovering ? 0.4 : 0.22), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+            } else {
+                Capsule().fill(Color.primary.opacity(scheme == .dark ? 0.14 : 0.1))
+                GeometryReader { g in
+                    let v = min(max(level ?? 1, 0), 1)
+                    LinearGradient(colors: colors, startPoint: vertical ? .bottom : .leading, endPoint: vertical ? .top : .trailing)
+                        .frame(width: vertical ? g.size.width : g.size.width * v,
+                               height: vertical ? g.size.height * v : g.size.height)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: vertical ? .bottom : .leading)
                 }
-                .transition(.opacity)
-            } else if prefs.paused {
-                hint("Paused", "Your trackpad works as usual.")
-            } else if selection == nil {
-                hint(nil, "Click an edge or corner\nto choose what it does")
+                .clipShape(Capsule())
+                .opacity(muted ? 0.3 : 1)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .animation(.easeOut(duration: 0.15), value: live.activeSide)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+        .frame(width: vertical ? thickness : length, height: vertical ? length : thickness)
+        .padding(outward, 4)
+        .shadow(color: (colors.last ?? .clear).opacity(active ? 0.9 : (hovering ? 0.45 : 0)), radius: 5)
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: level)
+        .animation(.easeOut(duration: 0.15), value: active)
     }
 
-    private func hint(_ title: String?, _ text: String) -> some View {
-        VStack(spacing: 3) {
-            if let title { Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white.opacity(0.85)) }
-            Text(text)
-                .font(.system(size: 11.5))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.white.opacity(0.55))
+    private var chip: some View {
+        let dark = scheme == .dark
+        let off = function == .off
+        let fill: Color = off
+            ? Color.white.opacity(dark ? (hovering ? 0.1 : 0.05) : (hovering ? 0.6 : 0.35))
+            : (dark ? Color.black.opacity(hovering ? 0.5 : 0.34) : Color.white.opacity(hovering ? 0.98 : 0.8))
+        return HStack(spacing: 4) {
+            if off {
+                Image(systemName: "plus").font(.system(size: 9, weight: .bold))
+                Text("Add")
+            } else {
+                Image(systemName: muted ? "speaker.slash.fill" : function.icon)
+                    .foregroundStyle(function.mapColors[dark ? 1 : 0])
+                Text(function.shortTitle)
+                if let value {
+                    Text(value).monospacedDigit().foregroundStyle(.secondary)
+                }
+            }
+        }
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(off ? Color.secondary : Color.primary)
+        .lineLimit(1)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(fill))
+        .overlay(Capsule().strokeBorder(Color.white.opacity(dark ? 0.09 : 0.7), lineWidth: 0.5))
+        .overlay(Capsule().strokeBorder(Color.brimAccent, lineWidth: selected ? 2 : 0))
+        .overlay(Capsule().inset(by: -3).stroke(Color(nsColor: .keyboardFocusIndicatorColor),
+                                                lineWidth: selected && keyboardFocused ? 3 : 0))
+        .shadow(color: .black.opacity(off ? 0 : (dark ? 0.3 : 0.14)), radius: 1.5, y: 0.5)
+        .fixedSize()
+        .background(AnchorView(anchor: anchor))
+        .scaleEffect(active ? 1.06 : 1)
+        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: active)
+    }
+}
+
+/// One corner: a small glyph that gets a soft disc on hover and turns solid orange while its
+/// mute is on.
+private struct CornerSpot<Label: View>: View {
+    let selected: Bool
+    let keyboardFocused: Bool
+    let off: Bool
+    /// A mute that's currently on.
+    let on: Bool
+    let anchor: MenuAnchor
+    let action: () -> Void
+    @ViewBuilder let label: () -> Label
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle().fill(on ? Color.orange : Color.primary.opacity(hovering ? 0.12 : 0))
+                    .padding(on ? 3 : 0)
+                Circle().strokeBorder(Color.primary.opacity(off && !selected ? 0.25 : 0), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                    .padding(3)
+                Circle().strokeBorder(Color.brimAccent, lineWidth: selected ? 2 : 0)
+                Circle().inset(by: -3).stroke(Color(nsColor: .keyboardFocusIndicatorColor),
+                                              lineWidth: selected && keyboardFocused ? 3 : 0)
+                label()
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.primary.opacity(0.7))
+            }
+            .frame(width: 30, height: 30)
+            .contentShape(Circle())
+            .background(AnchorView(anchor: anchor))
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .onHover { hovering = $0 }
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+}
+
+extension EdgeFunction {
+    /// The strip's colors on the trackpad map: one hue per action, readable on silver and on gray.
+    var mapColors: [Color] {
+        switch self {
+        case .brightness: return [.brimAmber, .brimAmberTop]
+        case .volume: return [.brimViolet, .brimCyan]
+        case .keyboardBrightness: return [Color(red: 0.24, green: 0.52, blue: 0.98), Color(red: 0.5, green: 0.74, blue: 1)]
+        case .micVolume: return [Color(red: 0.16, green: 0.62, blue: 0.45), Color(red: 0.5, green: 0.95, blue: 0.72)]
+        case .nightShift: return [Color(red: 0.95, green: 0.42, blue: 0.12), Color(red: 1.0, green: 0.72, blue: 0.38)]
+        case .tabs: return [Color(red: 0.2, green: 0.6, blue: 0.9), Color(red: 0.45, green: 0.85, blue: 1)]
+        case .undo: return [Color(red: 0.55, green: 0.38, blue: 0.95), Color(red: 0.75, green: 0.6, blue: 1)]
+        case .songs: return [Color(red: 0.92, green: 0.3, blue: 0.48), Color(red: 1, green: 0.55, blue: 0.68)]
+        case .windows: return [Color(red: 0.1, green: 0.66, blue: 0.66), Color(red: 0.4, green: 0.9, blue: 0.85)]
+        case .off: return [Color.gray, Color.gray]
         }
     }
 }

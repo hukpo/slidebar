@@ -35,7 +35,7 @@ struct MenuView: View {
 // MARK: - Main page
 
 /// The everyday surface: your trackpad with what every edge and corner does (and live levels),
-/// options for the spot you click, an on/off switch, the current app and haptics.
+/// options for the spot you click, an on/off switch and haptics.
 struct MainPage: View {
     @Binding var page: MenuPage
     @ObservedObject var prefs = Prefs.shared
@@ -49,28 +49,25 @@ struct MainPage: View {
                 AppIconView(size: 22)
                 Text("Brim").font(.system(size: 15, weight: .semibold))
                 Spacer()
-                StatusPill()
+                Text(stateText)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(live.status == .noTrackpad ? Color.orange : Color.secondary)
+                    .help(stateHelp)
+                Toggle("Brim Gestures", isOn: Binding(get: { !prefs.paused }, set: { prefs.paused = !$0 }))
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .controlSize(.small)
+                    .help(prefs.paused ? "Turn Brim on" : "Pause Brim. Your trackpad works as usual.")
             }
             .padding(.horizontal, 2)
 
             NoticeArea()
 
             TrackpadMap(selection: $selection)
-                .frame(height: 212)
+                .frame(height: 216)
+                .padding(.vertical, 2)
 
-            Card {
-                ToggleRow(icon: "hand.draw", title: "Brim Gestures",
-                          subtitle: gesturesSubtitle,
-                          isOn: Binding(get: { !prefs.paused }, set: { prefs.paused = !$0 }))
-
-                RowDivider()
-
-                ChoiceRow(icon: "hand.tap", title: "Haptic Feedback",
-                          subtitle: "A tick under your finger at each step",
-                          options: HapticStrength.allCases.map { ($0, $0.title) },
-                          selection: $prefs.haptics,
-                          onChange: { Haptics.tick($0) })
-            }
+            HapticsRow()
 
             MenuFooter {
                 PlainIconButton(systemName: "gearshape", title: "Settings", help: "Settings (⌘,)") { page = .settings }
@@ -80,10 +77,54 @@ struct MainPage: View {
         .padding(14)
     }
 
-    private var gesturesSubtitle: String {
-        if prefs.paused { return "Paused. Your trackpad works as usual." }
-        if prefs.requireModifier { return "Hold Fn or Option to use your edges and corners" }
-        return "Slide edges, double-tap corners"
+    private var stateText: String {
+        if prefs.paused { return "Paused" }
+        if live.status == .noTrackpad { return "No trackpad" }
+        if prefs.requireModifier { return "Hold Fn or ⌥" }
+        return "On"
+    }
+
+    private var stateHelp: String {
+        if prefs.paused { return "Your trackpad works as usual." }
+        if prefs.requireModifier { return "Hold Fn or Option to use your edges and corners." }
+        return "Slide edges, double-tap corners. Click one to change it."
+    }
+}
+
+/// Haptic strength in one compact row: a tick under your finger at each step.
+struct HapticsRow: View {
+    @ObservedObject var prefs = Prefs.shared
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "hand.tap")
+                .font(.system(size: 12.5))
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
+                .accessibilityHidden(true)
+            Text("Haptic Feedback").font(.system(size: 12.5))
+            Spacer()
+            Menu {
+                Picker("Haptic Feedback", selection: $prefs.haptics) {
+                    ForEach(HapticStrength.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            } label: {
+                Text(prefs.haptics.title)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .foregroundStyle(.secondary)
+            .accessibilityLabel("Haptic Feedback")
+            .accessibilityValue(prefs.haptics.title)
+        }
+        .padding(.leading, 10)
+        .padding(.trailing, 8)
+        .padding(.vertical, 7)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.05)))
+        .help("A tick under your finger at each step")
+        .onChange(of: prefs.haptics) { Haptics.tick($0) }
     }
 }
 
