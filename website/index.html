@@ -3,11 +3,79 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Brim · Your trackpad's edges, as sliders</title>
-<meta name="description" content="Brim turns the edges of your Mac trackpad into volume and brightness sliders. Free and open source. Lives in your menu bar.">
+<title>Brim: trackpad edge sliders for volume and brightness on Mac</title>
+<meta name="description" content="Brim is a free, open-source Mac menu bar app that turns the edges of your trackpad into volume and brightness sliders, with corner shortcuts, swipes and haptic feedback. For macOS 13 and later.">
+<link rel="canonical" href="https://hukpo.github.io/brim/">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="author" content="Pavlo Huk">
 <meta name="theme-color" content="#0b0b22">
+<meta name="color-scheme" content="dark">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Brim">
+<meta property="og:url" content="https://hukpo.github.io/brim/">
+<meta property="og:title" content="Brim: slide the edge of your Mac trackpad">
+<meta property="og:description" content="Turn your trackpad's edges into volume and brightness sliders. Free and open source, for macOS 13 and later.">
+<meta property="og:image" content="https://hukpo.github.io/brim/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Brim: a Mac trackpad whose edges are brightness and volume sliders.">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Brim: slide the edge of your Mac trackpad">
+<meta name="twitter:description" content="Turn your trackpad's edges into volume and brightness sliders. Free and open source.">
+<meta name="twitter:image" content="https://hukpo.github.io/brim/img/og.png">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preload" as="image" href="img/badge-128.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://hukpo.github.io/brim/#app",
+      "name": "Brim",
+      "description": "A menu bar app that turns the edges of your Mac trackpad into volume and brightness sliders, with corner double-taps, edge swipes and haptic feedback.",
+      "applicationCategory": "UtilitiesApplication",
+      "operatingSystem": "macOS 13 or later",
+      "softwareVersion": "1.0",
+      "url": "https://hukpo.github.io/brim/",
+      "downloadUrl": "https://github.com/hukpo/brim/releases/latest/download/Brim.dmg",
+      "installUrl": "https://github.com/hukpo/brim/releases/latest/download/Brim.dmg",
+      "image": "https://hukpo.github.io/brim/img/icon-512.png",
+      "screenshot": "https://hukpo.github.io/brim/img/menu-dark.png",
+      "license": "https://opensource.org/licenses/MIT",
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "author": { "@type": "Person", "name": "Pavlo Huk", "url": "https://github.com/hukpo" },
+      "sameAs": ["https://github.com/hukpo/brim"]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://hukpo.github.io/brim/#site",
+      "name": "Brim",
+      "url": "https://hukpo.github.io/brim/"
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        { "@type": "Question", "name": "How do I change the volume or brightness with my Mac trackpad?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Install Brim, then slide one finger up or down along the right edge of the trackpad for volume, or the left edge for brightness. You can give every edge and corner a different job from Brim's menu bar icon." } },
+        { "@type": "Question", "name": "Is Brim free?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Brim is free and open source under the MIT License. There are no accounts, ads, in-app purchases or tracking." } },
+        { "@type": "Question", "name": "Does Brim work with a Magic Trackpad?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Brim works with the built-in trackpad on MacBooks and with Apple's Magic Trackpad, on Apple silicon and Intel Macs running macOS 13 Ventura or later." } },
+        { "@type": "Question", "name": "Why does Brim ask for Accessibility?",
+          "acceptedAnswer": { "@type": "Answer", "text": "It's optional. Without it, Brim still changes volume and brightness. Allowing Accessibility lets Brim show the usual on-screen volume and brightness display and press media keys for you. Brim doesn't read your screen or what you type." } },
+        { "@type": "Question", "name": "macOS says it can't check Brim for malicious software. What do I do?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Open System Settings, choose Privacy & Security, scroll down and click Open Anyway next to Brim. You only need to do this once." } },
+        { "@type": "Question", "name": "Will Brim change things by accident?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Brim only responds to a deliberate slide that starts on an edge. It ignores a resting palm, touches while you type or hold the trackpad button, and anything that starts in the middle of the trackpad." } }
+      ]
+    }
+  ]
+}
+</script>
 <script>document.documentElement.classList.replace("no-js", "js");</script>
 <script src="config.js"></script>
 <style>
@@ -47,6 +115,9 @@
   nav ul a:hover { color: var(--ink); }
   nav .get-link { color: var(--bg); background: var(--ink); padding: 6px 14px; border-radius: 99px; font-weight: 600; }
   nav .get-link:hover { color: var(--bg); opacity: 0.88; }
+  nav .gh-link { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); border: 1px solid var(--line); padding: 5px 12px; border-radius: 99px; }
+  nav .gh-link svg { width: 15px; height: 15px; }
+  nav .gh-link:hover { background: rgba(255,255,255,0.08); }
 
   /* Buttons */
   .btn { display: inline-flex; align-items: center; gap: 9px; background: var(--ink); color: var(--bg); font: 600 16px/1 var(--font); padding: 14px 22px; border-radius: 99px; border: 0; cursor: pointer; text-decoration: none; transition: opacity .15s; }
@@ -146,6 +217,15 @@
   .steps .aside { font-size: 14px; color: var(--ink-3); margin-top: 8px; }
   .start img { border-radius: 16px; box-shadow: 0 28px 60px -18px rgba(0,0,0,0.65); }
 
+  /* FAQ */
+  .faq { max-width: 760px; margin-top: 40px; border-top: 1px solid var(--line); }
+  .faq details { border-bottom: 1px solid var(--line); }
+  .faq summary { cursor: pointer; list-style: none; padding: 20px 36px 20px 0; position: relative; font-weight: 600; font-size: 17px; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after { content: "+"; position: absolute; right: 4px; top: 16px; font-size: 22px; font-weight: 400; color: var(--ink-3); transition: transform .2s; }
+  .faq details[open] summary::after { transform: rotate(45deg); }
+  .faq details p { color: var(--ink-2); padding: 0 36px 22px 0; }
+
   /* Download */
   .get { margin: 120px auto 0; max-width: 720px; text-align: center; }
   .get img.icon { width: 96px; height: 96px; margin: 0 auto 26px; filter: drop-shadow(0 12px 26px rgba(0,0,0,0.5)); }
@@ -179,10 +259,12 @@
 
 <nav aria-label="Main">
   <div class="wrap">
-    <a href="#top" class="brand"><img src="img/badge-128.png" alt="">Brim</a>
+    <a href="#top" class="brand"><img src="img/badge-128.png" width="22" height="22" alt="">Brim</a>
     <ul>
       <li class="opt"><a href="#features">Features</a></li>
       <li class="opt"><a href="#start">Getting started</a></li>
+      <li class="opt"><a href="#faq">FAQ</a></li>
+      <li><a href="https://github.com/hukpo/brim" class="gh-link" aria-label="Star Brim on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span>Star</span></a></li>
       <li><a href="#get" class="get-link">Download</a></li>
     </ul>
   </div>
@@ -192,13 +274,13 @@
   <header class="hero">
     <div class="wrap">
       <h1>Slide the edge.</h1>
-      <p class="lede">Brim turns the edges of your Mac trackpad into volume and brightness sliders. Free and open source.</p>
+      <p class="lede">Brim turns the edges of your Mac trackpad into volume and brightness sliders. A free, open-source menu bar app.</p>
       <div class="cta">
-        <a class="btn" href="Brim.dmg" download>
+        <a class="btn" href="https://github.com/hukpo/brim/releases/latest/download/Brim.dmg">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14"/></svg>
           Download for Mac
         </a>
-        <a class="btn-quiet source-link" href="#" hidden>View the source code</a>
+        <a class="btn-quiet source-link" href="https://github.com/hukpo/brim">View the source on GitHub</a>
       </div>
       <p class="meta">Version <span class="version">1.0</span> · macOS 13 Ventura or later · Apple silicon and Intel</p>
       <p class="phone-note">Brim is a Mac app. Open this page on your Mac to download it. <button class="btn-quiet share-link" type="button">Copy the link</button></p>
@@ -259,7 +341,7 @@
           <dl>
             <dt>Palm Rejection</dt><dd>A hand resting on the trackpad doesn't change anything.</dd>
             <dt>Keep Pointer Still</dt><dd>The pointer stays where it is while you slide.</dd>
-            <dt>Off in Chosen Apps</dt><dd>Turn Brim off in games, drawing apps or music software.</dd>
+            <dt>Ignores Typing</dt><dd>Nothing changes while you type or hold the trackpad button down.</dd>
             <dt>Menu Bar Only</dt><dd>No Dock icon, and it idles until a finger lands on an edge.</dd>
           </dl>
         </div>
@@ -270,22 +352,18 @@
   <section id="menu" aria-labelledby="menu-title">
     <div class="wrap center">
       <h2 id="menu-title">Lives in your menu bar.</h2>
-      <p class="sub">Your levels at a glance, one switch to pause, and every edge and corner one click away.</p>
+      <p class="sub">Your trackpad, drawn live: levels fill the edges, every edge and corner is one click from a new job, and every setting sits right below.</p>
       <div class="theme" role="group" aria-label="Screenshot appearance">
         <button type="button" id="themeLight" aria-pressed="false">Light</button><button type="button" id="themeDark" aria-pressed="true">Dark</button>
       </div>
       <div class="shots">
         <figure>
-          <img id="shotMenu" src="img/menu-dark.png" width="340" alt="The Brim menu: live brightness and volume on the edges that control them, an Edge Sliders switch, and Haptic Feedback strength.">
-          <figcaption><strong>At a glance</strong>Drag the level bars to set brightness or volume directly.</figcaption>
+          <img id="shotMenu" src="img/menu-dark.png" width="340" height="789" loading="lazy" decoding="async" alt="The Brim menu: a drawn trackpad with Brightness on the left edge, Keyboard on the top, Songs on the bottom and corner shortcuts, above Slide Speed, Edge Width, Haptic Feedback, Keep Pointer Still, Edge Glow, Appearance and Open at Login.">
+          <figcaption><strong>Everything in one place</strong>Click any edge or corner on the trackpad and pick what it does. Every setting is right underneath.</figcaption>
         </figure>
         <figure>
-          <img id="shotGestures" src="img/gestures-dark.png" width="340" alt="Edges and Corners: a map of the trackpad where you choose what each edge and corner does.">
-          <figcaption><strong>Make it yours</strong>Click an edge or corner on the map and pick what it does.</figcaption>
-        </figure>
-        <figure>
-          <img id="shotSettings" src="img/settings-dark.png" width="340" alt="Brim Settings: slide speed, edge width, edge glow, apps and more.">
-          <figcaption><strong>Set once</strong>Speed, edge width, the glow, and how it starts at login.</figcaption>
+          <img id="shotAdvanced" src="img/advanced-dark.png" width="340" height="388" loading="lazy" decoding="async" alt="Brim's Advanced page: ignore the top of the side edges, palm rejection, only while holding Fn or Option, smaller steps with Shift-Option, and restore defaults.">
+          <figcaption><strong>Advanced, out of the way</strong>Palm rejection, a hold-a-key mode and finer steps, for people who want them.</figcaption>
         </figure>
       </div>
     </div>
@@ -310,27 +388,41 @@
             <p>Brim already works. Allowing Accessibility once lets it show the usual volume and brightness display and use the media gestures. Brim uses it only to press those keys for you. It doesn't read your screen or what you type.</p>
           </li>
         </ol>
-        <img id="shotSetup" src="img/setup-dark.png" width="440" alt="Brim's welcome window: try a slide, then optionally allow Accessibility.">
+        <img id="shotSetup" src="img/setup-dark.png" width="440" loading="lazy" decoding="async" alt="Brim's welcome window: try a slide, then optionally allow Accessibility.">
+      </div>
+    </div>
+  </section>
+
+  <section id="faq" aria-labelledby="faq-title">
+    <div class="wrap">
+      <h2 id="faq-title">Questions.</h2>
+      <div class="faq">
+        <details><summary>How do I change the volume or brightness with my Mac trackpad?</summary><p>Install Brim, then slide one finger up or down along the right edge of the trackpad for volume, or the left edge for brightness. You can give every edge and corner a different job from Brim's menu bar icon.</p></details>
+        <details><summary>Is Brim free?</summary><p>Yes. Brim is free and open source under the MIT License. There are no accounts, ads, in-app purchases or tracking.</p></details>
+        <details><summary>Does Brim work with a Magic Trackpad?</summary><p>Yes. Brim works with the built-in trackpad on MacBooks and with Apple's Magic Trackpad, on Apple silicon and Intel Macs running macOS 13 Ventura or later.</p></details>
+        <details><summary>Why does Brim ask for Accessibility?</summary><p>It's optional. Without it, Brim still changes volume and brightness. Allowing Accessibility lets Brim show the usual on-screen volume and brightness display and press media keys for you. Brim doesn't read your screen or what you type.</p></details>
+        <details><summary>macOS says it can't check Brim for malicious software. What do I do?</summary><p>Open System Settings, choose Privacy &amp; Security, scroll down and click Open Anyway next to Brim. You only need to do this once.</p></details>
+        <details><summary>Will Brim change things by accident?</summary><p>Brim only responds to a deliberate slide that starts on an edge. It ignores a resting palm, touches while you type or hold the trackpad button, and anything that starts in the middle of the trackpad.</p></details>
       </div>
     </div>
   </section>
 
   <div class="wrap">
     <div class="get" id="get">
-      <img class="icon" src="img/icon-512.png" alt="">
+      <img class="icon" src="img/icon-512.png" width="96" height="96" loading="lazy" alt="Brim app icon">
       <h2>Free. Open source. Private.</h2>
       <p class="sub" style="margin-left:auto;margin-right:auto">No account, no tracking, no ads. Your touches are handled on your Mac and never leave it.</p>
       <ul class="promises">
         <li>Every feature, free</li>
-        <li class="source-promise">Source code coming soon</li>
+        <li>MIT-licensed source on GitHub</li>
         <li>Updates you can turn off</li>
       </ul>
       <div class="cta">
-        <a class="btn" href="Brim.dmg" download>
+        <a class="btn" href="https://github.com/hukpo/brim/releases/latest/download/Brim.dmg">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14"/></svg>
           Download for Mac
         </a>
-        <a class="btn-quiet source-link" href="#" hidden>View the source code</a>
+        <a class="btn-quiet source-link" href="https://github.com/hukpo/brim">View the source on GitHub</a>
       </div>
       <p class="meta" style="margin-top:14px">Version <span class="version">1.0</span> · macOS 13 Ventura or later · Apple silicon and Intel</p>
       <p class="meta" style="margin-top:6px">To remove Brim, choose Quit in its menu and drag it from Applications to the Trash.</p>
@@ -345,7 +437,8 @@
     <ul>
       <li><a href="privacy.html">Privacy</a></li>
       <li><a href="terms.html">Terms</a></li>
-      <li class="source-item" hidden><a class="source-link" href="#">Source code</a></li>
+      <li><a href="https://github.com/hukpo/brim">GitHub</a></li>
+      <li><a href="https://github.com/hukpo/brim/blob/main/LICENSE">MIT License</a></li>
       <li class="contact-item" hidden><a class="contact-link" href="#">Contact</a></li>
     </ul>
   </div>
@@ -356,11 +449,6 @@
   // Site settings from config.js.
   const cfg = window.BRIM || {};
   document.querySelectorAll('.version').forEach(el => el.textContent = cfg.version || '1.0');
-  if (cfg.sourceURL) {
-    document.querySelectorAll('.source-promise').forEach(li => li.textContent = 'Source code anyone can read');
-    document.querySelectorAll('.source-link').forEach(a => { a.href = cfg.sourceURL; a.hidden = false; });
-    document.querySelectorAll('.source-item').forEach(li => li.hidden = false);
-  }
   if (cfg.contactEmail) {
     document.querySelectorAll('.contact-link').forEach(a => a.href = 'mailto:' + cfg.contactEmail);
     document.querySelectorAll('.contact-item').forEach(li => li.hidden = false);
@@ -382,8 +470,7 @@
   // Screenshot appearance.
   const setTheme = dark => {
     document.getElementById('shotMenu').src = `img/menu${dark ? '-dark' : ''}.png`;
-    document.getElementById('shotSettings').src = `img/settings${dark ? '-dark' : ''}.png`;
-    document.getElementById('shotGestures').src = `img/gestures${dark ? '-dark' : ''}.png`;
+    document.getElementById('shotAdvanced').src = `img/advanced${dark ? '-dark' : ''}.png`;
     document.getElementById('shotSetup').src = `img/setup${dark ? '-dark' : ''}.png`;
     document.getElementById('themeDark').setAttribute('aria-pressed', dark);
     document.getElementById('themeLight').setAttribute('aria-pressed', !dark);

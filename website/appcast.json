@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "build": 31,
+  "url": "https://github.com/hukpo/brim/releases/download/v1.0/Brim-1.0.dmg",
+  "sha256": "52e3db37014990a82317ba890c5f9fb5060f9a7c2e9693575d9d667cf0d75b59",
+  "date": "2026-11-02",
+  "minimumSystemVersion": "13.0",
+  "notes": [
+    "First public release"
+  ]
+}

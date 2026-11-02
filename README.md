@@ -1,12 +1,26 @@
 <p align="center"><img src="website/img/icon-512.png" width="128" alt="Brim icon"></p>
 
 <h1 align="center">Brim</h1>
-<p align="center"><b>Slide the edge.</b> Your Mac trackpad's edges become brightness and volume sliders.</p>
+
+<p align="center"><b>Slide the edge.</b> Brim turns the edges of your Mac trackpad into volume and brightness sliders.</p>
 
 <p align="center">
-  <img src="website/img/menu.png" width="300" alt="Brim menu">
+  <a href="https://github.com/hukpo/brim/releases/latest/download/Brim.dmg"><b>Download for Mac</b></a> ·
+  <a href="https://hukpo.github.io/brim/">Website</a> ·
+  <a href="#build-from-source">Build from source</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/hukpo/brim/actions/workflows/ci.yml"><img src="https://github.com/hukpo/brim/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/hukpo/brim/releases/latest"><img src="https://img.shields.io/github/v/release/hukpo/brim" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/macOS-13%2B-blue" alt="macOS 13 or later">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
+</p>
+
+<p align="center">
+  <img src="website/img/menu-dark.png" width="300" alt="Brim's menu in dark mode: a drawn trackpad showing what each edge and corner does, with every setting below it">
   &nbsp;
-  <img src="website/img/settings-dark.png" width="300" alt="Brim settings">
+  <img src="website/img/menu.png" width="300" alt="The same menu in light mode, with a silver trackpad">
 </p>
 
 ## What it does
@@ -15,96 +29,110 @@ Out of the box:
 
 | Gesture | Result |
 | --- | --- |
-| Slide along the **left edge** | Brightness up / down |
-| Slide along the **right edge** | Volume up / down |
-| **Swipe** along the bottom edge | Next / previous song |
-| **Double-tap** the top-right corner | Mute / unmute |
-| Hold **⇧⌥** while sliding | Quarter steps |
+| Slide along the **left edge** | Brightness up or down |
+| Slide along the **right edge** | Volume up or down |
+| **Swipe** along the bottom edge | Next or previous song |
+| **Double-tap** the top-right corner | Mute or unmute |
+| Hold **⇧⌥** while sliding | Smaller steps |
 
-**Every edge and corner is configurable** (click it on the trackpad map in the menu):
+Click any edge or corner on the trackpad in Brim's menu to change what it does:
 
-- **Edges** (left, right, top, bottom) can slide **Brightness, Volume, Keyboard Brightness, Microphone Volume, Night Shift Warmth**, step through **Tabs** or **Undo and Redo**, or be swiped for **Next/Previous Song** or **Switch Windows**. Top and bottom edges slide left and right.
-- **Corners** (all four) respond to a double-tap: **Mute Sound, Mute Microphone, Play or Pause, Next Song, Previous Song, Keep Mac Awake, Lock Screen, Turn Off Display, Take a Screenshot, Spotlight, Emoji & Symbols, Run a Shortcut, or Open an App**.
+- **Edges** slide **Brightness, Volume, Keyboard Brightness, Microphone Volume** or **Night Shift Warmth**, step through **Tabs** or **Undo and Redo**, or swipe for **Next/Previous Song** or **Switch Windows**.
+- **Corners** respond to a double-tap: **Mute Sound, Mute Microphone, Play or Pause, Next Song, Previous Song, Keep Mac Awake, Lock Screen, Turn Off Display, Take a Screenshot, Spotlight, Emoji & Symbols, Run a Shortcut** or **Open an App**.
 
-Brim deliberately leaves out things macOS already does with multi-finger gestures (scrolling, zooming, switching desktops, back and forward, Mission Control).
+Brim leaves out what macOS already does with multi-finger gestures (scrolling, zooming, switching desktops, Mission Control).
 
-Brightness, volume and keyboard brightness use the same on-screen display as the keyboard keys. Actions that press keys need Accessibility; Brim says so in place and offers to allow it.
+**It feels right:**
+- Haptic ticks under your finger.
+- The same on-screen display as the keyboard keys.
+- An optional glow on the screen edge.
+- The pointer stays still while you slide.
 
-**Menu:** a map of your trackpad showing what every edge and corner does, with live levels filling the edges; click a spot to change it. Plus an on/off switch and haptic strength.
+**It stays out of your way:**
+- It only responds to a deliberate slide that starts on an edge.
+- Palms are caught and their changes undone.
+- Nothing happens while you type or hold the trackpad button.
+- It lives in the menu bar only, with no Dock icon.
 
-**Settings:** slide speed, edge width, keep pointer still, edge glow, appearance, open at login, automatic updates; under Advanced: lower part of side edges only, palm rejection, only while holding Fn or Option, smaller steps with Shift-Option, restore defaults.
+## Install
 
-Also: accident protection (deliberate slides only, palms are caught and undone, quick straight swipes, double-taps in the same spot, nothing while typing or while the button is held), a first-run setup guide, palm rejection, trackpad hot-plug, menu bar only (no Dock icon), and updates that download and install themselves.
+1. [Download Brim](https://github.com/hukpo/brim/releases/latest/download/Brim.dmg), open it and drag Brim into Applications.
+2. Open Brim. If macOS says it can't check Brim for malicious software, open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
+3. Slide up the right edge of your trackpad. The volume goes up.
 
-## Build
+Allowing **Accessibility** is optional. Without it, Brim still changes volume and brightness directly. With it, Brim shows the usual on-screen display and can press media keys for you. Brim never reads your screen or what you type.
 
-Requires Xcode 15+ (Swift 5.9+). Runs on macOS 13 Ventura or later.
+It needs macOS 13 Ventura or later and runs on Apple silicon and Intel Macs, with built-in trackpads or a Magic Trackpad.
+
+## Build from source
+
+You need Xcode 15 or later (Swift 5.9+).
 
 ```sh
-scripts/build.sh            # → build/Brim.app (universal, signed)
-scripts/build.sh --dmg      # also build/Brim-1.0.dmg and website/Brim.dmg
-scripts/build.sh --install  # also copy to /Applications and launch
+git clone https://github.com/hukpo/brim.git && cd brim
 swift test                  # gesture recognizer tests
+scripts/build.sh            # build/Brim.app (universal, signed)
+scripts/build.sh --install  # also copies it to /Applications and launches it
 ```
 
-Signing uses `$SIGN_IDENTITY`, or the first Apple Development / Developer ID identity in your keychain, or ad-hoc. Use a real identity if you can: macOS ties the Accessibility grant to the signature, so ad-hoc builds need re-granting after every rebuild.
+Signing uses `$SIGN_IDENTITY`, or else the first Apple Development or Developer ID identity in your keychain, or else ad-hoc. A real identity is better, because macOS ties the Accessibility permission to the signature. With ad-hoc signing you have to allow Accessibility again after every rebuild.
 
-On first launch, allow Brim in **System Settings → Privacy & Security → Accessibility**. Without it, Brim still changes volume and brightness directly, but there's no on-screen display and media keys won't work.
-
-### Open source
-
-Brim is free and open source. Set where the code lives so the app's ⋯ menu and the website can link to it:
+### Checks and screenshots
 
 ```sh
-SOURCE_URL=https://github.com/you/brim scripts/build.sh --dmg
+build/Brim.app/Contents/MacOS/Brim --selftest            # trackpad, keys, brightness and haptics (restores your levels)
+build/Brim.app/Contents/MacOS/Brim --simulate            # drives the gesture engine with fake fingers (restores your levels)
+build/Brim.app/Contents/MacOS/Brim --snapshot out/ dark  # renders the menu, Advanced page and setup window to PNG
+open -n -W build/Brim.app --args --check-keys            # live check of Undo, Tabs and Windows in Brim's own test windows
 ```
 
-and set `sourceURL` in `website/config.js`. Pick a license and add a `LICENSE` file before publishing.
-
-### Releasing updates
+### Releasing
 
 ```sh
-WEBSITE_URL=https://your.site VERSION=1.1 NOTES="New thing|Fixed thing" scripts/build.sh --dmg
+VERSION=1.1 NOTES="New thing|Fixed thing" scripts/build.sh --dmg
+gh release create v1.1 build/Brim-1.1.dmg build/Brim.dmg --title "Brim 1.1"
+git add website/appcast.json && git commit -m "Release 1.1" && git push
 ```
 
-This writes `website/appcast.json` and `website/downloads/Brim-1.1.dmg`. Upload `website/` and every installed copy finds the update within 12 hours. Brim checks the DMG's SHA-256 and that the new app is signed by the same team, swaps itself and relaunches. Set the version, source link and contact email in `website/config.js`.
+`--dmg` writes `website/appcast.json`, which points at the release's DMG. Once the website redeploys, every installed copy finds the update within 12 hours. Before it swaps itself and relaunches, Brim checks that the download's SHA-256 matches and that the new app is signed by the same team.
 
-### Handy flags
-
-```sh
-build/Brim.app/Contents/MacOS/Brim --selftest            # checks trackpad, keys, brightness, haptics (restores levels)
-build/Brim.app/Contents/MacOS/Brim --snapshot out/ dark  # renders menu, settings and setup screens to PNG
-build/Brim.app/Contents/MacOS/Brim --simulate            # drives the gesture engine with fake fingers (restores every level)
-open -n -W build/Brim.app --args --check-keys             # live check of Undo, Tabs and Windows in Brim's own test windows
-```
+Forks can set `SOURCE_URL` and `WEBSITE_URL` to their own repository and site.
 
 ## How it works
 
 ```
 Sources/
-  CBrimPrivate/        C shim, loads private frameworks at runtime (dlopen):
-                         MultitouchSupport  raw finger positions + Force Touch actuator
-                         DisplayServices    read / set built-in display brightness
-  BrimCore/            EdgeRecognizer: pure gesture logic (frames in → actions out), unit tested
+  CBrimPrivate/        C shim that loads private frameworks at runtime (dlopen):
+                         MultitouchSupport  raw finger positions and the Force Touch actuator
+                         DisplayServices    built-in display brightness
+  BrimCore/            EdgeRecognizer: pure gesture logic (touch frames in, actions out), unit tested
   Brim/
-    EdgeEngine.swift   runs the recognizer on each trackpad frame and performs actions
-    SystemControls     media key events, CoreAudio volume/mute, brightness
-    Haptics.swift      actuator ticks, falls back to NSHapticFeedbackManager
-    Prefs.swift        settings (UserDefaults) + Open at Login (SMAppService)
-    Config.swift       build-time settings from Info.plist (AppConfig)
-    Updater.swift      update feed check, download, verify, swap and relaunch
+    EdgeEngine.swift   runs the recognizer on every trackpad frame and performs the actions
+    SystemControls     media keys, CoreAudio volume and mute, brightness
+    Haptics.swift      actuator ticks, with NSHapticFeedbackManager as a fallback
+    Functions.swift    what edges and corners can do
+    Prefs.swift        settings (UserDefaults) and Open at Login (SMAppService)
+    Updater.swift      update check, download, verification, swap and relaunch
     BrandArt.swift     the app icon and menu bar glyph, drawn in code
-    Functions.swift    what edges and corners can do (EdgeFunction, CornerFunction)
-    KeyboardBacklight  keyboard backlight level (CoreBrightness)
-    Views/             SwiftUI menu with the trackpad map, settings, setup guide
+    Views/             the menu (trackpad map and settings), Advanced page, setup guide
 scripts/
-  build.sh             build, bundle, sign, DMG, appcast.json
+  build.sh             build, bundle, sign, DMG and appcast.json
   IconTool/            renders BrandArt's icon to AppIcon.icns
-website/               landing page with an interactive trackpad demo, terms, privacy
+website/               the site at hukpo.github.io/brim, with an interactive trackpad demo
 ```
 
-Gestures only start when a single finger **lands** in an edge zone, so moving the pointer into an edge never triggers anything. A slide is cancelled if the finger moves sideways first, or if a second finger lands before it starts (a scroll).
+A gesture only starts when one finger lands in an edge zone, so moving the pointer to the edge of the trackpad never triggers anything. A slide is cancelled if the finger moves sideways first, if a second finger lands soon after (a scroll), or if the touch turns out to be a palm. In that last case the change is undone.
 
-## Name and icon
+Brim reads touches through Apple's private MultitouchSupport framework, the same one the system uses. A future macOS update could change it.
 
-**Brim**: the edge of something, as in "filled to the brim". The icon is a trackpad on a midnight tile with a warm brightness edge, a cool volume edge, and a glowing fingertip riding the volume edge.
+## Privacy
+
+There are no accounts, analytics or ads. Touches are handled in memory and never leave your Mac. The only network request is the optional update check, which downloads one small JSON file. See the [privacy page](https://hukpo.github.io/brim/privacy.html).
+
+## Contributing
+
+Bug reports, ideas and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). If Brim makes your day a little smoother, a ⭐ helps other Mac users find it.
+
+## License
+
+[MIT](LICENSE) © 2026 Pavlo Huk. Mac and macOS are trademarks of Apple Inc.
