@@ -494,17 +494,99 @@ final class EdgeRecognizerTests: XCTestCase {
         XCTAssertGreaterThan(steps(actions).count, 10)
     }
 
+    func testThumbBrushingMidSlideDoesNotUndoALongSlide() {
+        // From a recording: a slide along the top edge, and a thumb brushes the bottom edge.
+        var c = EdgeConfig()
+        c.edges[.top] = .slider
+        var r = EdgeRecognizer(config: c)
+        var actions: [EdgeAction] = []
+        var time = 0.0
+        for (x, y) in line(from: (0.85, 0.99), to: (0.4, 0.99), frames: 40) {
+            actions += r.process([TouchPoint(id: 1, x: x, y: y, size: 0.9)], time: time)
+            time += 0.01
+        }
+        let after = r.process([TouchPoint(id: 1, x: 0.4, y: 0.99, size: 0.9),
+                               TouchPoint(id: 2, x: 0.87, y: 0.003, size: 0.8)], time: time)
+        XCTAssertFalse(after.contains(.slideCancelled(.top)))
+        XCTAssertTrue(r.isTracking)
+        // The slide keeps following the first finger after the thumb lifts.
+        var more: [EdgeAction] = []
+        for (x, y) in line(from: (0.4, 0.99), to: (0.2, 0.99), frames: 20) {
+            time += 0.01
+            more += r.process([TouchPoint(id: 1, x: x, y: y, size: 0.9)], time: time)
+        }
+        XCTAssertFalse(steps(more).isEmpty)
+    }
+
+    func testFingerLandingBesideABriefStrayTouchStillSlides() {
+        // From a recording: a finger lands on the top edge while a thumb is brushing the bottom
+        // edge; the thumb lifts 60 ms later, then the finger slides.
+        var c = EdgeConfig()
+        c.edges[.top] = .slider
+        var r = EdgeRecognizer(config: c)
+        var actions: [EdgeAction] = []
+        var time = 0.0
+        let thumb = TouchPoint(id: 4, x: 0.87, y: 0.004, size: 0.7)
+        actions += r.process([thumb], time: time)
+        time += 0.01
+        for _ in 0..<6 {
+            actions += r.process([TouchPoint(id: 2, x: 0.198, y: 0.996, size: 0.7), thumb], time: time)
+            time += 0.01
+        }
+        for (x, y) in line(from: (0.2, 0.996), to: (0.8, 0.996), frames: 40) {
+            actions += r.process([TouchPoint(id: 2, x: x, y: y, size: 0.7)], time: time)
+            time += 0.01
+        }
+        XCTAssertTrue(actions.contains(.slideBegan(.top)))
+        XCTAssertFalse(steps(actions).isEmpty)
+    }
+
+    func testFingerThatWasDownLongBesideAnotherDoesNotStart() {
+        // Two fingers scrolling, then one lifts: the one left mustn't start a slide.
+        var r = EdgeRecognizer()
+        var time = 0.0
+        for _ in 0..<40 {
+            _ = r.process([TouchPoint(id: 1, x: 0.98, y: 0.5, size: 0.7), TouchPoint(id: 2, x: 0.8, y: 0.5, size: 0.7)], time: time)
+            time += 0.01
+        }
+        var actions: [EdgeAction] = []
+        for (x, y) in line(from: (0.98, 0.5), to: (0.98, 0.8), frames: 20) {
+            actions += r.process([TouchPoint(id: 1, x: x, y: y, size: 0.7)], time: time)
+            time += 0.01
+        }
+        XCTAssertFalse(r.isTracking)
+        XCTAssertTrue(steps(actions).isEmpty)
+    }
+
+    func testFingerThatAlreadyHadItsChanceDoesNotRestart() {
+        // A finger that rested too long on a slider edge is let go, and stays let go.
+        var r = EdgeRecognizer()
+        var time = 0.0
+        var actions: [EdgeAction] = []
+        for _ in 0..<70 {
+            actions += r.process([TouchPoint(id: 1, x: 0.98, y: 0.3, size: 0.7)], time: time)
+            time += 0.01
+        }
+        XCTAssertFalse(r.isTracking)
+        for (x, y) in line(from: (0.98, 0.3), to: (0.98, 0.7), frames: 20) {
+            actions += r.process([TouchPoint(id: 1, x: x, y: y, size: 0.7)], time: time)
+            time += 0.01
+        }
+        XCTAssertTrue(steps(actions).isEmpty)
+    }
+
     func testFingerLandingSoonAfterUndoesTheSlide() {
         var r = EdgeRecognizer()
         var actions: [EdgeAction] = []
         var time = 0.0
-        for (x, y) in line(from: (0.98, 0.2), to: (0.98, 0.4), frames: 20) {
+        // A palm creeps a short way up the edge.
+        for (x, y) in line(from: (0.98, 0.2), to: (0.98, 0.3), frames: 20) {
             actions += r.process([TouchPoint(id: 1, x: x, y: y, size: 0.8)], time: time)
             time += 0.01
         }
         XCTAssertTrue(actions.contains(.slideBegan(.right)))
         // The index finger lands to move the pointer: the "slide" was a palm.
-        let after = r.process([TouchPoint(id: 1, x: 0.98, y: 0.4, size: 0.8),
+        let after = r.process([TouchPoint(id: 1, x: 0.98, y: 0.3, size: 0.8),
                                TouchPoint(id: 2, x: 0.5, y: 0.5, size: 0.8)], time: time)
         XCTAssertEqual(after, [.slideCancelled(.right), .releaseCursor])
         XCTAssertFalse(r.isTracking)

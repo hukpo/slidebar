@@ -143,8 +143,12 @@ extension SystemControls {
         case tab = 48, z = 6, grave = 50, space = 49, q = 12
     }
 
+    /// When Slidebar last pressed a shortcut itself (system uptime), so it isn't mistaken for typing.
+    private(set) static var lastShortcutTime: TimeInterval = -.infinity
+
     /// Presses a keyboard shortcut, like the user typing it.
     static func shortcut(_ key: Key, _ flags: CGEventFlags) {
+        lastShortcutTime = ProcessInfo.processInfo.systemUptime
         for down in [true, false] {
             guard let event = CGEvent(keyboardEventSource: nil, virtualKey: key.rawValue, keyDown: down) else { continue }
             event.flags = flags

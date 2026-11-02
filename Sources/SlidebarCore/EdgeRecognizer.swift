@@ -162,6 +162,8 @@ public struct EdgeRecognizer {
     public static let engageWindow: Double = 0.5       // a slide has to get going this soon after touching
     public static let palmWatch: Double = 1.5          // another finger this soon means the first was a palm
     public static let holdDuration: Double = 0.5       // a finger resting this long, without moving, is a long press
+    public static let lateStartWindow: Double = 0.3    // a finger that landed beside a stray touch may still start this soon
+    public static let deliberateTravel: Float = 0.15   // a slide this long is a finger at work, not a creeping palm
 
     /// The single finger being followed, from touch-down to lift-off.
     struct Gesture {
@@ -186,6 +188,9 @@ public struct EdgeRecognizer {
     var lastTap: (zone: EdgeZone, time: Double, x: Float, y: Float)?
     /// Timestamp of the frame being processed.
     var lastTime: Double = 0
+    /// Where and when each finger touched down. `spent` once it has had its chance to start a gesture.
+    struct Landing { var time: Double; var x: Float; var y: Float; var spent = false }
+    var landings: [Int32: Landing] = [:]
 
     public init(config: EdgeConfig = EdgeConfig()) {
         self.config = config
@@ -199,6 +204,10 @@ public struct EdgeRecognizer {
         let ids = Set(touches.map(\.id))
         defer { previousIDs = ids }
         var actions: [EdgeAction] = []
+        landings = landings.filter { ids.contains($0.key) }
+        for t in touches where landings[t.id] == nil {
+            landings[t.id] = Landing(time: time, x: t.x, y: t.y)
+        }
 
         if var g = gesture {
             guard let t = touches.first(where: { $0.id == g.id }) else {
@@ -223,10 +232,13 @@ public struct EdgeRecognizer {
                 actions.append(.releaseCursor)
                 return actions
             }
-            // A slide that turns out to be a palm: stop it and put things back.
+            // A slide that turns out to be a palm: stop it and put things back. A palm creeps, so a
+            // finger that lands soon after one counts against it, but not against a slide that has
+            // clearly gone somewhere (a thumb brushing the trackpad mid-slide).
             if g.engaged, case .edge(let side) = g.zone, config.kind(side) == .slider {
                 let palm = isPalm(t)
                 let companion = touches.count > 1 && time - g.startTime <= Self.palmWatch
+                    && g.maxTravel < Self.deliberateTravel
                 if palm || companion {
                     gesture = nil
                     actions.append(.slideCancelled(side))
@@ -243,19 +255,23 @@ public struct EdgeRecognizer {
             return actions
         }
 
-        // Only start on a single fresh finger, so sliding in from the middle never triggers.
+        // Only a single finger, fresh on the trackpad, starts a gesture, so sliding in from the middle
+        // never triggers. A finger that landed while a stray touch (a thumb brushing the trackpad) was
+        // down gets one chance once it's alone, if that's soon; it counts from where it landed.
+        guard touches.count == 1, let t = touches.first, let landing = landings[t.id] else { return actions }
+        landings[t.id]?.spent = true
+        let late = !previousIDs.isEmpty
+        if late, landing.spent || time - landing.time > Self.lateStartWindow { return actions }
+        let origin = TouchPoint(id: t.id, x: landing.x, y: landing.y, size: t.size, major: t.major)
         guard context.gestureAllowed,
               !context.buttonHeld,
-              touches.count == 1,
-              previousIDs.isEmpty,
-              let t = touches.first,
               !isPalm(t),
-              let zone = classify(t)
+              let zone = classify(origin)
         else { return actions }
 
         let start: Float
-        if case .edge(let side) = zone { start = side.isVertical ? t.y : t.x } else { start = 0 }
-        gesture = Gesture(id: t.id, zone: zone, startX: t.x, startY: t.y, startTime: time, last: start)
+        if case .edge(let side) = zone { start = side.isVertical ? origin.y : origin.x } else { start = 0 }
+        gesture = Gesture(id: t.id, zone: zone, startX: origin.x, startY: origin.y, startTime: landing.time, last: start)
         // Edges that only listen for a double-tap leave the pointer alone.
         if config.freezeCursor, case .edge(let side) = zone, config.kind(side) != .off {
             actions.append(.freezeCursor)
