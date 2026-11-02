@@ -91,6 +91,8 @@ final class EdgeEngine {
     static let shared = EdgeEngine()
 
     private var recognizer = EdgeRecognizer()
+    /// Width over height of the trackpad, from the trackpad itself (0 until known).
+    private var surfaceAspect: Double = 0
     private let prefs = Prefs.shared
     private let live = LiveState.shared
     private var cancellables = Set<AnyCancellable>()
@@ -125,6 +127,7 @@ final class EdgeEngine {
     func syncConfig() {
         var c = EdgeConfig()
         c.edgeWidth = Float(prefs.edgeWidth)
+        if surfaceAspect > 0 { c.aspect = Float(surfaceAspect) }
         c.sensitivity = Float(prefs.sensitivity)
         c.bottomQuarterOnly = prefs.bottomQuarterOnly
         c.freezeCursor = prefs.freezeCursor
@@ -156,7 +159,9 @@ final class EdgeEngine {
             DispatchQueue.main.async { engine.handle(points, time: timestamp) }
         }, context)
         live.deviceCount = Int(count)
-        NSLog("Slidebar: listening on \(count) trackpad(s)")
+        surfaceAspect = SlidebarMTSurfaceAspect()
+        syncConfig()
+        NSLog("Slidebar: listening on \(count) trackpad(s), width/height \(String(format: "%.2f", surfaceAspect))")
     }
 
     func restart() {

@@ -494,6 +494,21 @@ final class EdgeRecognizerTests: XCTestCase {
         XCTAssertGreaterThan(steps(actions).count, 10)
     }
 
+    func testTopAndBottomEdgesAreAsDeepAsTheSides() {
+        // A 125 × 77 mm trackpad with wide edges: 12% of the width is 15 mm, which is 19.5% of the height.
+        var c = EdgeConfig()
+        c.edgeWidth = 0.12
+        c.aspect = 124.8 / 76.8
+        c.edges[.top] = .slider
+        XCTAssertEqual(c.depth(.top), 0.195, accuracy: 0.001)
+        let r = EdgeRecognizer(config: c)
+        XCTAssertEqual(r.classify(TouchPoint(id: 1, x: 0.5, y: 0.83)), .edge(.top))
+        XCTAssertNil(r.classify(TouchPoint(id: 1, x: 0.5, y: 0.78)))
+        // Narrow edges never make the top and bottom shallower than before.
+        c.edgeWidth = 0.02
+        XCTAssertEqual(c.depth(.bottom), EdgeRecognizer.stripHeight)
+    }
+
     func testThumbBrushingMidSlideDoesNotUndoALongSlide() {
         // From a recording: a slide along the top edge, and a thumb brushes the bottom edge.
         var c = EdgeConfig()

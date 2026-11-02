@@ -95,7 +95,10 @@ public enum EdgeAction: Equatable {
 
 /// The user's settings, as far as recognizing gestures goes.
 public struct EdgeConfig: Equatable {
+    /// How deep the left and right edges are, as a share of the trackpad's width.
     public var edgeWidth: Float = 0.05
+    /// The trackpad's width over its height, so the top and bottom edges can be as deep as the sides.
+    public var aspect: Float = 1.6
     public var sensitivity: Float = 1.5
     /// Only the lower part of the left and right edges responds.
     public var bottomQuarterOnly = false
@@ -119,6 +122,12 @@ public struct EdgeConfig: Equatable {
     public init() {}
 
     public func kind(_ side: EdgeSide) -> EdgeKind { edges[side] ?? .off }
+
+    /// How deep an edge reaches into the trackpad, as a share of the trackpad across that edge.
+    /// Top and bottom match the sides in millimeters, and are never shallower than they used to be.
+    public func depth(_ side: EdgeSide) -> Float {
+        side.isVertical ? edgeWidth : max(EdgeRecognizer.stripHeight, edgeWidth * aspect)
+    }
 
     /// An edge listens when it slides, swipes or has a double-tap.
     public func listens(_ side: EdgeSide) -> Bool { kind(side) != .off || edgeTaps.contains(side) || holdEdges.contains(side) }
@@ -148,7 +157,7 @@ public struct EdgeRecognizer {
     public static let engageDistance: Float = 0.025    // travel along the edge before a slide starts
     public static let straightness: Float = 0.6        // before starting, sideways travel must stay under this × along
     public static let laneDrift: Float = 0.10          // a started slide stops if the finger wanders this far across
-    public static let stripHeight: Float = 0.09        // depth of the top and bottom edges
+    public static let stripHeight: Float = 0.09        // the least depth of the top and bottom edges
     public static let bottomQuarter: Float = 0.25
     public static let cornerSize: Float = 0.10
     public static let swipeDistance: Float = 0.15
@@ -303,10 +312,10 @@ public struct EdgeRecognizer {
 
     func inEdge(_ side: EdgeSide, _ t: TouchPoint) -> Bool {
         switch side {
-        case .left: return t.x <= config.edgeWidth && sideAllowed(atY: t.y)
-        case .right: return t.x >= 1 - config.edgeWidth && sideAllowed(atY: t.y)
-        case .top: return t.y >= 1 - Self.stripHeight
-        case .bottom: return t.y <= Self.stripHeight
+        case .left: return t.x <= config.depth(.left) && sideAllowed(atY: t.y)
+        case .right: return t.x >= 1 - config.depth(.right) && sideAllowed(atY: t.y)
+        case .top: return t.y >= 1 - config.depth(.top)
+        case .bottom: return t.y <= config.depth(.bottom)
         }
     }
 
@@ -358,7 +367,7 @@ public struct EdgeRecognizer {
         let across = side.isVertical ? dx : dy
         let position = side.isVertical ? t.y : t.x
         // How far the finger may stray from the edge before it clearly isn't an edge gesture.
-        let zoneDepth = side.isVertical ? config.edgeWidth : Self.stripHeight
+        let zoneDepth = config.depth(side)
 
         switch config.kind(side) {
         case .off:

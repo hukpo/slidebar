@@ -38,6 +38,7 @@ typedef void (*fn_MTDeviceStart)(MTDeviceRef, int);
 typedef void (*fn_MTDeviceStop)(MTDeviceRef);
 typedef bool (*fn_MTDeviceIsBuiltIn)(MTDeviceRef);
 typedef int32_t (*fn_MTDeviceGetDeviceID)(MTDeviceRef, uint64_t *);
+typedef int (*fn_MTDeviceGetSensorSurfaceDimensions)(MTDeviceRef, int *, int *);
 typedef CFTypeRef (*fn_MTActuatorCreateFromDeviceID)(uint64_t);
 typedef int32_t (*fn_MTActuatorOpen)(CFTypeRef);
 typedef int32_t (*fn_MTActuatorActuate)(CFTypeRef, int32_t, uint32_t, float, float);
@@ -56,6 +57,7 @@ static struct {
     fn_MTDeviceStop stop;
     fn_MTDeviceIsBuiltIn isBuiltIn;
     fn_MTDeviceGetDeviceID getDeviceID;
+    fn_MTDeviceGetSensorSurfaceDimensions surfaceDimensions;
     fn_MTActuatorCreateFromDeviceID actuatorCreate;
     fn_MTActuatorOpen actuatorOpen;
     fn_MTActuatorActuate actuatorActuate;
@@ -82,6 +84,7 @@ static void loadAPI(void) {
         api.stop = (fn_MTDeviceStop)dlsym(api.mt, "MTDeviceStop");
         api.isBuiltIn = (fn_MTDeviceIsBuiltIn)dlsym(api.mt, "MTDeviceIsBuiltIn");
         api.getDeviceID = (fn_MTDeviceGetDeviceID)dlsym(api.mt, "MTDeviceGetDeviceID");
+        api.surfaceDimensions = (fn_MTDeviceGetSensorSurfaceDimensions)dlsym(api.mt, "MTDeviceGetSensorSurfaceDimensions");
         api.actuatorCreate = (fn_MTActuatorCreateFromDeviceID)dlsym(api.mt, "MTActuatorCreateFromDeviceID");
         api.actuatorOpen = (fn_MTActuatorOpen)dlsym(api.mt, "MTActuatorOpen");
         api.actuatorActuate = (fn_MTActuatorActuate)dlsym(api.mt, "MTActuatorActuate");
@@ -156,6 +159,23 @@ int32_t SlidebarMTStart(SlidebarTouchCallback callback, void *context) {
     }
     pthread_mutex_unlock(&lock);
     return count;
+}
+
+double SlidebarMTSurfaceAspect(void) {
+    if (!api.loaded || !api.surfaceDimensions) return 0;
+    double aspect = 0;
+    pthread_mutex_lock(&lock);
+    CFIndex n = devices ? CFArrayGetCount(devices) : 0;
+    for (CFIndex i = 0; i < n; i++) {
+        MTDeviceRef dev = (MTDeviceRef)CFArrayGetValueAtIndex(devices, i);
+        int w = 0, h = 0;
+        if (api.surfaceDimensions(dev, &w, &h) != 0 || w <= 0 || h <= 0) continue;
+        bool builtIn = api.isBuiltIn && api.isBuiltIn(dev);
+        if (aspect == 0 || builtIn) aspect = (double)w / h;
+        if (builtIn) break;
+    }
+    pthread_mutex_unlock(&lock);
+    return aspect;
 }
 
 void SlidebarMTStop(void) {

@@ -29,6 +29,9 @@ bool SlidebarMTAvailable(void);
 int32_t SlidebarMTStart(SlidebarTouchCallback callback, void *context);
 /// Stops listening on all trackpads.
 void SlidebarMTStop(void);
+/// Width over height of the trackpad being listened to (the built-in one if there is one),
+/// or 0 when unknown. Call after SlidebarMTStart.
+double SlidebarMTSurfaceAspect(void);
 
 // MARK: Haptics (MTActuator)
 
