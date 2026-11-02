@@ -73,6 +73,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         popover.behavior = .transient
         popover.animates = true
         popover.delegate = self
+        // A menu bar popover takes its look from the menu bar, not the app, so the Appearance
+        // setting has to be applied to it directly. Auto (nil) follows the menu bar.
+        prefs.$appearance
+            .sink { [weak self] appearance in self?.popover.appearance = appearance.nsAppearance }
+            .store(in: &cancellables)
 
         // Trackpad listening, including trackpads connected later.
         EdgeEngine.shared.start()
