@@ -2,7 +2,7 @@ import BrimCore
 import SwiftUI
 
 enum MenuPage: Hashable {
-    case main, settings
+    case main, advanced
 }
 
 /// Root view of the menu bar popover.
@@ -16,8 +16,8 @@ struct MenuView: View {
             case .main:
                 MainPage(page: $page)
                     .transition(transition(from: .leading))
-            case .settings:
-                SettingsPage(page: $page)
+            case .advanced:
+                AdvancedPage(page: $page)
                     .transition(transition(from: .trailing))
             }
         }
@@ -35,7 +35,7 @@ struct MenuView: View {
 // MARK: - Main page
 
 /// The everyday surface: your trackpad with what every edge and corner does (and live levels),
-/// options for the spot you click, an on/off switch and haptics.
+/// options for the spot you click, an on/off switch, and every setting under it.
 struct MainPage: View {
     @Binding var page: MenuPage
     @ObservedObject var prefs = Prefs.shared
@@ -53,9 +53,10 @@ struct MainPage: View {
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(live.status == .noTrackpad ? Color.orange : Color.secondary)
                     .help(stateHelp)
-                Toggle("Brim Gestures", isOn: Binding(get: { !prefs.paused }, set: { prefs.paused = !$0 }))
-                    .toggleStyle(.switch)
+                Toggle(isOn: Binding(get: { !prefs.paused }, set: { prefs.paused = !$0 })) { EmptyView() }
                     .labelsHidden()
+                    .accessibilityLabel("Brim Gestures")
+                    .modifier(SwitchStyle())
                     .controlSize(.small)
                     .help(prefs.paused ? "Turn Brim on" : "Pause Brim. Your trackpad works as usual.")
             }
@@ -65,13 +66,12 @@ struct MainPage: View {
 
             TrackpadMap(selection: $selection)
                 .frame(height: 216)
-                .padding(.vertical, 2)
+                .padding(.bottom, 4)
 
-            HapticsRow()
+            SettingsSections()
 
             MenuFooter {
-                PlainIconButton(systemName: "gearshape", title: "Settings", help: "Settings (⌘,)") { page = .settings }
-                    .keyboardShortcut(",", modifiers: .command)
+                PlainIconButton(systemName: "slider.horizontal.3", title: "Advanced", help: "Advanced options") { page = .advanced }
             }
         }
         .padding(14)
@@ -88,43 +88,6 @@ struct MainPage: View {
         if prefs.paused { return "Your trackpad works as usual." }
         if prefs.requireModifier { return "Hold Fn or Option to use your edges and corners." }
         return "Slide edges, double-tap corners. Click one to change it."
-    }
-}
-
-/// Haptic strength in one compact row: a tick under your finger at each step.
-struct HapticsRow: View {
-    @ObservedObject var prefs = Prefs.shared
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "hand.tap")
-                .font(.system(size: 12.5))
-                .foregroundStyle(.secondary)
-                .frame(width: 18)
-                .accessibilityHidden(true)
-            Text("Haptic Feedback").font(.system(size: 12.5))
-            Spacer()
-            Menu {
-                Picker("Haptic Feedback", selection: $prefs.haptics) {
-                    ForEach(HapticStrength.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.inline)
-                .labelsHidden()
-            } label: {
-                Text(prefs.haptics.title)
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            .foregroundStyle(.secondary)
-            .accessibilityLabel("Haptic Feedback")
-            .accessibilityValue(prefs.haptics.title)
-        }
-        .padding(.leading, 10)
-        .padding(.trailing, 8)
-        .padding(.vertical, 7)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.05)))
-        .help("A tick under your finger at each step")
-        .onChange(of: prefs.haptics) { Haptics.tick($0) }
     }
 }
 

@@ -22,7 +22,7 @@ Feel and craft. Brim should feel like Apple built it: precise haptics, a quiet n
 
 ## Operating Context
 
-- Lives in the menu bar only (no Dock icon). The main surface is a popover opened from the menu bar icon; a Settings page and an "apps turned off" page slide in inside the same popover.
+- Lives in the menu bar only (no Dock icon). The main surface is a popover opened from the menu bar icon; every setting sits under the trackpad map in that same popover, and a small Advanced page slides in for the rarely used options.
 - First launch opens a setup window: grant Accessibility, then try a first slide.
 - Used in short, frequent glances while doing something else; the popover is opened rarely after setup.
 

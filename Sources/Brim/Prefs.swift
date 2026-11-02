@@ -68,7 +68,7 @@ final class Prefs: ObservableObject {
         didSet { for c in Corner.allCases { defaults.set(cornerShortcuts[c], forKey: Keys.cornerShortcut(c)) } }
     }
 
-    // Settings page
+    // Options under the trackpad map
     @Published var bottomQuarterOnly: Bool { didSet { defaults.set(bottomQuarterOnly, forKey: Keys.bottomQuarterOnly) } }
     @Published var requireModifier: Bool { didSet { defaults.set(requireModifier, forKey: Keys.requireModifier) } }
     @Published var freezeCursor: Bool { didSet { defaults.set(freezeCursor, forKey: Keys.freezeCursor) } }

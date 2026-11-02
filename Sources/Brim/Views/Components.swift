@@ -177,7 +177,7 @@ extension EnvironmentValues {
 
 /// The native switch. Offscreen renders can't draw its active (accent) look, so screenshots
 /// use a drawn stand-in that matches it.
-private struct SwitchStyle: ViewModifier {
+struct SwitchStyle: ViewModifier {
     @Environment(\.snapshotMode) private var snapshotMode
     func body(content: Content) -> some View {
         if snapshotMode {
