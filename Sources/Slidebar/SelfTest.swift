@@ -16,6 +16,8 @@ enum SelfTest {
         let savedPaused = prefs.paused, savedModifier = prefs.requireModifier
         let savedEdges = prefs.edges, savedCorners = prefs.corners, savedApps = prefs.cornerApps
         let savedTaps = prefs.edgeTaps, savedTapApps = prefs.edgeTapApps, savedTapShortcuts = prefs.edgeTapShortcuts
+        let savedSplit = prefs.splitEdges
+        prefs.splitEdges = []
         prefs.paused = false; prefs.requireModifier = false
         prefs.edgeTaps = [:]
         // Test the shipping layout: brightness left, volume right, songs bottom, mute top-right.
@@ -216,13 +218,13 @@ enum SelfTest {
         prefs.corners[.bottomRight] = .off
 
         // A double-tap on an edge: alongside a slider (left edge), and on an edge that does nothing else (top).
-        prefs.edgeTaps = [.left: .keepAwake]
+        prefs.edgeTaps = [.edge(.left, nil): .keepAwake]
         engine.syncConfig()
         tap(x: 0.02, y: 0.5); tap(x: 0.02, y: 0.5); wait(0.4)
         let sliderTapOn = KeepAwake.isOn
         tap(x: 0.02, y: 0.5); tap(x: 0.02, y: 0.5); wait(0.4)
         let sliderTapOff = !KeepAwake.isOn
-        prefs.edgeTaps = [.top: .keepAwake]
+        prefs.edgeTaps = [.edge(.top, nil): .keepAwake]
         engine.syncConfig()
         tap(x: 0.5, y: 0.96); tap(x: 0.5, y: 0.96); wait(0.4)
         let topTapOn = KeepAwake.isOn
@@ -232,6 +234,21 @@ enum SelfTest {
         engine.syncConfig()
         line(sliderTapOn && sliderTapOff && topTapOn && topTapOff, "Double-tapping an edge runs its action",
              "slider edge \(sliderTapOn)/\(sliderTapOff), tap-only edge \(topTapOn)/\(topTapOff)")
+
+        // A split edge: only the third that has a double-tap answers.
+        prefs.splitEdges = [.top]
+        prefs.edgeTaps = [.edge(.top, .low): .keepAwake]
+        engine.syncConfig()
+        tap(x: 0.5, y: 0.96); tap(x: 0.5, y: 0.96); wait(0.4)
+        let middleQuiet = !KeepAwake.isOn
+        tap(x: 0.2, y: 0.96); tap(x: 0.2, y: 0.96); wait(0.4)
+        let leftOn = KeepAwake.isOn
+        tap(x: 0.2, y: 0.96); tap(x: 0.2, y: 0.96); wait(0.4)
+        let leftOff = !KeepAwake.isOn
+        prefs.splitEdges = []; prefs.edgeTaps = [:]
+        engine.syncConfig()
+        line(middleQuiet && leftOn && leftOff, "Each third of a split edge has its own double-tap",
+             "middle quiet: \(middleQuiet), left third on/off: \(leftOn)/\(leftOff)")
 
         // Run a Shortcut: Slidebar can read the user's shortcut list (without running any).
         var shortcutNames: [String]? = nil
@@ -261,10 +278,10 @@ enum SelfTest {
             let hasLock = cornerMenu.items.contains { $0.title == TapFunction.lockScreen.title }
             let hasShortcuts = cornerMenu.items.first { $0.title == TapFunction.runShortcut.title }?.submenu != nil
             // Edges offer the same double-tap choices, and picking one sets that edge's double-tap.
-            let edgeTapMenu = SpotMenu.tapMenu(for: .edge(.top))
+            let edgeTapMenu = SpotMenu.tapMenu(for: .edge(.top, nil))
             let playItem = edgeTapMenu.items.first { $0.title == TapFunction.playPause.title }
             if let playItem, let action = playItem.action { _ = (playItem.target as AnyObject).perform(action) }
-            let edgeTapOK = prefs.tap(.edge(.top)) == .playPause
+            let edgeTapOK = prefs.tap(.edge(.top, nil)) == .playPause
             prefs.edgeTaps = [:]
             line(edgeOK && hasLock && hasShortcuts && edgeTapOK, "Spot menus list actions and apply the choice",
                  "\(edgeMenu.items.count) slide items, \(cornerMenu.items.count) double-tap items")
@@ -282,6 +299,7 @@ enum SelfTest {
         prefs.paused = savedPaused; prefs.requireModifier = savedModifier
         prefs.edges = savedEdges; prefs.corners = savedCorners; prefs.cornerApps = savedApps
         prefs.edgeTaps = savedTaps; prefs.edgeTapApps = savedTapApps; prefs.edgeTapShortcuts = savedTapShortcuts
+        prefs.splitEdges = savedSplit
         SystemControls.setVolume(vol0)
         SystemControls.setMuted(muted0)
         SystemControls.setBrightness(b0)

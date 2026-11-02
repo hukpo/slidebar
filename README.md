@@ -38,7 +38,7 @@ Out of the box:
 Click any edge or corner on the trackpad in Slidebar's menu to change what it does:
 
 - **Edges** slide **Brightness, Volume, Keyboard Brightness, Microphone Volume** or **Night Shift Warmth**, step through **Tabs** or **Undo and Redo**, or swipe for **Next/Previous Song** or **Switch Windows**.
-- **Double-tap** any corner, or any edge on top of what it slides or swipes (say, open an app from the Keyboard Brightness edge, or play/pause from the Songs edge): **Mute Sound, Mute Microphone, Play or Pause, Next Song, Previous Song, Keep Mac Awake, Lock Screen, Turn Off Display, Take a Screenshot, Spotlight, Emoji & Symbols, Run a Shortcut** or **Open an App**.
+- **Double-tap** any corner, or any edge on top of what it slides or swipes (say, open an app from the Keyboard Brightness edge, or play/pause from the Songs edge). Split an edge into **3 parts** to give each third its own double-tap. The choices: **Mute Sound, Mute Microphone, Play or Pause, Next Song, Previous Song, Keep Mac Awake, Lock Screen, Turn Off Display, Take a Screenshot, Spotlight, Emoji & Symbols, Run a Shortcut** or **Open an App**.
 
 Slidebar leaves out what macOS already does with multi-finger gestures (scrolling, zooming, switching desktops, Mission Control).
 

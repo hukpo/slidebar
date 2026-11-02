@@ -130,7 +130,8 @@ final class EdgeEngine {
         c.palmRejection = prefs.palmRejection
         c.edges = Dictionary(uniqueKeysWithValues: EdgeSide.allCases.map { ($0, prefs.edge($0).kind) })
         c.corners = Set(Corner.allCases.filter { prefs.tapIsActive(.corner($0)) })
-        c.edgeTaps = Set(EdgeSide.allCases.filter { prefs.tapIsActive(.edge($0)) })
+        c.edgeTaps = Set(EdgeSide.allCases.filter { prefs.edgeHasTaps($0) })
+        c.splitEdges = prefs.splitEdges
         recognizer.config = c
     }
 
@@ -223,8 +224,8 @@ final class EdgeEngine {
             let function = prefs.edge(side)
             swipe(function, forward: forward)
 
-        case .doubleTap(let side):
-            tapAction(.edge(side))
+        case .doubleTap(let side, let section):
+            tapAction(.edge(side, section))
 
         case .cornerDoubleTap(let corner):
             tapAction(.corner(corner))
@@ -320,7 +321,7 @@ final class EdgeEngine {
     }
 
     /// A double-tap on a corner or an edge.
-    private func tapAction(_ spot: MapSpot) {
+    private func tapAction(_ spot: TapSpot) {
         let function = prefs.tap(spot)
         run(needsAccess: function.needsAccess, name: function.blockedName) {
             switch function {

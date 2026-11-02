@@ -150,9 +150,13 @@ struct TrackpadMap: View {
         switch spot {
         case .edge(let side):
             let slide = prefs.edge(side).title
-            return prefs.tapIsActive(spot) ? "\(slide); double-tap: \(prefs.tapTitle(spot))" : slide
-        case .corner:
-            return prefs.tapTitle(spot)
+            let taps = prefs.tapSpots(on: side).filter(prefs.tapIsActive).map { spot -> String in
+                if case .edge(_, let section?) = spot { return "\(section.title(on: side)): \(prefs.tapTitle(spot))" }
+                return prefs.tapTitle(spot)
+            }
+            return taps.isEmpty ? slide : "\(slide); double-tap: \(taps.joined(separator: ", "))"
+        case .corner(let corner):
+            return prefs.tapTitle(.corner(corner))
         }
     }
 
@@ -166,11 +170,13 @@ struct TrackpadMap: View {
         let level = live.level(of: function).map { CGFloat($0) }
         let muted = function == .volume && live.muted
         let percent = muted ? "Muted" : level.map { "\(Int(($0 * 100).rounded()))%" }
-        let tap: TapFunction? = prefs.tapIsActive(spot) ? prefs.tap(spot) : nil
+        let taps = prefs.tapSpots(on: side).filter(prefs.tapIsActive).map { tapSpot in
+            TapMark(function: prefs.tap(tapSpot), appID: prefs.tap(tapSpot) == .openApp ? prefs.tapApp(tapSpot) : nil,
+                    title: prefs.tapTitle(tapSpot))
+        }
         return EdgeSpot(side: side, length: length, function: function,
                         level: function.hasLevel ? level : nil, value: function.hasLevel ? percent : nil,
-                        tap: tap, tapApp: tap == .openApp ? prefs.tapApp(spot) : nil,
-                        tapTitle: tap == nil ? nil : prefs.tapTitle(spot),
+                        taps: taps, split: prefs.splitEdges.contains(side),
                         muted: muted, active: live.activeSide == side,
                         selected: selection == spot, keyboardFocused: mapFocused && keyboardNav,
                         anchor: anchors.anchor(spot)) {
@@ -248,10 +254,10 @@ private struct EdgeSpot: View {
     let function: EdgeFunction
     let level: CGFloat?
     let value: String?
-    /// What a double-tap on this edge does, if anything.
-    let tap: TapFunction?
-    let tapApp: String?
-    let tapTitle: String?
+    /// What double-tapping this edge (or each of its thirds) does.
+    let taps: [TapMark]
+    /// The double-taps are split into thirds: ticks mark them on the strip.
+    let split: Bool
     let muted: Bool
     /// Being slid right now.
     let active: Bool
@@ -315,24 +321,39 @@ private struct EdgeSpot: View {
             }
         }
         .frame(width: vertical ? thickness : length, height: vertical ? length : thickness)
+        .overlay { if split { thirdTicks } }
         .padding(outward, 4)
         .shadow(color: (colors.last ?? .clear).opacity(active ? 0.9 : (hovering ? 0.45 : 0)), radius: 5)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: level)
         .animation(.easeOut(duration: 0.15), value: active)
     }
 
-    /// The double-tap's mark: the app's own icon, or the action's symbol.
-    @ViewBuilder private var tapMark: some View {
-        if let id = tapApp {
-            AppIcon(bundleID: id).frame(width: 13, height: 13)
-        } else if let tap {
-            Image(systemName: tap.icon).foregroundStyle(.secondary)
+    /// Two small ticks across the strip at its thirds, for an edge whose double-taps are split.
+    private var thirdTicks: some View {
+        GeometryReader { g in
+            let vertical = side.isVertical
+            ForEach([1.0 / 3, 2.0 / 3], id: \.self) { t in
+                Capsule()
+                    .fill(Color.primary.opacity(0.55))
+                    .frame(width: vertical ? 10 : 1.5, height: vertical ? 1.5 : 10)
+                    .position(x: vertical ? g.size.width / 2 : g.size.width * t,
+                              y: vertical ? g.size.height * (1 - t) : g.size.height / 2)
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    /// The double-taps' marks: an app's own icon, or the action's symbol.
+    private var tapMarks: some View {
+        HStack(spacing: 3) {
+            ForEach(Array(taps.enumerated()), id: \.offset) { _, mark in mark }
         }
     }
 
     private var chip: some View {
         let dark = scheme == .dark
-        let off = function == .off && tap == nil
+        let off = function == .off && taps.isEmpty
         let fill: Color = off
             ? Color.white.opacity(dark ? (hovering ? 0.1 : 0.05) : (hovering ? 0.6 : 0.35))
             : (dark ? Color.black.opacity(hovering ? 0.5 : 0.34) : Color.white.opacity(hovering ? 0.98 : 0.8))
@@ -340,10 +361,10 @@ private struct EdgeSpot: View {
             if off {
                 Image(systemName: "plus").font(.system(size: 9, weight: .bold))
                 Text("Add")
-            } else if function == .off, let tapTitle {
-                // Only a double-tap here.
-                tapMark
-                Text(tapTitle)
+            } else if function == .off {
+                // Only double-taps here: one names itself, several show their marks.
+                tapMarks
+                Text(taps.count == 1 ? taps[0].title : "Double-tap")
             } else {
                 Image(systemName: muted ? "speaker.slash.fill" : function.icon)
                     .foregroundStyle(function.mapColors[dark ? 1 : 0])
@@ -351,9 +372,9 @@ private struct EdgeSpot: View {
                 if let value {
                     Text(value).monospacedDigit().foregroundStyle(.secondary)
                 }
-                if tap != nil {
+                if !taps.isEmpty {
                     Circle().fill(Color.secondary.opacity(0.6)).frame(width: 2.5, height: 2.5)
-                    tapMark
+                    tapMarks
                 }
             }
         }
@@ -372,6 +393,21 @@ private struct EdgeSpot: View {
         .background(AnchorView(anchor: anchor))
         .scaleEffect(active ? 1.06 : 1)
         .animation(.spring(response: 0.25, dampingFraction: 0.7), value: active)
+    }
+}
+
+/// A double-tap's small mark on an edge chip.
+struct TapMark: View {
+    let function: TapFunction
+    let appID: String?
+    let title: String
+
+    var body: some View {
+        if let appID {
+            AppIcon(bundleID: appID).frame(width: 13, height: 13)
+        } else {
+            Image(systemName: function.icon).foregroundStyle(.secondary)
+        }
     }
 }
 
@@ -466,7 +502,7 @@ enum SpotMenu {
     }
 
     /// What a double-tap on an edge or corner can do.
-    static func tapMenu(for spot: MapSpot) -> NSMenu {
+    static func tapMenu(for spot: TapSpot) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
         addTapChoices(menu, spot)
@@ -477,7 +513,7 @@ enum SpotMenu {
 
     // MARK: Double-tap choices (corners and edges)
 
-    private static func addTapChoices(_ menu: NSMenu, _ spot: MapSpot) {
+    private static func addTapChoices(_ menu: NSMenu, _ spot: TapSpot) {
         let prefs = Prefs.shared
         let current = prefs.tap(spot)
         let choose: (TapFunction) -> Void = { f in
@@ -516,7 +552,7 @@ enum SpotMenu {
         return icon
     }
 
-    private static func shortcutsMenu(_ spot: MapSpot, chosen: String?) -> NSMenu {
+    private static func shortcutsMenu(_ spot: TapSpot, chosen: String?) -> NSMenu {
         let sub = NSMenu()
         sub.autoenablesItems = false
         let names = UserShortcuts.cached
@@ -535,7 +571,7 @@ enum SpotMenu {
         return sub
     }
 
-    private static func chooseApp(for spot: MapSpot) {
+    private static func chooseApp(for spot: TapSpot) {
         let panel = NSOpenPanel()
         panel.title = "Choose an App to Open with a Double-Tap on the \(spot.title)"
         panel.prompt = "Choose"

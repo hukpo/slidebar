@@ -29,6 +29,17 @@ public enum EdgeSide: String, CaseIterable, Codable, Hashable {
     public var isVertical: Bool { self == .left || self == .right }
 }
 
+/// A third of an edge, for edges split into three double-tap parts. `low` is the bottom of a side
+/// edge or the left of the top and bottom edges; `high` the top or the right.
+public enum EdgeSection: String, CaseIterable, Codable, Hashable {
+    case low, middle, high
+
+    /// Which third a position along the edge (0…1) falls in.
+    public static func at(_ position: Float) -> EdgeSection {
+        position < 1 / 3 ? .low : position < 2 / 3 ? .middle : .high
+    }
+}
+
 /// The four corners of the trackpad.
 public enum Corner: String, CaseIterable, Codable, Hashable {
     case topLeft, topRight, bottomLeft, bottomRight
@@ -72,8 +83,8 @@ public enum EdgeAction: Equatable {
     /// A slide turned out to be a palm (it grew, or another finger landed soon after):
     /// undo what it changed.
     case slideCancelled(EdgeSide)
-    /// Two quick taps in the same place on an edge.
-    case doubleTap(EdgeSide)
+    /// Two quick taps in the same place on an edge. `section` says which third, for split edges.
+    case doubleTap(EdgeSide, section: EdgeSection?)
     /// Two quick taps in a corner.
     case cornerDoubleTap(Corner)
 }
@@ -95,6 +106,8 @@ public struct EdgeConfig: Equatable {
     public var corners: Set<Corner> = [.topRight]
     /// Edges that respond to a double-tap, on top of whatever sliding or swiping they do.
     public var edgeTaps: Set<EdgeSide> = []
+    /// Edges whose double-taps are told apart by third (bottom, middle, top or left, middle, right).
+    public var splitEdges: Set<EdgeSide> = []
 
     public init() {}
 
@@ -368,7 +381,11 @@ public struct EdgeRecognizer {
            abs(g.startX - last.x) <= Self.doubleTapSpread, abs(g.startY - last.y) <= Self.doubleTapSpread {
             lastTap = nil
             switch g.zone {
-            case .edge(let side): if config.edgeTaps.contains(side) { actions.append(.doubleTap(side)) }
+            case .edge(let side):
+                guard config.edgeTaps.contains(side) else { break }
+                let section = config.splitEdges.contains(side)
+                    ? EdgeSection.at(side.isVertical ? g.startY : g.startX) : nil
+                actions.append(.doubleTap(side, section: section))
             case .corner(let corner): actions.append(.cornerDoubleTap(corner))
             }
         } else {

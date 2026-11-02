@@ -43,24 +43,71 @@ struct SpotEditor: View {
                 RowDivider()
             }
 
-            let tapOn = prefs.tapIsActive(spot)
-            let tap = prefs.tap(spot)
-            EditorRow(icon: "hand.tap", title: "Double-tap", help: tapDetail) {
-                PopUpField(icon: tapOn ? tap.icon : nil,
-                           appID: tapOn && tap == .openApp ? prefs.tapApp(spot) : nil,
-                           title: tapOn ? prefs.tapTitle(spot) : "Nothing",
-                           accessibilityName: "\(spot.title) double-tap") {
-                    SpotMenu.tapMenu(for: spot)
+            switch spot {
+            case .corner(let corner):
+                EditorRow(icon: "hand.tap", title: "Double-tap", help: "Two quick taps in the corner.") {
+                    tapField(.corner(corner))
                 }
+            case .edge(let side):
+                EditorRow(icon: "hand.tap", title: "Double-tap",
+                          help: "Two quick taps in the same spot on the edge. Works alongside the slide. Split the edge to give each third its own double-tap.") {
+                    Picker("Double-tap parts", selection: Binding(
+                        get: { prefs.splitEdges.contains(side) },
+                        set: { split in
+                            if split { prefs.splitEdges.insert(side) } else { prefs.splitEdges.remove(side) }
+                        })) {
+                        Text("Whole").tag(false)
+                        Text("3 parts").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .controlSize(.small)
+                    .fixedSize()
+                }
+                ForEach(prefs.tapSpots(on: side), id: \.self) { tapSpot in
+                    PartRow(title: partTitle(tapSpot)) { tapField(tapSpot) }
+                }
+                .padding(.bottom, 2)
             }
         }
     }
 
-    private var tapDetail: String {
-        switch spot {
-        case .edge: return "Two quick taps in the same spot on the edge. Works alongside the slide."
-        case .corner: return "Two quick taps in the corner."
+    private func partTitle(_ spot: TapSpot) -> String {
+        if case .edge(let side, let section?) = spot { return section.title(on: side) }
+        return "Whole edge"
+    }
+
+    /// The pop-up showing a double-tap's action, opening its choices.
+    private func tapField(_ tapSpot: TapSpot) -> some View {
+        let on = prefs.tapIsActive(tapSpot)
+        let tap = prefs.tap(tapSpot)
+        return PopUpField(icon: on ? tap.icon : nil,
+                          appID: on && tap == .openApp ? prefs.tapApp(tapSpot) : nil,
+                          title: on ? prefs.tapTitle(tapSpot) : "Nothing",
+                          accessibilityName: "\(tapSpot.title) double-tap") {
+            SpotMenu.tapMenu(for: tapSpot)
         }
+    }
+}
+
+/// One part of an edge's double-tap (the whole edge, or a third of it), indented under its row.
+private struct PartRow<Control: View>: View {
+    let title: String
+    @ViewBuilder let control: () -> Control
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .layoutPriority(1)
+            Spacer(minLength: 8)
+            control()
+        }
+        .padding(.leading, 44)
+        .padding(.trailing, 8)
+        .padding(.vertical, 3)
     }
 }
 

@@ -242,3 +242,39 @@ enum MapSpot: Hashable {
         }
     }
 }
+
+/// Something a double-tap can be set on: a corner, a whole edge, or one third of a split edge.
+enum TapSpot: Hashable {
+    case corner(Corner)
+    /// `nil` is the whole edge.
+    case edge(EdgeSide, EdgeSection?)
+
+    var title: String {
+        switch self {
+        case .corner(let corner): return corner.title
+        case .edge(let side, nil): return side.title
+        case .edge(let side, let section?): return "\(side.title), \(section.title(on: side))"
+        }
+    }
+
+    /// Every edge spot, whole and split.
+    static let allEdges: [TapSpot] = EdgeSide.allCases.flatMap { side in
+        [TapSpot.edge(side, nil)] + EdgeSection.allCases.map { TapSpot.edge(side, $0) }
+    }
+}
+
+extension EdgeSection {
+    /// "Top", "Middle", "Bottom" on a side edge; "Left", "Middle", "Right" on the top and bottom.
+    func title(on side: EdgeSide) -> String {
+        switch self {
+        case .low: return side.isVertical ? "Bottom" : "Left"
+        case .middle: return "Middle"
+        case .high: return side.isVertical ? "Top" : "Right"
+        }
+    }
+
+    /// The thirds in the order they appear on the edge: top to bottom, or left to right.
+    static func ordered(on side: EdgeSide) -> [EdgeSection] {
+        side.isVertical ? [.high, .middle, .low] : [.low, .middle, .high]
+    }
+}
