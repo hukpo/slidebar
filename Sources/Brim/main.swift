@@ -1,5 +1,6 @@
 import AppKit
 
+// Command-line modes (--snapshot, --selftest, --simulate) run and exit; otherwise start the menu bar app.
 let app = NSApplication.shared
 if Snapshot.runIfRequested() || SelfTest.runIfRequested() || SelfTest.runSimulationIfRequested() { exit(0) }
 

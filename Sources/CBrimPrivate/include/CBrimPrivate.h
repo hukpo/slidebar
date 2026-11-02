@@ -1,3 +1,6 @@
+// Thin C layer over private macOS frameworks (MultitouchSupport, DisplayServices).
+// Everything is loaded at runtime with dlopen, so a missing symbol degrades gracefully.
+
 #pragma once
 
 #include <stdbool.h>

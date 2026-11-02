@@ -2,7 +2,8 @@ import AppKit
 import BrimCore
 import CBrimPrivate
 
-/// `Brim --selftest`: checks the system hooks Brim relies on, then restores every level it touched.
+/// Command-line checks for verifying a build on a real Mac:
+/// `--selftest`, `--simulate` and `--check-keys`. Each one restores what it changed.
 enum SelfTest {
     /// `Brim --simulate`: drives the real gesture engine with synthetic finger paths and checks
     /// that volume, brightness and mute actually change. Restores every level afterwards.
@@ -161,7 +162,7 @@ enum SelfTest {
         let mc1 = SystemControls.isMuted()
         line(mc1 != mc0, "Bottom-left corner set to Mute works", "\(mc0) → \(mc1)")
 
-        // New sliders: microphone volume and Night Shift warmth.
+        // Microphone Volume and Night Shift sliders.
         if Microphone.hasVolume, let mic0 = Microphone.volume() {
             prefs.edges[.left] = .micVolume
             engine.syncConfig()
@@ -187,7 +188,7 @@ enum SelfTest {
             line(back, "Night Shift put back as it was", String(format: "strength %.2f, active %@", NightShift.rawStrength() ?? -1, NightShift.isActive ? "yes" : "no"))
         }
 
-        // New corners: mute microphone and keep awake (each toggled twice, so nothing changes).
+        // Mute Microphone and Keep Mac Awake corners (each toggled twice, so nothing changes).
         prefs.corners[.bottomRight] = .muteMicrophone
         engine.syncConfig()
         let micMuted0 = Microphone.isMuted()
@@ -218,7 +219,7 @@ enum SelfTest {
         for _ in 0..<50 where shortcutNames == nil { wait(0.1) }
         line(shortcutNames != nil, "Can list your Shortcuts", "\(shortcutNames?.count ?? 0) found")
 
-        // Edges and Corners map: arrow keys move in the direction pressed.
+        // Trackpad map: arrow keys move in the direction pressed.
         let n = TrackpadMap.neighbor
         let arrowsOK = n(.edge(.bottom), .right) == .corner(.bottomRight)
             && n(.edge(.bottom), .up) == .edge(.top)
@@ -394,6 +395,7 @@ enum SelfTest {
         finish()
     }
 
+    /// `Brim --selftest`: checks the system hooks Brim relies on, then restores every level it touched.
     static func runIfRequested() -> Bool {
         guard CommandLine.arguments.contains("--selftest") else { return false }
         func line(_ ok: Bool, _ name: String, _ detail: String = "") {

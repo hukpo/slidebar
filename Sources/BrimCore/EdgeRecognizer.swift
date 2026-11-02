@@ -44,17 +44,19 @@ public enum Corner: String, CaseIterable, Codable, Hashable {
 public enum EdgeKind: Equatable {
     /// Ignored.
     case off
-    /// Continuous: one step per bit of travel (volume, brightness, scrolling…).
+    /// Continuous: one step per bit of travel (volume, brightness, tabs…).
     case slider
-    /// One action per swipe along the edge (next song, next desktop…).
+    /// One action per swipe along the edge (next song, next window…).
     case swipe
 }
 
+/// The part of the trackpad a gesture belongs to.
 public enum EdgeZone: Equatable {
     case edge(EdgeSide)
     case corner(Corner)
 }
 
+/// What the recognizer asks the app to do.
 public enum EdgeAction: Equatable {
     /// Stop the pointer from moving while the finger slides.
     case freezeCursor
@@ -76,6 +78,7 @@ public enum EdgeAction: Equatable {
     case cornerDoubleTap(Corner)
 }
 
+/// The user's settings, as far as recognizing gestures goes.
 public struct EdgeConfig: Equatable {
     public var edgeWidth: Float = 0.05
     public var sensitivity: Float = 1.5
@@ -134,6 +137,7 @@ public struct EdgeRecognizer {
     public static let engageWindow: Double = 0.5       // a slide has to get going this soon after touching
     public static let palmWatch: Double = 1.5          // another finger this soon means the first was a palm
 
+    /// The single finger being followed, from touch-down to lift-off.
     struct Gesture {
         var id: Int32
         var zone: EdgeZone
@@ -148,9 +152,12 @@ public struct EdgeRecognizer {
 
     public var config: EdgeConfig
     var gesture: Gesture?
+    /// Fingers in the previous frame, so only a fresh touch can start a gesture.
     var previousIDs: Set<Int32> = []
     /// The last single tap (time and place), waiting for a second one.
     var lastTap: (zone: EdgeZone, time: Double, x: Float, y: Float)?
+    /// Timestamp of the frame being processed.
+    var lastTime: Double = 0
 
     public init(config: EdgeConfig = EdgeConfig()) {
         self.config = config
@@ -340,8 +347,6 @@ public struct EdgeRecognizer {
             return true
         }
     }
-
-    var lastTime: Double = 0
 
     func timeSinceStart(_ g: Gesture) -> Double { lastTime - g.startTime }
 

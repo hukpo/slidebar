@@ -245,7 +245,7 @@ final class EdgeRecognizerTests: XCTestCase {
 
     func testDoubleClickJustOutsideTheCornerDoesNothing() {
         var r = EdgeRecognizer()
-        // Corners are now the outer 10%; (0.88, 0.88) used to count, now it doesn't.
+        // Corners are the outer 10% of the trackpad, so (0.88, 0.88) is outside them.
         _ = run(&r, path: [(0.88, 0.88), (0.88, 0.88)], start: 0)
         XCTAssertFalse(run(&r, path: [(0.88, 0.88), (0.88, 0.88)], start: 0.2).contains(.cornerDoubleTap(.topRight)))
     }
@@ -281,7 +281,7 @@ final class EdgeRecognizerTests: XCTestCase {
     func testDisabledCornerFallsThroughToEdge() {
         var r = EdgeRecognizer()
         r.config.corners = []
-        // A double-tap in the top-right corner is now just a double-tap on the right edge.
+        // A double-tap in the top-right corner is then just a double-tap on the right edge.
         _ = run(&r, path: [(0.98, 0.95), (0.98, 0.95)], start: 0)
         XCTAssertTrue(run(&r, path: [(0.98, 0.95), (0.98, 0.95)], start: 0.2).contains(.doubleTap(.right)))
     }

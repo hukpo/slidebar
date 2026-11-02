@@ -11,7 +11,6 @@ enum AppConfig {
     }
 
     static var updateFeedURL: URL? { string("BrimUpdateFeedURL").flatMap(URL.init(string:)) }
-    static var websiteURL: URL? { string("BrimWebsiteURL").flatMap(URL.init(string:)) }
     /// Where the source code lives. Forks can point this elsewhere with SOURCE_URL in scripts/build.sh.
     static var sourceURL: URL? { URL(string: string("BrimSourceURL") ?? defaultSourceURL) }
     static let defaultSourceURL = "https://github.com/hukpo/brim"

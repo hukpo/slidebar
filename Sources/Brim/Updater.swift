@@ -30,7 +30,6 @@ final class Updater: ObservableObject {
     }
 
     @Published private(set) var phase: Phase = .idle
-    @Published private(set) var lastChecked: Date?
     private var timer: Timer?
 
     var isConfigured: Bool { AppConfig.updateFeedURL != nil }
@@ -75,7 +74,6 @@ final class Updater: ObservableObject {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard (response as? HTTPURLResponse)?.statusCode ?? 200 < 400 else { throw UpdateError("The update server didn't respond.") }
             let info = try JSONDecoder().decode(UpdateInfo.self, from: data)
-            lastChecked = Date()
 
             let osOK = info.minimumSystemVersion.map { !isVersion($0, newerThan: osVersion()) } ?? true
             if isVersion(info.version, newerThan: AppConfig.version), osOK {
@@ -205,6 +203,7 @@ final class Updater: ObservableObject {
     }
 }
 
+/// An update failure, with a message written for the user.
 struct UpdateError: Error {
     let message: String
     init(_ message: String) { self.message = message }

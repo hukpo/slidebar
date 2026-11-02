@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # Builds Brim.app (and optionally a DMG) into ./build.
 #   scripts/build.sh            # release build → build/Brim.app
-#   scripts/build.sh --dmg      # also build/Brim-<version>.dmg
+#   scripts/build.sh --dmg      # also build/Brim-<version>.dmg, build/Brim.dmg and website/appcast.json
 #   scripts/build.sh --install  # also copy to /Applications and launch
 #
-# Release settings (all optional, via environment):
+# Release settings (all optional, via environment). Forks should set the first two to their own.
+#   SOURCE_URL=https://…        the repository (default github.com/hukpo/brim); the DMG is downloaded
+#                               from its GitHub release v$VERSION
+#   WEBSITE_URL=https://…       where website/ is hosted; the update feed is $WEBSITE_URL/appcast.json
+#   UPDATE_FEED_URL=https://…   override the update feed ("" turns updates off)
 #   VERSION=1.1                 marketing version (default 1.0)
-#   WEBSITE_URL=https://…       where website/ is hosted; also sets the update feed to $WEBSITE_URL/appcast.json
-#   UPDATE_FEED_URL=https://…   override the update feed
-#   SOURCE_URL=https://…        link to the source code (shown in the app's ⋯ menu)
 #   NOTES="Fix A|Add B"         release notes for appcast.json, separated by |
 # Signing: uses $SIGN_IDENTITY, else the first "Apple Development"/"Developer ID" identity, else ad-hoc.
 # A stable identity matters: macOS ties the Accessibility grant to the signature.
@@ -42,11 +43,11 @@ sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" Resources/Info.plist >
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
 PLIST="$APP/Contents/Info.plist"
-WEBSITE_URL="${WEBSITE_URL:-}"
-UPDATE_FEED_URL="${UPDATE_FEED_URL:-${WEBSITE_URL:+${WEBSITE_URL%/}/appcast.json}}"
+SOURCE_URL="${SOURCE_URL:-https://github.com/hukpo/brim}"
+WEBSITE_URL="${WEBSITE_URL:-https://hukpo.github.io/brim}"
+UPDATE_FEED_URL="${UPDATE_FEED_URL-${WEBSITE_URL%/}/appcast.json}"
 plutil -replace BrimUpdateFeedURL -string "$UPDATE_FEED_URL" "$PLIST"
-plutil -replace BrimSourceURL -string "${SOURCE_URL:-}" "$PLIST"
-plutil -replace BrimWebsiteURL -string "$WEBSITE_URL" "$PLIST"
+plutil -replace BrimSourceURL -string "$SOURCE_URL" "$PLIST"
 echo "   updates:   ${UPDATE_FEED_URL:-off}"
 
 IDENTITY="${SIGN_IDENTITY:-}"
@@ -71,25 +72,24 @@ if [[ " $* " == *" --dmg "* ]]; then
   rm -f "$DMG"
   hdiutil create -volname "Brim" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
   rm -rf "$STAGE"
-  cp "$DMG" website/Brim.dmg   # the website's download link
-  mkdir -p website/downloads
-  cp "$DMG" "website/downloads/Brim-$VERSION.dmg"
+  cp "$DMG" build/Brim.dmg   # the stable name the website links to (releases/latest/download/Brim.dmg)
 
   echo "→ Writing website/appcast.json"
   SHA="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
-  python3 -I - "$VERSION" "$BUILD" "$SHA" "${NOTES:-Improvements and fixes.}" > website/appcast.json <<'PY'
+  python3 -I - "$VERSION" "$BUILD" "$SHA" "${NOTES:-Improvements and fixes.}" "${SOURCE_URL%/}" > website/appcast.json <<'PY'
 import json, sys, datetime
-version, build, sha, notes = sys.argv[1:5]
+version, build, sha, notes, source = sys.argv[1:6]
 print(json.dumps({
     "version": version,
     "build": int(build),
-    "url": f"downloads/Brim-{version}.dmg",
+    "url": f"{source}/releases/download/v{version}/Brim-{version}.dmg",
     "sha256": sha,
     "date": datetime.date.today().isoformat(),
     "minimumSystemVersion": "13.0",
     "notes": [n.strip() for n in notes.split("|") if n.strip()],
 }, indent=2))
 PY
+  echo "   publish:   gh release create v$VERSION $DMG build/Brim.dmg, then push website/appcast.json"
 fi
 
 if [[ " $* " == *" --install "* ]]; then

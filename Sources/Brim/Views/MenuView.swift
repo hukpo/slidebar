@@ -1,6 +1,7 @@
 import BrimCore
 import SwiftUI
 
+/// The popover's two pages.
 enum MenuPage: Hashable {
     case main, advanced
 }
@@ -34,8 +35,8 @@ struct MenuView: View {
 
 // MARK: - Main page
 
-/// The everyday surface: your trackpad with what every edge and corner does (and live levels),
-/// options for the spot you click, an on/off switch, and every setting under it.
+/// The home page: an on/off switch, the trackpad map (what every edge and corner does, with live
+/// levels), and the everyday settings under it.
 struct MainPage: View {
     @Binding var page: MenuPage
     @ObservedObject var prefs = Prefs.shared
@@ -91,13 +92,18 @@ struct MainPage: View {
     }
 }
 
-/// At most one notice at a time, most useful first. Every notice can be dismissed or acted on.
+/// The notices above the map: the most useful one of the general notices, then Keep Awake and
+/// update status when they apply.
 struct NoticeArea: View {
     @ObservedObject var live = LiveState.shared
     @ObservedObject var prefs = Prefs.shared
+    @Environment(\.snapshotMode) private var snapshotMode
 
     var body: some View {
-        if live.showWelcome {
+        if snapshotMode {
+            // Screenshots show the menu itself, not whatever notice this Mac happens to have.
+            EmptyView()
+        } else if live.showWelcome {
             Banner(icon: "menubar.arrow.up.rectangle",
                    text: "Brim lives here in the menu bar. Click its icon any time to see your levels or change what the edges do.",
                    onDismiss: { live.showWelcome = false })
@@ -126,7 +132,7 @@ struct NoticeArea: View {
 
 // MARK: - Banners
 
-/// Update notices. Every notice can be dismissed.
+/// Update progress and results, following the updater's phase.
 struct UpdateBanner: View {
     @ObservedObject var updater = Updater.shared
 
@@ -178,7 +184,7 @@ struct StarBanner: View {
 struct AccessBanner: View {
     var body: some View {
         Banner(icon: "lock.open",
-               text: "Volume and brightness already work. Allow Accessibility to also see the usual on-screen display and use gestures that press keys, like songs and desktops.",
+               text: "Volume and brightness already work. Allow Accessibility to also see the usual on-screen display and use gestures that press keys, like songs and tabs.",
                primary: ("Allow…", { Permissions.ask() }),
                onDismiss: { Prefs.shared.accessNoticeDismissed = true })
     }

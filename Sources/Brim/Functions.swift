@@ -38,7 +38,7 @@ enum EdgeFunction: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Fits inside the small trackpad map and the meters.
+    /// Short enough for a chip on the trackpad map and the setup guide's demo.
     var shortTitle: String {
         switch self {
         case .off: return "Nothing"
@@ -220,16 +220,6 @@ extension EdgeSide {
 }
 
 extension Corner {
-    /// "Top-right", for summaries.
-    var shortTitle: String {
-        switch self {
-        case .topLeft: return "Top-left"
-        case .topRight: return "Top-right"
-        case .bottomLeft: return "Bottom-left"
-        case .bottomRight: return "Bottom-right"
-        }
-    }
-
     var title: String {
         switch self {
         case .topLeft: return "Top-Left Corner"

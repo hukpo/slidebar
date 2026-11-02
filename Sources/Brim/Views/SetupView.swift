@@ -93,15 +93,16 @@ struct SetupView: View {
 
     private var accessDetail: String {
         if live.trusted {
-            return "All set. You'll see the usual volume and brightness display, and gestures that press keys, like songs, desktops and Spotlight, work too."
+            return "All set. You'll see the usual volume and brightness display, and gestures that press keys, like songs, tabs and Spotlight, work too."
         }
         if prefs.didPromptAccess {
             return "In System Settings, turn on Brim in the Accessibility list. macOS may ask for your password. Then come back here."
         }
-        return "Brim already works. Allowing this once lets it show the usual volume and brightness display and use gestures that press keys, like songs, desktops and Spotlight. Brim is open source, so anyone can check what it does."
+        return "Brim already works. Allowing this once lets it show the usual volume and brightness display and use gestures that press keys, like songs, tabs and Spotlight. Brim is open source, so anyone can check what it does."
     }
 }
 
+/// One numbered step of the guide, ticked once done.
 private struct StepRow<Accessory: View>: View {
     let number: Int
     let done: Bool

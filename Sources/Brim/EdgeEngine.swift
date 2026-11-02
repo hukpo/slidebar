@@ -7,16 +7,9 @@ import Combine
 final class LiveState: ObservableObject {
     static let shared = LiveState()
 
+    /// Whether Brim is responding to the trackpad right now.
     enum Status: Equatable {
         case ready, noTrackpad, paused
-
-        var title: String {
-            switch self {
-            case .ready: return "Ready"
-            case .noTrackpad: return "No Trackpad"
-            case .paused: return "Paused"
-            }
-        }
     }
 
     @Published var brightness: Float?

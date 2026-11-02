@@ -24,6 +24,7 @@ final class AppActions {
     }
 }
 
+/// Owns the menu bar item, its popover and the setup window, and starts trackpad listening.
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowDelegate {
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()

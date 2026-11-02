@@ -12,6 +12,7 @@ enum Haptics {
         NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
     }
 
+    /// A tick for one step of a slide or one action.
     static func tick(_ strength: HapticStrength) {
         guard strength != .off else { return }
 

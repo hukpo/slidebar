@@ -1,8 +1,9 @@
 import AppKit
 import ApplicationServices
 
+/// Accessibility access. Brim works without it, but needs it to press keys for you
+/// (volume and brightness keys with the on-screen display, media keys, shortcuts).
 enum Permissions {
-    /// Brim needs Accessibility access to send volume, brightness and media key events.
     static var isTrusted: Bool { AXIsProcessTrusted() }
 
     /// Shows the system prompt (only appears once per app identity).

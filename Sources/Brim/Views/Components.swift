@@ -18,7 +18,7 @@ extension LinearGradient {
     static let brimNight = LinearGradient(colors: [.brimNightTop, .brimNightBottom], startPoint: .top, endPoint: .bottom)
 }
 
-/// The dark surface used for brand moments (meters card, setup header).
+/// The dark brand surface behind the setup guide's header.
 struct NightBackground: View {
     var cornerRadius: CGFloat = 16
 
@@ -57,6 +57,7 @@ struct Card<Content: View>: View {
     }
 }
 
+/// A hairline between rows in a card, inset to line up with the row titles.
 struct RowDivider: View {
     var inset: CGFloat = 44
     var body: some View {
@@ -68,6 +69,7 @@ struct RowDivider: View {
     }
 }
 
+/// A small gray title above a card.
 struct SectionHeader: View {
     let title: String
     var body: some View {
@@ -121,6 +123,7 @@ struct FeatureIcon: View {
     }
 }
 
+/// A row's title with an optional gray subtitle under it.
 struct RowLabel: View {
     let title: String
     var subtitle: String?
@@ -142,7 +145,7 @@ struct RowLabel: View {
 /// A row with a native switch. The whole row is the switch's label, so VoiceOver and
 /// Full Keyboard Access treat it as one labeled control.
 struct ToggleRow: View {
-    let icon: String?
+    let icon: String
     let title: String
     var subtitle: String?
     @Binding var isOn: Bool
@@ -150,11 +153,7 @@ struct ToggleRow: View {
     var body: some View {
         Toggle(isOn: $isOn) {
             HStack(spacing: 10) {
-                if let icon {
-                    FeatureIcon(systemName: icon)
-                } else {
-                    Color.clear.frame(width: 26, height: 1)
-                }
+                FeatureIcon(systemName: icon)
                 RowLabel(title: title, subtitle: subtitle)
                 Spacer(minLength: 8)
             }
@@ -166,7 +165,7 @@ struct ToggleRow: View {
     }
 }
 
-/// True while rendering marketing screenshots offscreen.
+/// True while `--snapshot` renders screens offscreen.
 private struct SnapshotModeKey: EnvironmentKey { static let defaultValue = false }
 extension EnvironmentValues {
     var snapshotMode: Bool {
@@ -198,38 +197,6 @@ private struct SnapshotSwitchStyle: ToggleStyle {
             }
             .frame(width: 32, height: 18)
         }
-    }
-}
-
-/// A row with a native segmented control under its label.
-struct ChoiceRow<Value: Hashable>: View {
-    let icon: String
-    let title: String
-    var subtitle: String?
-    let options: [(value: Value, title: String)]
-    @Binding var selection: Value
-    var onChange: ((Value) -> Void)?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                FeatureIcon(systemName: icon)
-                RowLabel(title: title, subtitle: subtitle)
-                Spacer(minLength: 0)
-            }
-            Picker(title, selection: $selection) {
-                ForEach(options.indices, id: \.self) { i in
-                    Text(options[i].title).tag(options[i].value)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .controlSize(.small)
-            .padding(.leading, 36)
-            .onChange(of: selection) { onChange?($0) }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
     }
 }
 
@@ -269,32 +236,6 @@ struct SliderRow: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
-    }
-}
-
-/// A row that opens another page.
-struct NavigationRow: View {
-    let icon: String
-    let title: String
-    var subtitle: String?
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                FeatureIcon(systemName: icon)
-                RowLabel(title: title, subtitle: subtitle)
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 7)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .hoverHighlight()
     }
 }
 
@@ -373,39 +314,9 @@ struct MenuFooter<Leading: View>: View {
     }
 }
 
-// MARK: - Status
+// MARK: - Icon and notices
 
-/// Read-only status. Anything that needs action appears as a notice with a button instead.
-struct StatusPill: View {
-    @ObservedObject var live = LiveState.shared
-    @ObservedObject var prefs = Prefs.shared
-
-    var body: some View {
-        let status = live.status
-        HStack(spacing: 5) {
-            Circle()
-                .fill(dotColor(status))
-                .frame(width: 6, height: 6)
-            Text(status.title)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(Capsule().fill(Color.primary.opacity(0.06)))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Status: \(status.title)")
-    }
-
-    private func dotColor(_ status: LiveState.Status) -> Color {
-        switch status {
-        case .ready: return .green
-        case .noTrackpad: return .orange
-        case .paused: return .gray
-        }
-    }
-}
-
+/// Brim's icon tile, as shown next to its name.
 struct AppIconView: View {
     var size: CGFloat = 22
     var body: some View {

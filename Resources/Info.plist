@@ -34,8 +34,6 @@
     <string></string>
     <key>BrimSourceURL</key>
     <string></string>
-    <key>BrimWebsiteURL</key>
-    <string></string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsLocalNetworking</key>

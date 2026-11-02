@@ -3,6 +3,7 @@ import BrimCore
 import Combine
 import ServiceManagement
 
+/// How strong the tick under the finger is at each step.
 enum HapticStrength: String, CaseIterable, Identifiable {
     case off, light, medium, strong
     var id: String { rawValue }
@@ -16,6 +17,7 @@ enum HapticStrength: String, CaseIterable, Identifiable {
     }
 }
 
+/// Light or dark menus, or follow the system.
 enum Appearance: String, CaseIterable, Identifiable {
     case auto, light, dark
     var id: String { rawValue }
@@ -46,12 +48,6 @@ final class Prefs: ObservableObject {
 
     private let defaults = UserDefaults.standard
 
-    // Main menu
-    @Published var haptics: HapticStrength { didSet { defaults.set(haptics.rawValue, forKey: Keys.haptics) } }
-    @Published var tapToPlay: Bool { didSet { defaults.set(tapToPlay, forKey: Keys.tapToPlay) } }
-    @Published var sensitivity: Double { didSet { defaults.set(sensitivity, forKey: Keys.sensitivity) } }
-    @Published var edgeWidth: Double { didSet { defaults.set(edgeWidth, forKey: Keys.edgeWidth) } }
-
     // Edges and corners
     @Published var edges: [EdgeSide: EdgeFunction] {
         didSet { for (side, f) in edges { defaults.set(f.rawValue, forKey: Keys.edge(side)) } }
@@ -67,23 +63,30 @@ final class Prefs: ObservableObject {
     @Published var cornerShortcuts: [Corner: String] {
         didSet { for c in Corner.allCases { defaults.set(cornerShortcuts[c], forKey: Keys.cornerShortcut(c)) } }
     }
+    /// Double-tapping a Songs edge plays or pauses.
+    @Published var tapToPlay: Bool { didSet { defaults.set(tapToPlay, forKey: Keys.tapToPlay) } }
 
-    // Options under the trackpad map
-    @Published var bottomQuarterOnly: Bool { didSet { defaults.set(bottomQuarterOnly, forKey: Keys.bottomQuarterOnly) } }
-    @Published var requireModifier: Bool { didSet { defaults.set(requireModifier, forKey: Keys.requireModifier) } }
+    // Feel
+    @Published var haptics: HapticStrength { didSet { defaults.set(haptics.rawValue, forKey: Keys.haptics) } }
+    @Published var sensitivity: Double { didSet { defaults.set(sensitivity, forKey: Keys.sensitivity) } }
+    @Published var edgeWidth: Double { didSet { defaults.set(edgeWidth, forKey: Keys.edgeWidth) } }
     @Published var freezeCursor: Bool { didSet { defaults.set(freezeCursor, forKey: Keys.freezeCursor) } }
-    @Published var fineControl: Bool { didSet { defaults.set(fineControl, forKey: Keys.fineControl) } }
+    @Published var edgeGlow: Bool { didSet { defaults.set(edgeGlow, forKey: Keys.edgeGlow) } }
+
+    // General
     @Published var appearance: Appearance {
         didSet {
             defaults.set(appearance.rawValue, forKey: Keys.appearance)
             NSApp.appearance = appearance.nsAppearance
         }
     }
-
-    // State
     @Published var autoUpdate: Bool { didSet { defaults.set(autoUpdate, forKey: Keys.autoUpdate) } }
+
+    // Advanced
+    @Published var bottomQuarterOnly: Bool { didSet { defaults.set(bottomQuarterOnly, forKey: Keys.bottomQuarterOnly) } }
     @Published var palmRejection: Bool { didSet { defaults.set(palmRejection, forKey: Keys.palmRejection) } }
-    @Published var edgeGlow: Bool { didSet { defaults.set(edgeGlow, forKey: Keys.edgeGlow) } }
+    @Published var requireModifier: Bool { didSet { defaults.set(requireModifier, forKey: Keys.requireModifier) } }
+    @Published var fineControl: Bool { didSet { defaults.set(fineControl, forKey: Keys.fineControl) } }
 
     // State
     @Published var paused: Bool { didSet { defaults.set(paused, forKey: Keys.paused) } }
@@ -98,9 +101,6 @@ final class Prefs: ObservableObject {
 
     private enum Keys {
         static let haptics = "haptics"
-        static let quickMute = "quickMute"       // legacy, read once for migration
-        static let mediaStrip = "mediaStrip"     // legacy
-        static let swapSides = "swapSides"       // legacy
         static func edge(_ side: EdgeSide) -> String { "edge.\(side.rawValue)" }
         static func corner(_ c: Corner) -> String { "corner.\(c.rawValue)" }
         static func cornerApp(_ c: Corner) -> String { "cornerApp.\(c.rawValue)" }
@@ -121,6 +121,10 @@ final class Prefs: ObservableObject {
         static let didPromptAccess = "didPromptAccess"
         static let accessNoticeDismissed = "accessNoticeDismissed"
         static let starNoticeDismissed = "starNoticeDismissed"
+        // Older switches, read only to carry existing users' settings over to edges and corners.
+        static let quickMute = "quickMute"
+        static let mediaStrip = "mediaStrip"
+        static let swapSides = "swapSides"
     }
 
     private init() {
@@ -193,13 +197,6 @@ final class Prefs: ObservableObject {
 
     static func defaultCorner(_ c: Corner) -> CornerFunction { c == .topRight ? .mute : .off }
 
-    /// True when edges and corners are exactly as Brim ships.
-    var gesturesAreDefault: Bool {
-        EdgeSide.allCases.allSatisfy { edge($0) == Prefs.defaultEdge($0) }
-            && Corner.allCases.allSatisfy { corner($0) == Prefs.defaultCorner($0) }
-            && cornerApps.isEmpty && cornerShortcuts.isEmpty && !tapToPlay
-    }
-
     func edge(_ side: EdgeSide) -> EdgeFunction { edges[side] ?? .off }
     func corner(_ c: Corner) -> CornerFunction { corners[c] ?? .off }
 
@@ -213,16 +210,8 @@ final class Prefs: ObservableObject {
         }
     }
 
-    /// Puts only the edges and corners back the way Brim ships.
-    func resetGestures() {
-        edges = Dictionary(uniqueKeysWithValues: EdgeSide.allCases.map { ($0, Prefs.defaultEdge($0)) })
-        corners = Dictionary(uniqueKeysWithValues: Corner.allCases.map { ($0, Prefs.defaultCorner($0)) })
-        cornerApps = [:]
-        cornerShortcuts = [:]
-        tapToPlay = false
-    }
-
-    /// Puts every gesture and option back the way Brim ships. Keeps setup, permission and app-list state.
+    /// Puts every gesture and option back the way Brim ships. Leaves appearance, updates,
+    /// Open at Login, setup and notice state alone.
     func restoreDefaults() {
         haptics = .medium
         tapToPlay = false

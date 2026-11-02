@@ -7,7 +7,6 @@ enum Brand {
     static let amberBottom = NSColor(srgbRed: 1.00, green: 0.45, blue: 0.20, alpha: 1)
     static let cyanTop = NSColor(srgbRed: 0.45, green: 0.92, blue: 1.00, alpha: 1)
     static let violetBottom = NSColor(srgbRed: 0.42, green: 0.36, blue: 1.00, alpha: 1)
-    static let accent = NSColor(srgbRed: 0.07, green: 0.62, blue: 0.80, alpha: 1)
     static let backgroundTop = NSColor(srgbRed: 0.19, green: 0.18, blue: 0.47, alpha: 1)
     static let backgroundBottom = NSColor(srgbRed: 0.05, green: 0.05, blue: 0.16, alpha: 1)
 

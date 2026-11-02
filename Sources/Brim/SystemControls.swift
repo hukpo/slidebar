@@ -18,7 +18,6 @@ enum MediaKey: Int32 {
 /// Changes volume and brightness by sending the same key events the keyboard sends,
 /// so macOS shows its own on-screen display and honors ⇧⌥ quarter steps.
 enum SystemControls {
-
     // MARK: Key events
 
     static func press(_ key: MediaKey, fine: Bool = false) {

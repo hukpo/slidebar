@@ -624,6 +624,7 @@ private struct AnchorView: NSViewRepresentable {
 
 // MARK: - App names and icons
 
+/// Display names and locations of apps, by bundle ID.
 enum AppNames {
     static func url(for id: String) -> URL? { NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) }
 
@@ -633,6 +634,7 @@ enum AppNames {
     }
 }
 
+/// An app's Finder icon, by bundle ID.
 struct AppIcon: View {
     let bundleID: String
     var body: some View {
