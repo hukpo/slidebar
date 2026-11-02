@@ -134,7 +134,7 @@ enum TapFunction: String, CaseIterable, Identifiable {
     case off
     case mute, muteMicrophone, playPause, nextSong, previousSong
     case keepAwake, lockScreen, sleepDisplay, screenshot
-    case spotlight, emoji
+    case spotlight, emoji, dictate
     case runShortcut, openApp
 
     var id: String { rawValue }
@@ -154,6 +154,7 @@ enum TapFunction: String, CaseIterable, Identifiable {
         case .screenshot: return "Screenshot"
         case .spotlight: return "Spotlight"
         case .emoji: return "Emoji"
+        case .dictate: return "Dictate"
         case .runShortcut: return "Shortcut"
         case .openApp: return "App"
         }
@@ -173,6 +174,7 @@ enum TapFunction: String, CaseIterable, Identifiable {
         case .screenshot: return "Take a Screenshot"
         case .spotlight: return "Spotlight"
         case .emoji: return "Emoji & Symbols"
+        case .dictate: return "Dictate"
         case .runShortcut: return "Run a Shortcut"
         case .openApp: return "Open an App"
         }
@@ -192,6 +194,7 @@ enum TapFunction: String, CaseIterable, Identifiable {
         case .screenshot: return "camera.viewfinder"
         case .spotlight: return "magnifyingglass"
         case .emoji: return "face.smiling"
+        case .dictate: return "waveform.and.mic"
         case .runShortcut: return "square.2.layers.3d"
         case .openApp: return "app"
         }
@@ -199,7 +202,7 @@ enum TapFunction: String, CaseIterable, Identifiable {
 
     var needsAccess: Bool {
         switch self {
-        case .playPause, .nextSong, .previousSong, .spotlight, .emoji: return true
+        case .playPause, .nextSong, .previousSong, .spotlight, .emoji, .dictate: return true
         default: return false
         }
     }
@@ -211,6 +214,7 @@ enum TapFunction: String, CaseIterable, Identifiable {
         case .nextSong, .previousSong: return "Skipping songs"
         case .spotlight: return "Spotlight"
         case .emoji: return "Emoji & Symbols"
+        case .dictate: return "Dictation"
         default: return title
         }
     }
@@ -223,7 +227,7 @@ enum TapFunction: String, CaseIterable, Identifiable {
         [.off],
         [.mute, .muteMicrophone, .playPause, .nextSong, .previousSong],
         [.keepAwake, .lockScreen, .sleepDisplay, .screenshot],
-        [.spotlight, .emoji],
+        [.dictate, .spotlight, .emoji],
         [.runShortcut, .openApp],
     ]
 }
@@ -263,6 +267,13 @@ enum MapSpot: Hashable {
     }
 }
 
+/// The two gestures that run an action on a spot: two quick taps, or one long press.
+enum TapKind: Hashable {
+    case doubleTap, hold
+
+    var title: String { self == .hold ? "Long press" : "Double-tap" }
+}
+
 /// Something a double-tap can be set on: a corner, a whole edge, or one third of a split edge.
 enum TapSpot: Hashable {
     case corner(Corner)
@@ -276,6 +287,9 @@ enum TapSpot: Hashable {
         case .edge(let side, let section?): return "\(side.title), \(section.title(on: side))"
         }
     }
+
+    /// Where a long press can be set: every corner and every whole edge.
+    static let holdSpots: [TapSpot] = Corner.allCases.map { TapSpot.corner($0) } + EdgeSide.allCases.map { TapSpot.edge($0, nil) }
 
     /// Every edge spot, whole and split.
     static let allEdges: [TapSpot] = EdgeSide.allCases.flatMap { side in

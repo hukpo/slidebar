@@ -214,6 +214,47 @@ enum UserShortcuts {
 
 // MARK: - Confirmation toast
 
+/// macOS Dictation, started and stopped through the frontmost app's own Edit menu (Start
+/// Dictation… / Stop Dictation), so it works whatever dictation shortcut the user has chosen.
+/// Needs Accessibility.
+enum Dictation {
+    /// Starts dictation in the frontmost app. False when the app has no Start Dictation item.
+    @discardableResult static func start() -> Bool { press { $0.hasPrefix("Start Dictation") } }
+
+    /// Stops dictation, if it's running.
+    @discardableResult static func stop() -> Bool { press { $0.hasPrefix("Stop Dictation") } }
+
+    /// Stops dictation when it's running, otherwise starts it.
+    @discardableResult static func toggle() -> Bool { stop() || start() }
+
+    private static func press(_ matches: (String) -> Bool) -> Bool {
+        guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else { return false }
+        let app = AXUIElementCreateApplication(pid)
+        guard let bar: AXUIElement = value(app, kAXMenuBarAttribute) else { return false }
+        // Menu bar → its menus → their items (Start Dictation… lives in Edit).
+        for barItem in children(bar) {
+            for menu in children(barItem) {
+                for item in children(menu) {
+                    if let title: String = value(item, kAXTitleAttribute), matches(title) {
+                        return AXUIElementPerformAction(item, kAXPressAction as CFString) == .success
+                    }
+                }
+            }
+        }
+        return false
+    }
+
+    private static func children(_ element: AXUIElement) -> [AXUIElement] {
+        value(element, kAXChildrenAttribute) ?? []
+    }
+
+    private static func value<T>(_ element: AXUIElement, _ attribute: String) -> T? {
+        var result: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &result) == .success else { return nil }
+        return result as? T
+    }
+}
+
 /// A brief on-screen confirmation for toggles ("Microphone Muted"), styled like the system HUD.
 final class Toast {
     static let shared = Toast()

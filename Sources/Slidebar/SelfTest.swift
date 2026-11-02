@@ -18,6 +18,8 @@ enum SelfTest {
         let savedTaps = prefs.edgeTaps, savedTapApps = prefs.edgeTapApps, savedTapShortcuts = prefs.edgeTapShortcuts
         let savedSplit = prefs.splitEdges
         prefs.splitEdges = []
+        let savedHolds = prefs.holds, savedHoldApps = prefs.holdApps, savedHoldShortcuts = prefs.holdShortcuts
+        prefs.holds = [:]
         prefs.paused = false; prefs.requireModifier = false
         prefs.edgeTaps = [:]
         // Test the shipping layout: brightness left, volume right, songs bottom, mute top-right.
@@ -48,6 +50,14 @@ enum SelfTest {
             engine.feed([], time: clock); clock += 0.05
             wait(0.5)
         }
+        /// One finger resting still for `seconds`, then lifting.
+        func press(x: Float, y: Float, seconds: Double = 0.7) {
+            nextID += 1
+            let frames = Int(seconds / 0.02)
+            for _ in 0...frames { engine.feed([TouchPoint(id: nextID, x: x, y: y)], time: clock); clock += 0.02 }
+            engine.feed([], time: clock); clock += 0.3
+        }
+
         func tap(x: Float, y: Float) {
             nextID += 1
             engine.feed([TouchPoint(id: nextID, x: x, y: y)], time: clock); clock += 0.05
@@ -250,6 +260,23 @@ enum SelfTest {
         line(middleQuiet && leftOn && leftOff, "Each third of a split edge has its own double-tap",
              "middle quiet: \(middleQuiet), left third on/off: \(leftOn)/\(leftOff)")
 
+        // Long press: on a slider edge a still finger runs the action, and a moving one still slides.
+        prefs.holds = [.edge(.left, nil): .keepAwake]
+        engine.syncConfig()
+        press(x: 0.02, y: 0.5)
+        let holdOn = KeepAwake.isOn
+        let bHold = SystemControls.brightness() ?? 0
+        press(x: 0.02, y: 0.5)
+        let holdOff = !KeepAwake.isOn
+        let quickTapIgnored: Bool = {
+            tap(x: 0.02, y: 0.5); wait(0.3)
+            return !KeepAwake.isOn
+        }()
+        prefs.holds = [:]
+        engine.syncConfig()
+        line(holdOn && holdOff && quickTapIgnored && abs((SystemControls.brightness() ?? 0) - bHold) < 0.001,
+             "Long press runs its action without sliding", "on/off: \(holdOn)/\(holdOff), quick tap ignored: \(quickTapIgnored)")
+
         // Run a Shortcut: Slidebar can read the user's shortcut list (without running any).
         var shortcutNames: [String]? = nil
         UserShortcuts.list { shortcutNames = $0 }
@@ -300,6 +327,7 @@ enum SelfTest {
         prefs.edges = savedEdges; prefs.corners = savedCorners; prefs.cornerApps = savedApps
         prefs.edgeTaps = savedTaps; prefs.edgeTapApps = savedTapApps; prefs.edgeTapShortcuts = savedTapShortcuts
         prefs.splitEdges = savedSplit
+        prefs.holds = savedHolds; prefs.holdApps = savedHoldApps; prefs.holdShortcuts = savedHoldShortcuts
         SystemControls.setVolume(vol0)
         SystemControls.setMuted(muted0)
         SystemControls.setBrightness(b0)

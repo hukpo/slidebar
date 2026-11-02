@@ -48,6 +48,8 @@ struct SpotEditor: View {
                 EditorRow(icon: "hand.tap", title: "Double-tap", help: "Two quick taps in the corner.") {
                     tapField(.corner(corner))
                 }
+                RowDivider()
+                holdRow(.corner(corner))
             case .edge(let side):
                 EditorRow(icon: "hand.tap", title: "Double-tap",
                           help: "Two quick taps in the same spot on the edge. Works alongside the slide. Split the edge to give each third its own double-tap.") {
@@ -78,6 +80,8 @@ struct SpotEditor: View {
                     PartRow(title: "Whole edge") { tapField(.edge(side, nil)) }
                         .padding(.bottom, 2)
                 }
+                RowDivider()
+                holdRow(.edge(side, nil))
             }
         }
     }
@@ -87,15 +91,23 @@ struct SpotEditor: View {
         return "Whole edge"
     }
 
-    /// The pop-up showing a double-tap's action, opening its choices.
-    private func tapField(_ tapSpot: TapSpot) -> some View {
-        let on = prefs.tapIsActive(tapSpot)
-        let tap = prefs.tap(tapSpot)
+    /// Long press: hold one finger still on the spot.
+    private func holdRow(_ tapSpot: TapSpot) -> some View {
+        EditorRow(icon: "hand.point.up.left", title: "Long press",
+                  help: "Rest one finger still on the spot for half a second. Set it to Dictate to talk while you hold.") {
+            tapField(tapSpot, .hold)
+        }
+    }
+
+    /// The pop-up showing a double-tap's or long press's action, opening its choices.
+    private func tapField(_ tapSpot: TapSpot, _ kind: TapKind = .doubleTap) -> some View {
+        let on = prefs.tapIsActive(tapSpot, kind)
+        let tap = prefs.tap(tapSpot, kind)
         return PopUpField(icon: on ? tap.icon : nil,
-                          appID: on && tap == .openApp ? prefs.tapApp(tapSpot) : nil,
-                          title: on ? prefs.tapTitle(tapSpot) : "Nothing",
-                          accessibilityName: "\(tapSpot.title) double-tap") {
-            SpotMenu.tapMenu(for: tapSpot)
+                          appID: on && tap == .openApp ? prefs.tapApp(tapSpot, kind) : nil,
+                          title: on ? prefs.tapTitle(tapSpot, kind) : "Nothing",
+                          accessibilityName: "\(tapSpot.title) \(kind.title.lowercased())") {
+            SpotMenu.tapMenu(for: tapSpot, kind)
         }
     }
 }

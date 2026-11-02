@@ -106,6 +106,8 @@ final class EdgeEngine {
     private var slideStartMuted = false
     /// Tab or undo actions sent in this slide (forward minus back).
     private var slideActions = 0
+    /// The long press that started dictation, which stops when its finger lifts.
+    private var dictatingSpot: TapSpot?
 
     private init() {
         // Keep the recognizer's config in sync with settings.
@@ -132,6 +134,8 @@ final class EdgeEngine {
         c.corners = Set(Corner.allCases.filter { prefs.tapIsActive(.corner($0)) })
         c.edgeTaps = Set(EdgeSide.allCases.filter { prefs.edgeHasTaps($0) })
         c.splitEdges = prefs.splitEdges
+        c.holdEdges = Set(EdgeSide.allCases.filter { prefs.tapIsActive(.edge($0, nil), .hold) })
+        c.holdCorners = Set(Corner.allCases.filter { prefs.tapIsActive(.corner($0), .hold) })
         recognizer.config = c
     }
 
@@ -229,6 +233,30 @@ final class EdgeEngine {
 
         case .cornerDoubleTap(let corner):
             tapAction(.corner(corner))
+
+        case .holdBegan(let zone):
+            let spot = Self.spot(zone)
+            if prefs.tap(spot, .hold) == .dictate {
+                // Push to talk: dictation runs while the finger stays down.
+                run(needsAccess: true, name: TapFunction.dictate.blockedName) {
+                    if Dictation.start() {
+                        dictatingSpot = spot
+                        Haptics.tick(prefs.haptics)
+                    } else {
+                        Toast.shared.show("This App Can't Take Dictation", icon: "mic.slash")
+                        Haptics.bump(prefs.haptics)
+                    }
+                }
+            } else {
+                tapAction(spot, .hold)
+            }
+
+        case .holdEnded(let zone):
+            if dictatingSpot == Self.spot(zone) {
+                dictatingSpot = nil
+                Dictation.stop()
+                Haptics.tick(prefs.haptics)
+            }
         }
     }
 
@@ -320,9 +348,17 @@ final class EdgeEngine {
         }
     }
 
-    /// A double-tap on a corner or an edge.
-    private func tapAction(_ spot: TapSpot) {
-        let function = prefs.tap(spot)
+    /// The spot a long press belongs to (long presses use the whole edge).
+    private static func spot(_ zone: EdgeZone) -> TapSpot {
+        switch zone {
+        case .edge(let side): return .edge(side, nil)
+        case .corner(let corner): return .corner(corner)
+        }
+    }
+
+    /// A double-tap or long press on a corner or an edge.
+    private func tapAction(_ spot: TapSpot, _ kind: TapKind = .doubleTap) {
+        let function = prefs.tap(spot, kind)
         run(needsAccess: function.needsAccess, name: function.blockedName) {
             switch function {
             case .off: return
@@ -345,13 +381,16 @@ final class EdgeEngine {
             case .screenshot: SystemControls.openSystemApp("/System/Applications/Utilities/Screenshot.app")
             case .spotlight: SystemControls.shortcut(.space, .maskCommand)
             case .emoji: SystemControls.shortcut(.space, [.maskCommand, .maskControl])
+            case .dictate:
+                // As a double-tap (or a long press set to something else), dictation toggles.
+                if !Dictation.toggle() { Toast.shared.show("This App Can't Take Dictation", icon: "mic.slash") }
             case .runShortcut:
-                if let name = prefs.tapShortcut(spot) {
+                if let name = prefs.tapShortcut(spot, kind) {
                     UserShortcuts.run(name: name)
                     Toast.shared.show("Running \u{201C}\(name)\u{201D}", icon: "square.2.layers.3d.fill")
                 }
             case .openApp:
-                if let id = prefs.tapApp(spot) { SystemControls.openApp(bundleID: id) }
+                if let id = prefs.tapApp(spot, kind) { SystemControls.openApp(bundleID: id) }
             }
             Haptics.tick(prefs.haptics)
         }

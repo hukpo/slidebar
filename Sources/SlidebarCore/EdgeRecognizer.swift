@@ -87,6 +87,10 @@ public enum EdgeAction: Equatable {
     case doubleTap(EdgeSide, section: EdgeSection?)
     /// Two quick taps in a corner.
     case cornerDoubleTap(Corner)
+    /// A finger has rested still on an edge or corner long enough to count as a long press.
+    case holdBegan(EdgeZone)
+    /// The finger of a long press lifted.
+    case holdEnded(EdgeZone)
 }
 
 /// The user's settings, as far as recognizing gestures goes.
@@ -108,13 +112,16 @@ public struct EdgeConfig: Equatable {
     public var edgeTaps: Set<EdgeSide> = []
     /// Edges whose double-taps are told apart by third (bottom, middle, top or left, middle, right).
     public var splitEdges: Set<EdgeSide> = []
+    /// Edges and corners that respond to a long press.
+    public var holdEdges: Set<EdgeSide> = []
+    public var holdCorners: Set<Corner> = []
 
     public init() {}
 
     public func kind(_ side: EdgeSide) -> EdgeKind { edges[side] ?? .off }
 
     /// An edge listens when it slides, swipes or has a double-tap.
-    public func listens(_ side: EdgeSide) -> Bool { kind(side) != .off || edgeTaps.contains(side) }
+    public func listens(_ side: EdgeSide) -> Bool { kind(side) != .off || edgeTaps.contains(side) || holdEdges.contains(side) }
 }
 
 /// Per-frame input that isn't about touches.
@@ -154,6 +161,7 @@ public struct EdgeRecognizer {
     // Palms: they rest, then creep; and a finger usually lands next to them soon after.
     public static let engageWindow: Double = 0.5       // a slide has to get going this soon after touching
     public static let palmWatch: Double = 1.5          // another finger this soon means the first was a palm
+    public static let holdDuration: Double = 0.5       // a finger resting this long, without moving, is a long press
 
     /// The single finger being followed, from touch-down to lift-off.
     struct Gesture {
@@ -166,6 +174,8 @@ public struct EdgeRecognizer {
         var maxTravel: Float = 0
         var engaged = false
         var accumulated: Float = 0
+        /// A long press is under way: the finger is held until it lifts.
+        var holding = false
     }
 
     public var config: EdgeConfig
@@ -193,11 +203,20 @@ public struct EdgeRecognizer {
         if var g = gesture {
             guard let t = touches.first(where: { $0.id == g.id }) else {
                 // The finger lifted.
+                if g.holding {
+                    actions.append(.holdEnded(g.zone))
+                    gesture = nil
+                    actions.append(.releaseCursor)
+                    return actions
+                }
                 finish(g, time: time, actions: &actions)
                 gesture = nil
                 actions.append(.releaseCursor)
                 return actions
             }
+            // Once a long press is under way it lasts until that finger lifts, whatever else happens
+            // (you may click or type while dictating).
+            if g.holding { return actions }
             // A second finger, a palm, or a press of the button before the gesture started: let it go.
             if !g.engaged && (touches.count > 1 || isPalm(t) || context.buttonHeld) {
                 gesture = nil
@@ -276,7 +295,7 @@ public struct EdgeRecognizer {
     }
 
     func classify(_ t: TouchPoint) -> EdgeZone? {
-        if let c = corner(at: t), config.corners.contains(c) {
+        if let c = corner(at: t), config.corners.contains(c) || config.holdCorners.contains(c) {
             return .corner(c)
         }
         for side in [EdgeSide.left, .right, .bottom, .top] where config.listens(side) && inEdge(side, t) {
@@ -292,6 +311,13 @@ public struct EdgeRecognizer {
         let dx = t.x - g.startX
         let dy = t.y - g.startY
         g.maxTravel = max(g.maxTravel, (dx * dx + dy * dy).squareRoot())
+
+        // A finger that rests still long enough on a spot with a long press starts one.
+        if !g.engaged, g.maxTravel <= Self.tapMaxTravel, timeSinceStart(g) >= Self.holdDuration, holds(g.zone) {
+            g.holding = true
+            actions.append(.holdBegan(g.zone))
+            return true
+        }
 
         switch g.zone {
         case .edge(let side):
@@ -320,8 +346,8 @@ public struct EdgeRecognizer {
 
         switch config.kind(side) {
         case .off:
-            // A double-tap-only edge: keep following a finger that stays put, drop one that moves.
-            return config.edgeTaps.contains(side) && g.maxTravel <= Self.tapMaxTravel
+            // A double-tap or long-press edge: keep following a finger that stays put, drop one that moves.
+            return (config.edgeTaps.contains(side) || config.holdEdges.contains(side)) && g.maxTravel <= Self.tapMaxTravel
 
         case .swipe:
             if !g.engaged {
@@ -339,7 +365,9 @@ public struct EdgeRecognizer {
             if !g.engaged {
                 if abs(across) > zoneDepth * 1.5 { return false }  // left the edge before starting
                 guard abs(along) >= Self.engageDistance else {
-                    // Resting, then creeping: a palm or a finger parked on the edge.
+                    // Resting, then creeping: a palm or a finger parked on the edge. On an edge with a
+                    // long press, a finger that stays still is waiting for it instead.
+                    if config.holdEdges.contains(side) && g.maxTravel <= Self.tapMaxTravel { return true }
                     return timeSinceStart(g) <= Self.engageWindow
                 }
                 guard abs(across) <= abs(along) * Self.straightness else { return false } // diagonal: a pointer move
@@ -369,6 +397,13 @@ public struct EdgeRecognizer {
     }
 
     func timeSinceStart(_ g: Gesture) -> Double { lastTime - g.startTime }
+
+    func holds(_ zone: EdgeZone) -> Bool {
+        switch zone {
+        case .edge(let side): return config.holdEdges.contains(side)
+        case .corner(let corner): return config.holdCorners.contains(corner)
+        }
+    }
 
     mutating func finish(_ g: Gesture, time: Double, actions: inout [EdgeAction]) {
         let isTap = !g.engaged

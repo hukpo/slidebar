@@ -241,6 +241,77 @@ final class EdgeRecognizerTests: XCTestCase {
         XCTAssertEqual(EdgeSection.at(1.0), .high)
     }
 
+    // MARK: Long press
+
+    private func hold(at p: (Float, Float), seconds: Double = 0.8) -> [(Float, Float)] {
+        Array(repeating: p, count: Int(seconds / 0.01))
+    }
+
+    func testLongPressOnEdgeStartsAndEndsWithTheFinger() {
+        var r = EdgeRecognizer()
+        r.config.edges[.top] = .off
+        r.config.holdEdges = [.top]
+        let actions = run(&r, path: hold(at: (0.5, 0.96)))
+        XCTAssertEqual(actions.filter { $0 == .holdBegan(.edge(.top)) }.count, 1)
+        XCTAssertEqual(actions.last(where: { if case .holdEnded = $0 { return true } else { return false } }), .holdEnded(.edge(.top)))
+    }
+
+    func testShortRestIsNotALongPress() {
+        var r = EdgeRecognizer()
+        r.config.holdEdges = [.left]
+        let actions = run(&r, path: hold(at: (0.02, 0.5), seconds: 0.3))
+        XCTAssertFalse(actions.contains(.holdBegan(.edge(.left))))
+    }
+
+    func testNoLongPressWhereNoneIsSet() {
+        var r = EdgeRecognizer()
+        let actions = run(&r, path: hold(at: (0.02, 0.5)))
+        XCTAssertFalse(actions.contains { if case .holdBegan = $0 { return true } else { return false } })
+    }
+
+    func testSliderEdgeWithLongPressStillSlides() {
+        var r = EdgeRecognizer()
+        r.config.holdEdges = [.right]
+        let actions = run(&r, path: line(from: (0.98, 0.2), to: (0.98, 0.7)))
+        XCTAssertFalse(steps(actions).isEmpty)
+        XCTAssertFalse(actions.contains(.holdBegan(.edge(.right))))
+    }
+
+    func testSliderEdgeWithLongPressHoldsWhenStill() {
+        var r = EdgeRecognizer()
+        r.config.holdEdges = [.right]
+        let actions = run(&r, path: hold(at: (0.98, 0.5)))
+        XCTAssertTrue(actions.contains(.holdBegan(.edge(.right))))
+        XCTAssertTrue(steps(actions).isEmpty)
+    }
+
+    func testLongPressInCorner() {
+        var r = EdgeRecognizer()
+        r.config.corners = []
+        r.config.holdCorners = [.bottomLeft]
+        let actions = run(&r, path: hold(at: (0.04, 0.04)))
+        XCTAssertTrue(actions.contains(.holdBegan(.corner(.bottomLeft))))
+        XCTAssertTrue(actions.contains(.holdEnded(.corner(.bottomLeft))))
+    }
+
+    func testLongPressLastsThroughOtherFingers() {
+        var r = EdgeRecognizer()
+        r.config.holdEdges = [.top]
+        var actions: [EdgeAction] = []
+        var time = 0.0
+        for _ in 0..<70 {
+            actions += r.process([TouchPoint(id: 1, x: 0.5, y: 0.96, size: 0.8)], time: time); time += 0.01
+        }
+        // A second finger lands (say, to click) while the first keeps holding.
+        for _ in 0..<20 {
+            actions += r.process([TouchPoint(id: 1, x: 0.5, y: 0.96, size: 0.8), TouchPoint(id: 2, x: 0.5, y: 0.5, size: 0.8)], time: time)
+            time += 0.01
+        }
+        XCTAssertFalse(actions.contains(.holdEnded(.edge(.top))))
+        actions += r.process([], time: time)
+        XCTAssertTrue(actions.contains(.holdEnded(.edge(.top))))
+    }
+
     // MARK: Accidents
 
     func testSingleClickOnEdgeDoesNothing() {

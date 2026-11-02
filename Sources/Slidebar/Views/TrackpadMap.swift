@@ -150,13 +150,18 @@ struct TrackpadMap: View {
         switch spot {
         case .edge(let side):
             let slide = prefs.edge(side).title
-            let taps = prefs.tapSpots(on: side).filter(prefs.tapIsActive).map { spot -> String in
+            let taps = prefs.tapSpots(on: side).filter { prefs.tapIsActive($0) }.map { spot -> String in
                 if case .edge(_, let section?) = spot { return "\(section.title(on: side)): \(prefs.tapTitle(spot))" }
                 return prefs.tapTitle(spot)
             }
-            return taps.isEmpty ? slide : "\(slide); double-tap: \(taps.joined(separator: ", "))"
+            var parts = [slide]
+            if !taps.isEmpty { parts.append("double-tap: \(taps.joined(separator: ", "))") }
+            if prefs.tapIsActive(.edge(side, nil), .hold) { parts.append("long press: \(prefs.tapTitle(.edge(side, nil), .hold))") }
+            return parts.joined(separator: "; ")
         case .corner(let corner):
-            return prefs.tapTitle(.corner(corner))
+            var parts = [prefs.tapTitle(.corner(corner))]
+            if prefs.tapIsActive(.corner(corner), .hold) { parts.append("long press: \(prefs.tapTitle(.corner(corner), .hold))") }
+            return parts.joined(separator: "; ")
         }
     }
 
@@ -170,13 +175,19 @@ struct TrackpadMap: View {
         let level = live.level(of: function).map { CGFloat($0) }
         let muted = function == .volume && live.muted
         let percent = muted ? "Muted" : level.map { "\(Int(($0 * 100).rounded()))%" }
-        let taps = prefs.tapSpots(on: side).filter(prefs.tapIsActive).map { tapSpot in
+        let taps = prefs.tapSpots(on: side).filter { prefs.tapIsActive($0) }.map { tapSpot in
             TapMark(function: prefs.tap(tapSpot), appID: prefs.tap(tapSpot) == .openApp ? prefs.tapApp(tapSpot) : nil,
                     title: prefs.tapTitle(tapSpot))
         }
+        let holdSpot = TapSpot.edge(side, nil)
+        let hold = prefs.tapIsActive(holdSpot, .hold)
+            ? TapMark(function: prefs.tap(holdSpot, .hold),
+                      appID: prefs.tap(holdSpot, .hold) == .openApp ? prefs.tapApp(holdSpot, .hold) : nil,
+                      title: prefs.tapTitle(holdSpot, .hold))
+            : nil
         return EdgeSpot(side: side, length: length, function: function,
                         level: function.hasLevel ? level : nil, value: function.hasLevel ? percent : nil,
-                        taps: taps, split: prefs.splitEdges.contains(side),
+                        taps: taps, hold: hold, split: prefs.splitEdges.contains(side),
                         muted: muted, active: live.activeSide == side,
                         selected: selection == spot, keyboardFocused: mapFocused && keyboardNav,
                         anchor: anchors.anchor(spot)) {
@@ -190,7 +201,12 @@ struct TrackpadMap: View {
     }
 
     private func cornerButton(_ corner: Corner) -> some View {
-        let function = prefs.corner(corner)
+        let tapFunction = prefs.corner(corner)
+        let holdOn = prefs.tapIsActive(.corner(corner), .hold)
+        // The corner shows its double-tap, or its long press when it has only that.
+        let showsHold = tapFunction == .off && holdOn
+        let function = showsHold ? prefs.tap(.corner(corner), .hold) : tapFunction
+        let appID = function == .openApp ? prefs.tapApp(.corner(corner), showsHold ? .hold : .doubleTap) : nil
         let spot = MapSpot.corner(corner)
         // Mute corners show when they're on: filled orange, so a muted mic is never a surprise.
         let isMuted = (function == .muteMicrophone && live.micMuted) || (function == .mute && live.muted)
@@ -198,7 +214,7 @@ struct TrackpadMap: View {
                           off: function == .off, on: isMuted, anchor: anchors.anchor(spot)) {
             open(spot)
         } label: {
-            if function == .openApp, let id = prefs.cornerApps[corner] {
+            if let id = appID {
                 AppIcon(bundleID: id).frame(width: 18, height: 18)
             } else if isMuted {
                 Image(systemName: function.icon + ".fill").foregroundStyle(.white)
@@ -256,6 +272,8 @@ private struct EdgeSpot: View {
     let value: String?
     /// What double-tapping this edge (or each of its thirds) does.
     let taps: [TapMark]
+    /// What a long press on this edge does.
+    let hold: TapMark?
     /// The double-taps are split into thirds: ticks mark them on the strip.
     let split: Bool
     let muted: Bool
@@ -353,7 +371,7 @@ private struct EdgeSpot: View {
 
     private var chip: some View {
         let dark = scheme == .dark
-        let off = function == .off && taps.isEmpty
+        let off = function == .off && taps.isEmpty && hold == nil
         let fill: Color = off
             ? Color.white.opacity(dark ? (hovering ? 0.1 : 0.05) : (hovering ? 0.6 : 0.35))
             : (dark ? Color.black.opacity(hovering ? 0.5 : 0.34) : Color.white.opacity(hovering ? 0.98 : 0.8))
@@ -362,9 +380,14 @@ private struct EdgeSpot: View {
                 Image(systemName: "plus").font(.system(size: 9, weight: .bold))
                 Text("Add")
             } else if function == .off {
-                // Only double-taps here: one names itself, several show their marks.
+                // Only taps and presses here: one names itself, several show their marks.
+                let all = taps + [hold].compactMap { $0 }
                 tapMarks
-                Text(taps.count == 1 ? taps[0].title : "Double-tap")
+                if let hold {
+                    if !taps.isEmpty { Circle().fill(Color.secondary.opacity(0.6)).frame(width: 2.5, height: 2.5) }
+                    hold
+                }
+                Text(all.count == 1 ? all[0].title : "Taps")
             } else {
                 Image(systemName: muted ? "speaker.slash.fill" : function.icon)
                     .foregroundStyle(function.mapColors[dark ? 1 : 0])
@@ -375,6 +398,10 @@ private struct EdgeSpot: View {
                 if !taps.isEmpty {
                     Circle().fill(Color.secondary.opacity(0.6)).frame(width: 2.5, height: 2.5)
                     tapMarks
+                }
+                if let hold {
+                    Circle().fill(Color.secondary.opacity(0.6)).frame(width: 2.5, height: 2.5)
+                    hold
                 }
             }
         }
@@ -501,11 +528,11 @@ enum SpotMenu {
         return menu
     }
 
-    /// What a double-tap on an edge or corner can do.
-    static func tapMenu(for spot: TapSpot) -> NSMenu {
+    /// What a double-tap or long press on an edge or corner can do.
+    static func tapMenu(for spot: TapSpot, _ kind: TapKind = .doubleTap) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        addTapChoices(menu, spot)
+        addTapChoices(menu, spot, kind)
         return menu
     }
 
@@ -513,11 +540,11 @@ enum SpotMenu {
 
     // MARK: Double-tap choices (corners and edges)
 
-    private static func addTapChoices(_ menu: NSMenu, _ spot: TapSpot) {
+    private static func addTapChoices(_ menu: NSMenu, _ spot: TapSpot, _ kind: TapKind) {
         let prefs = Prefs.shared
-        let current = prefs.tap(spot)
+        let current = prefs.tap(spot, kind)
         let choose: (TapFunction) -> Void = { f in
-            prefs.setTap(spot, f)
+            prefs.setTap(spot, f, kind: kind)
             explainAccessIfNeeded(f.needsAccess, f.blockedName)
         }
         for (index, group) in TapFunction.groups.enumerated() {
@@ -525,20 +552,23 @@ enum SpotMenu {
             for f in group where isAvailable(f) {
                 switch f {
                 case .openApp:
-                    let app = current == .openApp ? prefs.tapApp(spot) : nil
+                    let app = current == .openApp ? prefs.tapApp(spot, kind) : nil
                     let title = app.map { "Open \(AppNames.name(for: $0))" } ?? "Open an App…"
-                    let open = item(title, f.icon, checked: app != nil) { chooseApp(for: spot) }
+                    let open = item(title, f.icon, checked: app != nil) { chooseApp(for: spot, kind) }
                     if let app { open.image = appIcon(app) }
                     menu.addItem(open)
                     if app != nil {
-                        menu.addItem(item("Choose Another App…", nil, indent: 1) { chooseApp(for: spot) })
+                        menu.addItem(item("Choose Another App…", nil, indent: 1) { chooseApp(for: spot, kind) })
                     }
                 case .runShortcut:
                     let run = item(f.title, f.icon, checked: current == .runShortcut)
-                    run.submenu = shortcutsMenu(spot, chosen: current == .runShortcut ? prefs.tapShortcut(spot) : nil)
+                    run.submenu = shortcutsMenu(spot, kind, chosen: current == .runShortcut ? prefs.tapShortcut(spot, kind) : nil)
                     menu.addItem(run)
                 default:
-                    let tip = f.isDisruptive ? "Pick a spot your palm doesn't rest on, so it doesn't happen by accident." : nil
+                    var tip = f.isDisruptive ? "Pick a spot your palm doesn't rest on, so it doesn't happen by accident." : nil
+                    if f == .dictate {
+                        tip = kind == .hold ? "Dictate while you hold; lift your finger to stop." : "Starts dictation, or stops it."
+                    }
                     menu.addItem(item(f.title, f == .off ? nil : f.icon, checked: current == f, tip: tip) { choose(f) })
                 }
             }
@@ -552,7 +582,7 @@ enum SpotMenu {
         return icon
     }
 
-    private static func shortcutsMenu(_ spot: TapSpot, chosen: String?) -> NSMenu {
+    private static func shortcutsMenu(_ spot: TapSpot, _ kind: TapKind, chosen: String?) -> NSMenu {
         let sub = NSMenu()
         sub.autoenablesItems = false
         let names = UserShortcuts.cached
@@ -563,7 +593,7 @@ enum SpotMenu {
         }
         for name in names {
             sub.addItem(item(name, nil, checked: name == chosen) {
-                Prefs.shared.setTap(spot, .runShortcut, shortcut: name)
+                Prefs.shared.setTap(spot, .runShortcut, kind: kind, shortcut: name)
             })
         }
         sub.addItem(.separator())
@@ -571,15 +601,15 @@ enum SpotMenu {
         return sub
     }
 
-    private static func chooseApp(for spot: TapSpot) {
+    private static func chooseApp(for spot: TapSpot, _ kind: TapKind) {
         let panel = NSOpenPanel()
-        panel.title = "Choose an App to Open with a Double-Tap on the \(spot.title)"
+        panel.title = "Choose an App to Open with a \(kind.title) on the \(spot.title)"
         panel.prompt = "Choose"
         panel.allowedContentTypes = [.application]
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
         NSApp.activate(ignoringOtherApps: true)
         if panel.runModal() == .OK, let url = panel.url, let id = Bundle(url: url)?.bundleIdentifier {
-            Prefs.shared.setTap(spot, .openApp, app: id)
+            Prefs.shared.setTap(spot, .openApp, kind: kind, app: id)
         }
     }
 

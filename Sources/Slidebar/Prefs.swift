@@ -73,6 +73,16 @@ final class Prefs: ObservableObject {
     @Published var edgeTapShortcuts: [TapSpot: String] {
         didSet { for spot in TapSpot.allEdges { defaults.set(edgeTapShortcuts[spot], forKey: Keys.edgeTapShortcut(spot)) } }
     }
+    /// What a long press on each corner or whole edge does.
+    @Published var holds: [TapSpot: TapFunction] {
+        didSet { for spot in TapSpot.holdSpots { defaults.set(holds[spot]?.rawValue, forKey: Keys.hold(spot)) } }
+    }
+    @Published var holdApps: [TapSpot: String] {
+        didSet { for spot in TapSpot.holdSpots { defaults.set(holdApps[spot], forKey: Keys.holdApp(spot)) } }
+    }
+    @Published var holdShortcuts: [TapSpot: String] {
+        didSet { for spot in TapSpot.holdSpots { defaults.set(holdShortcuts[spot], forKey: Keys.holdShortcut(spot)) } }
+    }
     /// Edges whose double-taps are split into three parts.
     @Published var splitEdges: Set<EdgeSide> {
         didSet { for side in EdgeSide.allCases { defaults.set(splitEdges.contains(side), forKey: Keys.splitEdge(side)) } }
@@ -126,6 +136,16 @@ final class Prefs: ObservableObject {
         static func edgeTapApp(_ spot: TapSpot) -> String { "edgeTapApp.\(edgeSuffix(spot))" }
         static func edgeTapShortcut(_ spot: TapSpot) -> String { "edgeTapShortcut.\(edgeSuffix(spot))" }
         static func splitEdge(_ side: EdgeSide) -> String { "edgeSplit.\(side.rawValue)" }
+        /// "hold.edge.top", "hold.corner.topLeft".
+        private static func holdSuffix(_ spot: TapSpot) -> String {
+            switch spot {
+            case .corner(let c): return "corner.\(c.rawValue)"
+            case .edge(let side, _): return "edge.\(side.rawValue)"
+            }
+        }
+        static func hold(_ spot: TapSpot) -> String { "hold.\(holdSuffix(spot))" }
+        static func holdApp(_ spot: TapSpot) -> String { "holdApp.\(holdSuffix(spot))" }
+        static func holdShortcut(_ spot: TapSpot) -> String { "holdShortcut.\(holdSuffix(spot))" }
         static let tapToPlay = "tapToPlay"       // legacy: "double-tap the Songs edge to play or pause"
         static let sensitivity = "sensitivity"
         static let edgeWidth = "edgeWidth"
@@ -204,6 +224,15 @@ final class Prefs: ObservableObject {
         self.edgeTaps = taps
         self.edgeTapApps = tapApps
         self.edgeTapShortcuts = tapShortcuts
+        var holds: [TapSpot: TapFunction] = [:], holdApps: [TapSpot: String] = [:], holdShortcuts: [TapSpot: String] = [:]
+        for spot in TapSpot.holdSpots {
+            holds[spot] = defaults.string(forKey: Keys.hold(spot)).flatMap(TapFunction.init(rawValue:))
+            holdApps[spot] = defaults.string(forKey: Keys.holdApp(spot))
+            holdShortcuts[spot] = defaults.string(forKey: Keys.holdShortcut(spot))
+        }
+        self.holds = holds
+        self.holdApps = holdApps
+        self.holdShortcuts = holdShortcuts
         let store = defaults
         self.splitEdges = Set(EdgeSide.allCases.filter { store.bool(forKey: Keys.splitEdge($0)) })
         bottomQuarterOnly = defaults.bool(forKey: Keys.bottomQuarterOnly)
@@ -236,31 +265,40 @@ final class Prefs: ObservableObject {
     func edge(_ side: EdgeSide) -> EdgeFunction { edges[side] ?? .off }
     func corner(_ c: Corner) -> TapFunction { corners[c] ?? .off }
 
-    // MARK: Double-taps, on corners and edges alike
+    // MARK: Double-taps and long presses, on corners and edges alike
 
-    func tap(_ spot: TapSpot) -> TapFunction {
+    func tap(_ spot: TapSpot, _ kind: TapKind = .doubleTap) -> TapFunction {
+        if kind == .hold { return holds[spot] ?? .off }
         switch spot {
         case .corner(let c): return corner(c)
         case .edge: return edgeTaps[spot] ?? .off
         }
     }
 
-    func tapApp(_ spot: TapSpot) -> String? {
+    func tapApp(_ spot: TapSpot, _ kind: TapKind = .doubleTap) -> String? {
+        if kind == .hold { return holdApps[spot] }
         switch spot {
         case .corner(let c): return cornerApps[c]
         case .edge: return edgeTapApps[spot]
         }
     }
 
-    func tapShortcut(_ spot: TapSpot) -> String? {
+    func tapShortcut(_ spot: TapSpot, _ kind: TapKind = .doubleTap) -> String? {
+        if kind == .hold { return holdShortcuts[spot] }
         switch spot {
         case .corner(let c): return cornerShortcuts[c]
         case .edge: return edgeTapShortcuts[spot]
         }
     }
 
-    /// Sets what a double-tap does; `app` and `shortcut` go with Open an App and Run a Shortcut.
-    func setTap(_ spot: TapSpot, _ function: TapFunction, app: String? = nil, shortcut: String? = nil) {
+    /// Sets what a double-tap or long press does; `app` and `shortcut` go with Open an App and Run a Shortcut.
+    func setTap(_ spot: TapSpot, _ function: TapFunction, kind: TapKind = .doubleTap, app: String? = nil, shortcut: String? = nil) {
+        if kind == .hold {
+            if let app { holdApps[spot] = app }
+            if let shortcut { holdShortcuts[spot] = shortcut }
+            holds[spot] = function
+            return
+        }
         switch spot {
         case .corner(let c):
             if let app { cornerApps[c] = app }
@@ -273,12 +311,12 @@ final class Prefs: ObservableObject {
         }
     }
 
-    /// A double-tap counts only when it has something to do.
-    func tapIsActive(_ spot: TapSpot) -> Bool {
-        switch tap(spot) {
+    /// Counts only when it has something to do.
+    func tapIsActive(_ spot: TapSpot, _ kind: TapKind = .doubleTap) -> Bool {
+        switch tap(spot, kind) {
         case .off: return false
-        case .openApp: return tapApp(spot) != nil
-        case .runShortcut: return tapShortcut(spot) != nil
+        case .openApp: return tapApp(spot, kind) != nil
+        case .runShortcut: return tapShortcut(spot, kind) != nil
         default: return true
         }
     }
@@ -289,21 +327,21 @@ final class Prefs: ObservableObject {
     }
 
     /// The edge listens for double-taps when any of its current spots has one.
-    func edgeHasTaps(_ side: EdgeSide) -> Bool { tapSpots(on: side).contains(where: tapIsActive) }
+    func edgeHasTaps(_ side: EdgeSide) -> Bool { tapSpots(on: side).contains { tapIsActive($0) } }
 
     /// A short name for small places: the app's or shortcut's own name, or the action's short title.
-    func tapShortTitle(_ spot: TapSpot) -> String {
-        let f = tap(spot)
-        if f == .openApp, let id = tapApp(spot) { return AppNames.name(for: id) }
-        if f == .runShortcut, let name = tapShortcut(spot) { return name }
+    func tapShortTitle(_ spot: TapSpot, _ kind: TapKind = .doubleTap) -> String {
+        let f = tap(spot, kind)
+        if f == .openApp, let id = tapApp(spot, kind) { return AppNames.name(for: id) }
+        if f == .runShortcut, let name = tapShortcut(spot, kind) { return name }
         return f.shortTitle
     }
 
     /// The double-tap's name as the user would say it ("Open Safari", "Run “Focus”").
-    func tapTitle(_ spot: TapSpot) -> String {
-        let f = tap(spot)
-        if f == .openApp, let id = tapApp(spot) { return "Open \(AppNames.name(for: id))" }
-        if f == .runShortcut, let name = tapShortcut(spot) { return "Run \u{201C}\(name)\u{201D}" }
+    func tapTitle(_ spot: TapSpot, _ kind: TapKind = .doubleTap) -> String {
+        let f = tap(spot, kind)
+        if f == .openApp, let id = tapApp(spot, kind) { return "Open \(AppNames.name(for: id))" }
+        if f == .runShortcut, let name = tapShortcut(spot, kind) { return "Run \u{201C}\(name)\u{201D}" }
         return f.title
     }
 
@@ -324,6 +362,9 @@ final class Prefs: ObservableObject {
         edgeTapApps = [:]
         edgeTapShortcuts = [:]
         splitEdges = []
+        holds = [:]
+        holdApps = [:]
+        holdShortcuts = [:]
         sensitivity = 1.5
         edgeWidth = 0.05
         edges = Dictionary(uniqueKeysWithValues: EdgeSide.allCases.map { ($0, Prefs.defaultEdge($0)) })
