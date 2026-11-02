@@ -176,8 +176,13 @@ extension SystemControls {
         try? process.run()
     }
 
+    /// Opens an app like clicking it in the Dock. Asking a running app to open only brings it to the
+    /// front, which shows nothing when its window is closed (Telegram keeps running with no window)
+    /// or on another desktop, so a running app gets a click on its Dock icon instead.
     static func openApp(bundleID: String) {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
+        let running = !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty
+        if running, DockIcon.click(appAt: url) { return }
         NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
     }
 }

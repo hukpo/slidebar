@@ -244,11 +244,37 @@ enum Dictation {
         return false
     }
 
-    private static func children(_ element: AXUIElement) -> [AXUIElement] {
+    private static func children(_ element: AXUIElement) -> [AXUIElement] { AX.children(element) }
+    private static func value<T>(_ element: AXUIElement, _ attribute: String) -> T? { AX.value(element, attribute) }
+}
+
+/// Clicks an app's icon in the Dock. Unlike asking the app to open, this does everything a real
+/// click does: it shows a window the app closed, un-minimizes it, and goes to the desktop it's on.
+enum DockIcon {
+    /// False when the Dock can't be reached (no Accessibility) or the app has no icon there.
+    static func click(appAt url: URL) -> Bool {
+        guard Permissions.isTrusted,
+              let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first
+        else { return false }
+        let target = url.standardizedFileURL.resolvingSymlinksInPath()
+        for list in AX.children(AXUIElementCreateApplication(dock.processIdentifier)) {
+            for item in AX.children(list) {
+                guard let itemURL: URL = AX.value(item, kAXURLAttribute),
+                      itemURL.standardizedFileURL.resolvingSymlinksInPath() == target else { continue }
+                return AXUIElementPerformAction(item, kAXPressAction as CFString) == .success
+            }
+        }
+        return false
+    }
+}
+
+/// Small helpers for reading the Accessibility tree.
+enum AX {
+    static func children(_ element: AXUIElement) -> [AXUIElement] {
         value(element, kAXChildrenAttribute) ?? []
     }
 
-    private static func value<T>(_ element: AXUIElement, _ attribute: String) -> T? {
+    static func value<T>(_ element: AXUIElement, _ attribute: String) -> T? {
         var result: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, attribute as CFString, &result) == .success else { return nil }
         return result as? T
